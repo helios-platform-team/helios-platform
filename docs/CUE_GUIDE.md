@@ -31,4 +31,4 @@ Below are the main commands used when working with the project:
 | Command | Description |
 | ------------- |:-------------:|
 | `cue vet ./templates/...` | Validate logic and data types across the entire project |
-| `cue export ./templates/definitions/... ./templates/services/myApp.cue --out yaml` | Render a specific application into YAML |
+| `cue export ./templates/definitions/... ./templates/services/myApp.cue -e 'myApp.objects' --out yaml` | Render a specific application into YAML |

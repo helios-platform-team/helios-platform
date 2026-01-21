@@ -19,4 +19,8 @@ package definitions
         "port":       port
         "targetPort": targetPort
     }
+    objects: [
+        k8sDeployment.output,
+        k8sService.output,
+    ]
 }
