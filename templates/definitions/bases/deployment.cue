@@ -1,4 +1,4 @@
-package definitions
+package bases
 
 #Deployment: {
     name:     string
