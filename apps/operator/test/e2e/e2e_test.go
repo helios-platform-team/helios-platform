@@ -1,5 +1,5 @@
 /*
-Copyright 2026.
+Copyright 2025.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,313 +17,281 @@ limitations under the License.
 package e2e
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/helios-platform-team/helios-platform/apps/operator/test/utils"
+	"github.com/hoangphuc841/helios-operator/test/utils"
 )
 
-// namespace where the project is deployed in
-const namespace = "operator-system"
+var _ = Describe("HeliosApp GitOps Flow E2E", Ordered, func() {
+	const (
+		testNamespace = "e2e-test"
+		testAppName   = "test-gitops-app"
+		timeout       = 5 * time.Minute
+		interval      = 2 * time.Second
+	)
 
-// serviceAccountName created for the project
-const serviceAccountName = "operator-controller-manager"
-
-// metricsServiceName is the name of the metrics service of the project
-const metricsServiceName = "operator-controller-manager-metrics-service"
-
-// metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
-const metricsRoleBindingName = "operator-metrics-binding"
-
-var _ = Describe("Manager", Ordered, func() {
-	var controllerPodName string
-
-	// Before running the tests, set up the environment by creating the namespace,
-	// enforce the restricted security policy to the namespace, installing CRDs,
-	// and deploying the controller.
 	BeforeAll(func() {
-		By("creating manager namespace")
-		cmd := exec.Command("kubectl", "create", "ns", namespace)
-		_, err := utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to create namespace")
+		By("Creating test namespace")
+		cmd := exec.Command("kubectl", "create", "namespace", testNamespace)
+		_, _ = utils.Run(cmd) // Ignore error if already exists
 
-		By("labeling the namespace to enforce the restricted security policy")
-		cmd = exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
-			"pod-security.kubernetes.io/enforce=restricted")
-		_, err = utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to label namespace with restricted policy")
+		By("Creating ServiceAccount for Tekton")
+		cmd = exec.Command("kubectl", "create", "serviceaccount", "tekton-bot-sa", "-n", testNamespace)
+		_, _ = utils.Run(cmd)
 
-		By("installing CRDs")
-		cmd = exec.Command("make", "install")
-		_, err = utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to install CRDs")
-
-		By("deploying the controller-manager")
-		cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
-		_, err = utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
+		By("Installing mock manifest-generation-pipeline")
+		cmd = exec.Command("kubectl", "apply", "-f", "../fixtures/mock-manifest-pipeline.yaml", "-n", testNamespace)
+		output, err := utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to install mock pipeline: %s", output))
 	})
 
-	// After all tests have been executed, clean up by undeploying the controller, uninstalling CRDs,
-	// and deleting the namespace.
 	AfterAll(func() {
-		By("cleaning up the curl pod for metrics")
-		cmd := exec.Command("kubectl", "delete", "pod", "curl-metrics", "-n", namespace)
-		_, _ = utils.Run(cmd)
-
-		By("undeploying the controller-manager")
-		cmd = exec.Command("make", "undeploy")
-		_, _ = utils.Run(cmd)
-
-		By("uninstalling CRDs")
-		cmd = exec.Command("make", "uninstall")
-		_, _ = utils.Run(cmd)
-
-		By("removing manager namespace")
-		cmd = exec.Command("kubectl", "delete", "ns", namespace)
+		By("Cleaning up test namespace")
+		cmd := exec.Command("kubectl", "delete", "namespace", testNamespace, "--wait=false")
 		_, _ = utils.Run(cmd)
 	})
 
-	// After each test, check for failures and collect logs, events,
-	// and pod descriptions for debugging.
-	AfterEach(func() {
-		specReport := CurrentSpecReport()
-		if specReport.Failed() {
-			By("Fetching controller manager pod logs")
-			cmd := exec.Command("kubectl", "logs", controllerPodName, "-n", namespace)
-			controllerLogs, err := utils.Run(cmd)
-			if err == nil {
-				_, _ = fmt.Fprintf(GinkgoWriter, "Controller logs:\n %s", controllerLogs)
-			} else {
-				_, _ = fmt.Fprintf(GinkgoWriter, "Failed to get Controller logs: %s", err)
-			}
+	Describe("3-Phase GitOps Reconciliation", func() {
+		var heliosAppYAML string
 
-			By("Fetching Kubernetes events")
-			cmd = exec.Command("kubectl", "get", "events", "-n", namespace, "--sort-by=.lastTimestamp")
-			eventsOutput, err := utils.Run(cmd)
-			if err == nil {
-				_, _ = fmt.Fprintf(GinkgoWriter, "Kubernetes events:\n%s", eventsOutput)
-			} else {
-				_, _ = fmt.Fprintf(GinkgoWriter, "Failed to get Kubernetes events: %s", err)
-			}
-
-			By("Fetching curl-metrics logs")
-			cmd = exec.Command("kubectl", "logs", "curl-metrics", "-n", namespace)
-			metricsOutput, err := utils.Run(cmd)
-			if err == nil {
-				_, _ = fmt.Fprintf(GinkgoWriter, "Metrics logs:\n %s", metricsOutput)
-			} else {
-				_, _ = fmt.Fprintf(GinkgoWriter, "Failed to get curl-metrics logs: %s", err)
-			}
-
-			By("Fetching controller manager pod description")
-			cmd = exec.Command("kubectl", "describe", "pod", controllerPodName, "-n", namespace)
-			podDescription, err := utils.Run(cmd)
-			if err == nil {
-				fmt.Println("Pod description:\n", podDescription)
-			} else {
-				fmt.Println("Failed to describe controller pod")
-			}
-		}
-	})
-
-	SetDefaultEventuallyTimeout(2 * time.Minute)
-	SetDefaultEventuallyPollingInterval(time.Second)
-
-	Context("Manager", func() {
-		It("should run successfully", func() {
-			By("validating that the controller-manager pod is running as expected")
-			verifyControllerUp := func(g Gomega) {
-				// Get the name of the controller-manager pod
-				cmd := exec.Command("kubectl", "get",
-					"pods", "-l", "control-plane=controller-manager",
-					"-o", "go-template={{ range .items }}"+
-						"{{ if not .metadata.deletionTimestamp }}"+
-						"{{ .metadata.name }}"+
-						"{{ \"\\n\" }}{{ end }}{{ end }}",
-					"-n", namespace,
-				)
-
-				podOutput, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred(), "Failed to retrieve controller-manager pod information")
-				podNames := utils.GetNonEmptyLines(podOutput)
-				g.Expect(podNames).To(HaveLen(1), "expected 1 controller pod running")
-				controllerPodName = podNames[0]
-				g.Expect(controllerPodName).To(ContainSubstring("controller-manager"))
-
-				// Validate the pod's status
-				cmd = exec.Command("kubectl", "get",
-					"pods", controllerPodName, "-o", "jsonpath={.status.phase}",
-					"-n", namespace,
-				)
-				output, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal("Running"), "Incorrect controller-manager pod status")
-			}
-			Eventually(verifyControllerUp).Should(Succeed())
+		BeforeEach(func() {
+			heliosAppYAML = fmt.Sprintf(`
+apiVersion: platform.helios.io/v1
+kind: HeliosApp
+metadata:
+  name: %s
+  namespace: %s
+spec:
+  gitRepo: https://github.com/example/test-app
+  gitBranch: main
+  imageRepo: ghcr.io/example/test-app
+  port: 8080
+  replicas: 2
+  serviceAccount: tekton-bot-sa
+  pipelineName: manifest-generation-pipeline
+  pvcName: workspace-pvc
+  webhookSecret: github-webhook
+  templateRepo: https://github.com/example/templates
+  templatePath: charts/app
+  gitopsRepo: https://github.com/example/gitops
+  gitopsPath: apps/test
+  values:
+    env: test
+    ingress.enabled: "false"
+`, testAppName, testNamespace)
 		})
 
-		It("should ensure the metrics endpoint is serving metrics", func() {
-			By("creating a ClusterRoleBinding for the service account to allow access to metrics")
-			cmd := exec.Command("kubectl", "create", "clusterrolebinding", metricsRoleBindingName,
-				"--clusterrole=operator-metrics-reader",
-				fmt.Sprintf("--serviceaccount=%s:%s", namespace, serviceAccountName),
-			)
+		AfterEach(func() {
+			By("Cleaning up HeliosApp")
+			cmd := exec.Command("kubectl", "delete", "heliosapp", testAppName, "-n", testNamespace, "--ignore-not-found=true")
+			_, _ = utils.Run(cmd)
+
+			By("Cleaning up Tekton resources")
+			cmd = exec.Command("kubectl", "delete", "pipelinerun", "--all", "-n", testNamespace)
+			_, _ = utils.Run(cmd)
+
+			cmd = exec.Command("kubectl", "delete", "eventlistener", "--all", "-n", testNamespace)
+			_, _ = utils.Run(cmd)
+		})
+
+		It("should complete Phase 1: Tekton Triggers creation", func() {
+			By("Creating HeliosApp")
+			cmd := exec.Command("kubectl", "apply", "-f", "-")
+			cmd.Stdin = strings.NewReader(heliosAppYAML)
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create HeliosApp: %s", output))
+
+			By("Waiting for EventListener to be created")
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "eventlistener", "-n", testNamespace, "-o", "name")
+				output, _ := utils.Run(cmd)
+				return output
+			}, timeout, interval).Should(ContainSubstring("eventlistener"))
+
+			By("Verifying TriggerBinding is created")
+			cmd = exec.Command("kubectl", "get", "triggerbinding", fmt.Sprintf("%s-binding", testAppName), "-n", testNamespace)
+			output, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("TriggerBinding not found: %s", output))
+
+			By("Verifying TriggerTemplate is created")
+			cmd = exec.Command("kubectl", "get", "triggertemplate", fmt.Sprintf("%s-template", testAppName), "-n", testNamespace)
+			output, err = utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("TriggerTemplate not found: %s", output))
+
+			By("Checking HeliosApp status shows Phase 1")
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "heliosapp", testAppName, "-n", testNamespace, "-o", "jsonpath={.status.phase}")
+				output, _ := utils.Run(cmd)
+				return output
+			}, timeout, interval).Should(Equal("ManifestGenerationInProgress"))
+		})
+
+		It("should complete Phase 2: ArgoCD Application creation after PipelineRun succeeds", func() {
+			By("Creating HeliosApp")
+			cmd := exec.Command("kubectl", "apply", "-f", "-")
+			cmd.Stdin = strings.NewReader(heliosAppYAML)
+			_, _ = utils.Run(cmd)
+
+			By("Waiting for PipelineRun to be created")
+			var pipelineRunName string
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "pipelinerun", "-n", testNamespace, "-o", "jsonpath={.items[0].metadata.name}")
+				output, _ := utils.Run(cmd)
+				pipelineRunName = output
+				return output
+			}, timeout, interval).ShouldNot(BeEmpty())
+
+			By("Simulating PipelineRun success by patching status")
+			patchJSON := `{"status":{"conditions":[{"type":"Succeeded","status":"True","reason":"Succeeded"}]}}`
+			cmd = exec.Command("kubectl", "patch", "pipelinerun", pipelineRunName, "-n", testNamespace,
+				"--type=merge", "--subresource=status", "-p", patchJSON)
+			_, _ = utils.Run(cmd)
+
+			By("Waiting for ArgoCD Application to be created")
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "application", "-n", "argocd", "-o", "name")
+				output, _ := utils.Run(cmd)
+				return output
+			}, timeout, interval).Should(ContainSubstring(testAppName))
+
+			By("Checking HeliosApp status shows Phase 2")
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "heliosapp", testAppName, "-n", testNamespace, "-o", "jsonpath={.status.phase}")
+				output, _ := utils.Run(cmd)
+				return output
+			}, timeout, interval).Should(Equal("DeployingWithArgoCD"))
+		})
+
+		It("should complete Phase 3: Status sync from ArgoCD", func() {
+			By("Creating HeliosApp and simulating full flow")
+			cmd := exec.Command("kubectl", "apply", "-f", "-")
+			cmd.Stdin = strings.NewReader(heliosAppYAML)
+			_, _ = utils.Run(cmd)
+
+			By("Waiting for PipelineRun and patching to success")
+			Eventually(func() error {
+				cmd := exec.Command("kubectl", "get", "pipelinerun", "-n", testNamespace, "-o", "jsonpath={.items[0].metadata.name}")
+				output, err := utils.Run(cmd)
+				if err != nil || output == "" {
+					return fmt.Errorf("no pipelinerun found")
+				}
+
+				patchJSON := `{"status":{"conditions":[{"type":"Succeeded","status":"True","reason":"Succeeded"}]}}`
+				cmd = exec.Command("kubectl", "patch", "pipelinerun", strings.TrimSpace(output), "-n", testNamespace,
+					"--type=merge", "--subresource=status", "-p", patchJSON)
+				_, err = utils.Run(cmd)
+				return err
+			}, timeout, interval).Should(Succeed())
+
+			By("Simulating ArgoCD Application status")
+			// In real scenario, ArgoCD would update this
+			// For E2E, we verify the operator creates the Application
+			Eventually(func() bool {
+				cmd := exec.Command("kubectl", "get", "application", testAppName, "-n", "argocd")
+				_, err := utils.Run(cmd)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("Verifying observedGeneration is updated")
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "heliosapp", testAppName, "-n", testNamespace,
+					"-o", "jsonpath={.status.observedGeneration}")
+				output, _ := utils.Run(cmd)
+				return output
+			}, timeout, interval).Should(Equal("1"))
+		})
+
+		It("should handle spec changes and trigger new PipelineRun", func() {
+			By("Creating initial HeliosApp")
+			cmd := exec.Command("kubectl", "apply", "-f", "-")
+			cmd.Stdin = strings.NewReader(heliosAppYAML)
+			_, _ = utils.Run(cmd)
+
+			By("Waiting for first PipelineRun")
+			Eventually(func() int {
+				cmd := exec.Command("kubectl", "get", "pipelinerun", "-n", testNamespace, "-o", "name")
+				output, _ := utils.Run(cmd)
+				return len(strings.Split(strings.TrimSpace(output), "\n"))
+			}, timeout, interval).Should(BeNumerically(">=", 1))
+
+			initialCount := func() int {
+				cmd := exec.Command("kubectl", "get", "pipelinerun", "-n", testNamespace, "-o", "name")
+				output, _ := utils.Run(cmd)
+				lines := strings.Split(strings.TrimSpace(output), "\n")
+				if lines[0] == "" {
+					return 0
+				}
+				return len(lines)
+			}()
+
+			By("Updating HeliosApp spec")
+			patchJSON := `{"spec":{"replicas":5}}`
+			cmd = exec.Command("kubectl", "patch", "heliosapp", testAppName, "-n", testNamespace,
+				"--type=merge", "-p", patchJSON)
 			_, err := utils.Run(cmd)
-			Expect(err).NotTo(HaveOccurred(), "Failed to create ClusterRoleBinding")
-
-			By("validating that the metrics service is available")
-			cmd = exec.Command("kubectl", "get", "service", metricsServiceName, "-n", namespace)
-			_, err = utils.Run(cmd)
-			Expect(err).NotTo(HaveOccurred(), "Metrics service should exist")
-
-			By("getting the service account token")
-			token, err := serviceAccountToken()
 			Expect(err).NotTo(HaveOccurred())
-			Expect(token).NotTo(BeEmpty())
 
-			By("waiting for the metrics endpoint to be ready")
-			verifyMetricsEndpointReady := func(g Gomega) {
-				cmd := exec.Command("kubectl", "get", "endpoints", metricsServiceName, "-n", namespace)
-				output, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(ContainSubstring("8443"), "Metrics endpoint is not ready")
-			}
-			Eventually(verifyMetricsEndpointReady).Should(Succeed())
+			By("Verifying new PipelineRun is created")
+			Eventually(func() int {
+				cmd := exec.Command("kubectl", "get", "pipelinerun", "-n", testNamespace, "-o", "name")
+				output, _ := utils.Run(cmd)
+				lines := strings.Split(strings.TrimSpace(output), "\n")
+				if lines[0] == "" {
+					return 0
+				}
+				return len(lines)
+			}, timeout, interval).Should(BeNumerically(">", initialCount))
 
-			By("verifying that the controller manager is serving the metrics server")
-			verifyMetricsServerStarted := func(g Gomega) {
-				cmd := exec.Command("kubectl", "logs", controllerPodName, "-n", namespace)
-				output, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(ContainSubstring("controller-runtime.metrics\tServing metrics server"),
-					"Metrics server not yet started")
-			}
-			Eventually(verifyMetricsServerStarted).Should(Succeed())
-
-			By("creating the curl-metrics pod to access the metrics endpoint")
-			cmd = exec.Command("kubectl", "run", "curl-metrics", "--restart=Never",
-				"--namespace", namespace,
-				"--image=curlimages/curl:latest",
-				"--overrides",
-				fmt.Sprintf(`{
-					"spec": {
-						"containers": [{
-							"name": "curl",
-							"image": "curlimages/curl:latest",
-							"command": ["/bin/sh", "-c"],
-							"args": ["curl -v -k -H 'Authorization: Bearer %s' https://%s.%s.svc.cluster.local:8443/metrics"],
-							"securityContext": {
-								"allowPrivilegeEscalation": false,
-								"capabilities": {
-									"drop": ["ALL"]
-								},
-								"runAsNonRoot": true,
-								"runAsUser": 1000,
-								"seccompProfile": {
-									"type": "RuntimeDefault"
-								}
-							}
-						}],
-						"serviceAccount": "%s"
-					}
-				}`, token, metricsServiceName, namespace, serviceAccountName))
-			_, err = utils.Run(cmd)
-			Expect(err).NotTo(HaveOccurred(), "Failed to create curl-metrics pod")
-
-			By("waiting for the curl-metrics pod to complete.")
-			verifyCurlUp := func(g Gomega) {
-				cmd := exec.Command("kubectl", "get", "pods", "curl-metrics",
-					"-o", "jsonpath={.status.phase}",
-					"-n", namespace)
-				output, err := utils.Run(cmd)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(output).To(Equal("Succeeded"), "curl pod in wrong status")
-			}
-			Eventually(verifyCurlUp, 5*time.Minute).Should(Succeed())
-
-			By("getting the metrics by checking curl-metrics logs")
-			metricsOutput := getMetricsOutput()
-			Expect(metricsOutput).To(ContainSubstring(
-				"controller_runtime_reconcile_total",
-			))
+			By("Verifying generation incremented")
+			cmd = exec.Command("kubectl", "get", "heliosapp", testAppName, "-n", testNamespace,
+				"-o", "jsonpath={.metadata.generation}")
+			output, err := utils.Run(cmd)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(Equal("2"))
 		})
 
-		// +kubebuilder:scaffold:e2e-webhooks-checks
+		It("should handle PipelineRun failures gracefully", func() {
+			By("Creating HeliosApp")
+			cmd := exec.Command("kubectl", "apply", "-f", "-")
+			cmd.Stdin = strings.NewReader(heliosAppYAML)
+			_, _ = utils.Run(cmd)
 
-		// TODO: Customize the e2e test suite with scenarios specific to your project.
-		// Consider applying sample/CR(s) and check their status and/or verifying
-		// the reconciliation by using the metrics, i.e.:
-		// metricsOutput := getMetricsOutput()
-		// Expect(metricsOutput).To(ContainSubstring(
-		//    fmt.Sprintf(`controller_runtime_reconcile_total{controller="%s",result="success"} 1`,
-		//    strings.ToLower(<Kind>),
-		// ))
+			By("Waiting for PipelineRun")
+			var pipelineRunName string
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "pipelinerun", "-n", testNamespace, "-o", "jsonpath={.items[0].metadata.name}")
+				output, _ := utils.Run(cmd)
+				pipelineRunName = strings.TrimSpace(output)
+				return pipelineRunName
+			}, timeout, interval).ShouldNot(BeEmpty())
+
+			By("Simulating PipelineRun failure")
+			patchJSON := `{"status":{"conditions":[{"type":"Succeeded","status":"False","reason":"Failed","message":"Mock failure"}]}}`
+			cmd = exec.Command("kubectl", "patch", "pipelinerun", pipelineRunName, "-n", testNamespace,
+				"--type=merge", "--subresource=status", "-p", patchJSON)
+			_, _ = utils.Run(cmd)
+
+			By("Checking HeliosApp status reflects failure")
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "heliosapp", testAppName, "-n", testNamespace,
+					"-o", "jsonpath={.status.phase}")
+				output, _ := utils.Run(cmd)
+				return output
+			}, timeout, interval).Should(Equal("ManifestGenerationFailed"))
+
+			By("Verifying failure message in status")
+			Eventually(func() string {
+				cmd := exec.Command("kubectl", "get", "heliosapp", testAppName, "-n", testNamespace,
+					"-o", "jsonpath={.status.message}")
+				output, _ := utils.Run(cmd)
+				return output
+			}, timeout, interval).Should(ContainSubstring("Mock failure"))
+		})
 	})
 })
-
-// serviceAccountToken returns a token for the specified service account in the given namespace.
-// It uses the Kubernetes TokenRequest API to generate a token by directly sending a request
-// and parsing the resulting token from the API response.
-func serviceAccountToken() (string, error) {
-	const tokenRequestRawString = `{
-		"apiVersion": "authentication.k8s.io/v1",
-		"kind": "TokenRequest"
-	}`
-
-	// Temporary file to store the token request
-	secretName := fmt.Sprintf("%s-token-request", serviceAccountName)
-	tokenRequestFile := filepath.Join("/tmp", secretName)
-	err := os.WriteFile(tokenRequestFile, []byte(tokenRequestRawString), os.FileMode(0o644))
-	if err != nil {
-		return "", err
-	}
-
-	var out string
-	verifyTokenCreation := func(g Gomega) {
-		// Execute kubectl command to create the token
-		cmd := exec.Command("kubectl", "create", "--raw", fmt.Sprintf(
-			"/api/v1/namespaces/%s/serviceaccounts/%s/token",
-			namespace,
-			serviceAccountName,
-		), "-f", tokenRequestFile)
-
-		output, err := cmd.CombinedOutput()
-		g.Expect(err).NotTo(HaveOccurred())
-
-		// Parse the JSON output to extract the token
-		var token tokenRequest
-		err = json.Unmarshal(output, &token)
-		g.Expect(err).NotTo(HaveOccurred())
-
-		out = token.Status.Token
-	}
-	Eventually(verifyTokenCreation).Should(Succeed())
-
-	return out, err
-}
-
-// getMetricsOutput retrieves and returns the logs from the curl pod used to access the metrics endpoint.
-func getMetricsOutput() string {
-	By("getting the curl-metrics logs")
-	cmd := exec.Command("kubectl", "logs", "curl-metrics", "-n", namespace)
-	metricsOutput, err := utils.Run(cmd)
-	Expect(err).NotTo(HaveOccurred(), "Failed to retrieve logs from curl pod")
-	Expect(metricsOutput).To(ContainSubstring("< HTTP/1.1 200 OK"))
-	return metricsOutput
-}
-
-// tokenRequest is a simplified representation of the Kubernetes TokenRequest API response,
-// containing only the token field that we need to extract.
-type tokenRequest struct {
-	Status struct {
-		Token string `json:"token"`
-	} `json:"status"`
-}

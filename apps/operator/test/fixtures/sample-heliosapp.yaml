@@ -1,0 +1,26 @@
+apiVersion: platform.helios.io/v1
+kind: HeliosApp
+metadata:
+  name: sample-app
+  namespace: default
+spec:
+  gitRepo: https://github.com/example/my-app
+  gitBranch: main
+  imageRepo: ghcr.io/example/my-app
+  port: 8080
+  replicas: 3
+  serviceAccount: tekton-bot-sa
+  pipelineName: manifest-generation-pipeline
+  pvcName: workspace-pvc
+  webhookSecret: github-webhook-secret
+  templateRepo: https://github.com/example/app-templates
+  templatePath: charts/nodejs-app
+  gitopsRepo: https://github.com/example/gitops-manifests
+  gitopsPath: apps/production/my-app
+  values:
+    env: production
+    autoscaling.enabled: "true"
+    autoscaling.minReplicas: "2"
+    autoscaling.maxReplicas: "10"
+    ingress.enabled: "true"
+    ingress.host: api.example.com

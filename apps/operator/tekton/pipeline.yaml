@@ -1,0 +1,87 @@
+# pipeline.yaml (Updated with separate workspaces)
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: from-code-to-cluster
+spec:
+  params:
+    - name: app-repo-url
+    - name: app-repo-revision
+    - name: image-repo
+    - name: gitops-repo-url
+    - name: manifest-path-in-gitops-repo
+    - name: gitops-repo-branch
+    - name: context-subpath
+      default: "" # Empty means Dockerfile is at repo root
+    - name: replicas
+      default: "2"
+    - name: port
+      default: "8080"
+
+  # CHANGE 1: Define two separate workspaces for the pipeline
+  workspaces:
+    - name: source-workspace
+    - name: gitops-workspace
+
+  tasks:
+    - name: fetch-source-code
+      taskRef:
+        name: git-clone
+      workspaces:
+        # CHANGE 2: Use the 'source-workspace' for app code
+        - name: output
+          workspace: source-workspace
+      params:
+        - name: url
+          value: $(params.app-repo-url)
+        - name: revision
+          value: $(params.app-repo-revision)
+
+    # CHANGE: Add Quality Gate (Lint & Test)
+    # This ensures code quality before building the image
+    - name: quality-gate
+      runAfter: [fetch-source-code]
+      taskRef:
+        name: golang-test # Assuming a generic Task or we can inline script
+      workspaces:
+        - name: source
+          workspace: source-workspace
+      params:
+        - name: packages
+          value: "./..."
+
+    - name: build-and-push-image
+      taskRef:
+        name: kaniko-build
+      runAfter: [quality-gate] # Only build if Quality Gate passes
+      workspaces:
+        # CHANGE 3: The build task also uses 'source-workspace'
+        - name: source
+          workspace: source-workspace
+      params:
+        - name: IMAGE
+          value: "$(params.image-repo):$(params.app-repo-revision)"
+        - name: CONTEXT_SUBPATH
+          value: "$(params.context-subpath)"
+
+    - name: update-gitops-manifest
+      taskRef:
+        name: git-update-manifest
+      runAfter: [build-and-push-image]
+      workspaces:
+        # CHANGE 4: This task gets its OWN clean 'gitops-workspace'
+        - name: gitops-repo
+          workspace: gitops-workspace
+      params:
+        - name: GITOPS_REPO_URL
+          value: $(params.gitops-repo-url)
+        - name: MANIFEST_PATH
+          value: $(params.manifest-path-in-gitops-repo)
+        - name: NEW_IMAGE_URL
+          value: $(tasks.build-and-push-image.results.IMAGE_URL)
+        - name: GITOPS_REPO_BRANCH
+          value: $(params.gitops-repo-branch)
+        - name: REPLICAS
+          value: $(params.replicas)
+        - name: PORT
+          value: $(params.port)

@@ -1,0 +1,19 @@
+apiVersion: platform.helios.io/v1
+kind: HeliosApp
+metadata:
+  name: ${{ values.appName }}
+spec:
+  gitRepo: ${{ values.gitRepo }}
+  replicas: ${{ values.resourceConfig.replicas }}
+  # Preserving other fields would require reading them first. 
+  # For this PoC, we update the core resource fields which is the goal.
+  resources:
+    requests:
+      cpu: "${{ values.resourceConfig.cpuRequest }}"
+      memory: "${{ values.resourceConfig.memoryRequest }}"
+  env:
+    {%- for item in values.envVars %}
+    - name: {{ item.name }}
+      value: "{{ item.value }}"
+    {%- endfor %}
+  enableAutoOptimization: true

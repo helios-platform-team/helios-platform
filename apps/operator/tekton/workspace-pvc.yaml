@@ -1,0 +1,15 @@
+# workspace-pvc.yaml
+# PersistentVolumeClaim for Tekton Pipeline workspace
+# This PVC is shared across all pipeline tasks for storing source code and build artifacts
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-workspace-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # storageClassName: standard # Uncomment and modify if using a specific storage class

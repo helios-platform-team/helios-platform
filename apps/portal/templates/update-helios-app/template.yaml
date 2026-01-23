@@ -1,0 +1,109 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: update-helios-app
+  title: Update Helios App Configuration
+  description: Modify resources (CPU/RAM) and Environment Variables for an existing Helios App
+  tags:
+    - helios
+    - day-2-ops
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: App Configuration (Single Page)
+      required:
+        - appName
+        - gitRepo
+        - cpuRequest
+        - memoryRequest
+        - replicas
+      properties:
+        appName:
+          title: Application Name
+          type: string
+          description: The name of the HeliosApp (Auto-filled)
+          ui:widget: text # Read-only feeling if we could, but text is fine
+        gitRepo:
+          title: Git Repository
+          type: string
+          description: Source code repository (Auto-filled)
+        
+        replicas:
+          title: Replicas (Pods)
+          type: number
+          default: 1
+          enum: [1, 2, 3, 5, 10]
+          description: Number of instances to run
+          ui:field: ResponsiveGrid
+
+        cpuRequest:
+          title: CPU Request
+          type: string
+          default: "200m"
+          enum: ["100m", "200m", "500m", "1000m"]
+          ui:field: ResponsiveGrid
+        
+        memoryRequest:
+          title: Memory Request
+          type: string
+          default: "256Mi"
+          enum: ["128Mi", "256Mi", "512Mi", "1Gi"]
+          ui:field: ResponsiveGrid
+
+        envVars:
+          title: Environment Variables
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              value:
+                type: string
+
+  steps:
+    - id: fetch-repo
+      name: Fetch Source Code
+      action: fetch:plain
+      input:
+        url: ${{ parameters.gitRepo }}
+    
+    - id: update-config
+      name: Update helios.yaml
+      action: roadiehq:utils:fs:replace # We might need a custom action, or just overwrite file
+      # For simplicity in this PoC, we will re-render the helios.yaml and overwrite it
+      # using the standard fetch:template over the existing file
+      
+    - id: render-config
+      name: Render New Configuration
+      action: fetch:template
+      input:
+        url: ./content
+        values:
+          appName: ${{ parameters.appName }}
+          gitRepo: ${{ parameters.gitRepo }}
+          replicas: ${{ parameters.replicas }}
+          cpuRequest: ${{ parameters.cpuRequest }}
+          memoryRequest: ${{ parameters.memoryRequest }}
+          envVars: ${{ parameters.envVars }}
+          # We need to preserve other fields, usually we query catalog, but here we assume user inputs crucial ones
+          
+    - id: publish
+      name: Create PR with Updates
+      action: publish:github:pull-request
+      input:
+        repoUrl: ${{ parameters.gitRepo }}
+        branchName: update-config-${{ parameters.appName }}
+        title: "chore(config): update resources for ${{ parameters.appName }}"
+        description: |
+          Updates resource requests via Backstage.
+          Replicas: ${{ parameters.replicas }}
+          CPU: ${{ parameters.cpuRequest }}
+          Memory: ${{ parameters.memoryRequest }}
+
+  output:
+    links:
+      - title: Pull Request
+        url: ${{ steps.publish.output.remoteUrl }}

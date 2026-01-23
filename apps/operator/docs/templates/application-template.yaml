@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # Operator sẽ điền tên app và namespace vào đây
+  name: <app-name>
+  namespace: argocd # Hoặc namespace nơi ArgoCD được cài đặt
+spec:
+  project: default
+  source:
+    # Operator sẽ điền repo URL và branch từ HeliosApp CR
+    repoURL: <git-repo>
+    targetRevision: <git-branch>
+    # Đường dẫn tới manifest trong repo. Bạn có thể để cố định hoặc thêm vào CRD nếu cần
+    path: deploy/kubernetes
+  destination:
+    server: https://kubernetes.default.svc
+    # Operator sẽ điền namespace nơi ứng dụng sẽ được deploy
+    namespace: <app-namespace>
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

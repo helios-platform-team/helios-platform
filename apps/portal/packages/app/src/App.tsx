@@ -1,3 +1,4 @@
+import React from 'react';
 import { Navigate, Route } from 'react-router-dom';
 import { apiDocsPlugin, ApiExplorerPage } from '@backstage/plugin-api-docs';
 import {
@@ -62,6 +63,14 @@ const app = createApp({
   },
 });
 
+import { ResponsiveGridField } from './components/scaffolder/ResponsiveGridField';
+import { createScaffolderFieldExtension } from '@backstage/plugin-scaffolder-react';
+
+const ResponsiveGridFieldExtension = createScaffolderFieldExtension({
+  component: ResponsiveGridField,
+  name: 'ResponsiveGrid', // Renamed for clarity
+});
+
 const routes = (
   <FlatRoutes>
     <Route path="/" element={<Navigate to="catalog" />} />
@@ -81,7 +90,11 @@ const routes = (
         <ReportIssue />
       </TechDocsAddons>
     </Route>
-    <Route path="/create" element={<ScaffolderPage />} />
+    <Route path="/create" element={
+        React.createElement(ScaffolderPage as any, {
+          customFieldExtensions: [ResponsiveGridFieldExtension]
+        })
+    } />
     <Route path="/api-docs" element={<ApiExplorerPage />} />
     <Route
       path="/catalog-import"

@@ -7,7 +7,7 @@
  */
 
 import { createBackend } from '@backstage/backend-defaults';
-
+import { scaffolderCustomActionsModule } from './modules/scaffolderCustomActions';
 const backend = createBackend();
 
 backend.add(import('@backstage/plugin-app-backend'));
@@ -62,5 +62,6 @@ backend.add(import('@backstage/plugin-kubernetes-backend'));
 // notifications and signals plugins
 backend.add(import('@backstage/plugin-notifications-backend'));
 backend.add(import('@backstage/plugin-signals-backend'));
+backend.add(scaffolderCustomActionsModule);
 
 backend.start();

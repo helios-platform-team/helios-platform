@@ -1,0 +1,43 @@
+# File này định nghĩa các bước trong một quy trình CI, ví dụ: clone code, build image, và đẩy image lên registry.
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  # Operator sẽ điền tên pipeline
+  name: <pipeline-name>
+spec:
+  params:
+    - name: git-repo
+      type: string
+      description: The git repository URL to clone from.
+    - name: git-revision
+      type: string
+      description: The git revision to clone.
+    - name: image-repo
+      type: string
+      description: The container image repository to push to.
+  workspaces:
+    - name: source-code
+      description: The workspace where source code is cloned.
+  tasks:
+    - name: git-clone
+      taskRef:
+        name: git-clone # Sử dụng Task có sẵn từ Tekton Hub
+      params:
+        - name: url
+          value: $(params.git-repo)
+        - name: revision
+          value: $(params.git-revision)
+      workspaces:
+        - name: output
+          workspace: source-code
+
+    - name: build-and-push
+      runAfter: ["git-clone"]
+      taskRef:
+        name: kaniko # Sử dụng Task kaniko để build image trong cluster
+      params:
+        - name: IMAGE
+          value: $(params.image-repo):$(tasks.git-clone.results.commit) # Gắn tag image bằng commit hash
+      workspaces:
+        - name: source
+          workspace: source-code

@@ -1,0 +1,164 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: manifest-generation-pipeline
+  namespace: e2e-test
+spec:
+  params:
+    - name: git-repo
+      type: string
+      description: Git repository URL
+    - name: git-revision
+      type: string
+      description: Git revision (branch/tag/commit)
+      default: main
+    - name: app-name
+      type: string
+      description: Application name
+    - name: values-json
+      type: string
+      description: Template values as JSON
+      default: "{}"
+
+  workspaces:
+    - name: source
+      description: Workspace for git source
+    - name: manifest-output
+      description: Workspace for generated manifests
+
+  tasks:
+    - name: git-clone
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: source
+      params:
+        - name: url
+          value: $(params.git-repo)
+        - name: revision
+          value: $(params.git-revision)
+
+    - name: generate-manifests
+      runAfter:
+        - git-clone
+      taskSpec:
+        params:
+          - name: app-name
+          - name: values-json
+        workspaces:
+          - name: source
+          - name: manifest-output
+        steps:
+          - name: generate
+            image: alpine:latest
+            script: |
+              #!/bin/sh
+              set -e
+
+              echo "🔧 Generating manifests for app: $(params.app-name)"
+              echo "📝 Values: $(params.values-json)"
+
+              # Mock manifest generation (just create a simple deployment)
+              cat > $(workspaces.manifest-output.path)/deployment.yaml <<EOF
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: $(params.app-name)
+                namespace: default
+              spec:
+                replicas: 1
+                selector:
+                  matchLabels:
+                    app: $(params.app-name)
+                template:
+                  metadata:
+                    labels:
+                      app: $(params.app-name)
+                  spec:
+                    containers:
+                    - name: app
+                      image: nginx:latest
+                      ports:
+                      - containerPort: 80
+              EOF
+
+              echo "✅ Manifests generated successfully"
+              cat $(workspaces.manifest-output.path)/deployment.yaml
+      params:
+        - name: app-name
+          value: $(params.app-name)
+        - name: values-json
+          value: $(params.values-json)
+      workspaces:
+        - name: source
+          workspace: source
+        - name: manifest-output
+          workspace: manifest-output
+
+    - name: push-to-manifest-repo
+      runAfter:
+        - generate-manifests
+      taskSpec:
+        params:
+          - name: app-name
+        workspaces:
+          - name: manifest-output
+        steps:
+          - name: push
+            image: alpine/git:latest
+            script: |
+              #!/bin/sh
+              set -e
+
+              echo "📤 Pushing manifests to git repository"
+              echo "   (This is a mock - in production, would push to actual git repo)"
+
+              cd $(workspaces.manifest-output.path)
+              ls -la
+
+              echo "✅ Manifests pushed successfully"
+      params:
+        - name: app-name
+          value: $(params.app-name)
+      workspaces:
+        - name: manifest-output
+          workspace: manifest-output
+
+---
+# Mock git-clone Task (simplified version)
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: git-clone
+  namespace: e2e-test
+spec:
+  params:
+    - name: url
+      type: string
+    - name: revision
+      type: string
+      default: main
+  workspaces:
+    - name: output
+      description: The git repo will be cloned here
+  steps:
+    - name: clone
+      image: alpine/git:latest
+      script: |
+        #!/bin/sh
+        set -e
+
+        echo "🔄 Cloning $(params.url) @ $(params.revision)"
+
+        # Mock clone (just create a placeholder)
+        mkdir -p $(workspaces.output.path)/repo
+        cd $(workspaces.output.path)/repo
+
+        # Create mock repo structure
+        mkdir -p templates charts
+        echo "# Mock Repository" > README.md
+        echo "appVersion: 1.0.0" > Chart.yaml
+
+        echo "✅ Clone completed (mock)"

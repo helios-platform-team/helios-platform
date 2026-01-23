@@ -1,25 +1,133 @@
 {
-  "name": "Kubebuilder DevContainer",
-  "image": "golang:1.24",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers/features/git:1": {}
+  "name": "Helios Operator DevContainer",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
   },
 
-  "runArgs": ["--network=host"],
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": false,
+      "dockerDashComposeVersion": "v2",
+      "installDockerBuildx": true,
+      "enableNonRootDocker": true
+    },
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "helm": "latest",
+      "minikube": "none"
+    }
+  },
+
+  "runArgs": [
+    "--privileged",
+    "--init",
+    "--cap-add=SYS_PTRACE",
+    "--security-opt=seccomp=unconfined"
+  ],
+
+  "mounts": [
+    "source=helios-operator-go-mod-cache,target=/go/pkg/mod,type=volume",
+    "source=helios-operator-go-build-cache,target=/home/vscode/.cache/go-build,type=volume",
+    "source=dind-var-lib-docker,target=/var/lib/docker,type=volume"
+  ],
 
   "customizations": {
     "vscode": {
       "settings": {
-        "terminal.integrated.shell.linux": "/bin/bash"
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "go.toolsManagement.autoUpdate": true,
+        "go.useLanguageServer": true,
+        "go.lintTool": "golangci-lint",
+        "go.lintOnSave": "package",
+        "go.formatTool": "goimports",
+        "go.testFlags": ["-v", "-race"],
+        "go.buildFlags": ["-trimpath"],
+        "go.installDependenciesWhenBuilding": true,
+        "go.coverOnSave": false,
+        "go.coverOnSingleTest": true,
+        "go.testTimeout": "30s",
+        "gopls": {
+          "ui.completion.usePlaceholders": true,
+          "ui.diagnostic.analyses": {
+            "unusedparams": true,
+            "shadow": true,
+            "nilness": true,
+            "unusedwrite": true,
+            "useany": true
+          },
+          "ui.semanticTokens": true,
+          "formatting.gofumpt": true
+        },
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        },
+        "[go]": {
+          "editor.defaultFormatter": "golang.go",
+          "editor.tabSize": 4,
+          "editor.insertSpaces": false
+        },
+        "[yaml]": {
+          "editor.defaultFormatter": "redhat.vscode-yaml",
+          "editor.tabSize": 2
+        },
+        "[json]": {
+          "editor.defaultFormatter": "vscode.json-language-features",
+          "editor.tabSize": 2
+        },
+        "files.eol": "\n",
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "files.watcherExclude": {
+          "**/.git/objects/**": true,
+          "**/.git/subtree-cache/**": true,
+          "**/node_modules/**": true,
+          "**/bin/**": true,
+          "**/testbin/**": true,
+          "**/.cache/**": true
+        },
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/bin": true,
+          "**/testbin": true,
+          "**/.cache": true,
+          "**/vendor": true
+        }
       },
       "extensions": [
+        "golang.go",
         "ms-kubernetes-tools.vscode-kubernetes-tools",
-        "ms-azuretools.vscode-docker"
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "eamodio.gitlens"
       ]
     }
   },
 
-  "onCreateCommand": "bash .devcontainer/post-install.sh"
-}
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/health-check.sh || true",
 
+  "remoteUser": "vscode",
+
+  "updateRemoteUserUID": false,
+
+  "containerEnv": {
+    "CGO_ENABLED": "0",
+    "GOPROXY": "https://proxy.golang.org,direct",
+    "GOSUMDB": "sum.golang.org",
+    "GOPATH": "/go",
+    "GOTOOLCHAIN": "auto",
+    "DOCKER_BUILDKIT": "1",
+    "COMPOSE_DOCKER_CLI_BUILD": "1"
+  },
+
+  "workspaceFolder": "/workspaces/helios-operator",
+  "overrideCommand": false,
+  "shutdownAction": "stopContainer",
+  "updateContentCommand": "bash .devcontainer/update-content.sh",
+  "waitFor": "postCreateCommand"
+}

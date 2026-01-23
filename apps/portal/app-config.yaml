@@ -76,7 +76,7 @@ catalog:
     entityFilename: catalog-info.yaml
     pullRequestBranchName: backstage-integration
   rules:
-    - allow: [Component, System, API, Resource, Location]
+    - allow: [Component, System, API, Resource, Location, Template]
   locations:
     # Local example data, file locations are relative to the backend process, typically `packages/backend`
     - type: file
@@ -93,6 +93,18 @@ catalog:
       target: ../../examples/org.yaml
       rules:
         - allow: [User, Group]
+
+    # Helios App Creation Template
+    - type: file
+      target: ../../templates/create-helios-app/template.yaml
+      rules:
+        - allow: [Template]
+
+    # Helios Update App (Fix for "Edit Configuration")
+    - type: file
+      target: ../../templates/update-helios-app/template.yaml
+      rules:
+        - allow: [Template]
 
     ## Uncomment these lines to add more example data
     # - type: url

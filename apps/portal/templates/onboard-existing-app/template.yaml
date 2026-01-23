@@ -1,0 +1,32 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: onboard-existing-app
+  title: Onboard Existing App
+  description: Minimal template to test scaffolder mechanism. REPLACED FOR DEBUGGING.
+spec:
+  owner: user:guest
+  type: service
+  parameters:
+    - title: Debug Input
+      properties:
+        testParam:
+          type: string
+          default: "Hello"
+  steps:
+    - id: log-message
+      name: Log Message
+      action: debug:log
+      input:
+        message: "Step 1: Debugging..."
+
+    - id: fetch-base
+      name: Fetch Content (Plain)
+      action: fetch:plain
+      input:
+        url: ./content
+        
+  output:
+    links:
+      - title: Success
+        url: https://google.com

@@ -1,0 +1,48 @@
+apiVersion: platform.helios.io/v1
+kind: HeliosApp
+metadata:
+  name: sample-heliosapp
+  namespace: default
+spec:
+  # ===== Thông tin Git Repository của Source Code =====
+  gitRepo: "https://github.com/myorg/my-api"
+  gitBranch: "main"
+
+  # ===== Container Image Registry =====
+  imageRepo: "ghcr.io/myorg/my-api"
+
+  # ===== Application Configuration =====
+  port: 8080
+  replicas: 3
+
+  # ===== CI/CD Pipeline Configuration =====
+  pipelineName: "from-code-to-cluster"
+  serviceAccount: "pipeline-sa"
+  webhookSecret: "github-webhook-secret"
+  pvcName: "shared-workspace-pvc"
+
+  # ===== GitOps Template Configuration (Giai đoạn 1 - Manifest Generation) =====
+  # Repository chứa Helm chart hoặc Kustomize template
+  templateRepo: "https://github.com/myorg/app-templates"
+  # Đường dẫn đến template trong repo
+  templatePath: "charts/nodejs-app"
+
+  # ===== GitOps Repository Configuration (Giai đoạn 2 - ArgoCD Deployment) =====
+  # Repository GitOps trung tâm nơi lưu trữ manifest đã render
+  gitopsRepo: "https://github.com/myorg/gitops-manifests"
+  # Đường dẫn đến thư mục của ứng dụng trong GitOps repo
+  gitopsPath: "apps/production/my-api"
+
+  # ===== Custom Values để render template =====
+  values:
+    # Helm values hoặc các biến để render template
+    image.tag: "latest"
+    ingress.enabled: "true"
+    ingress.host: "api.mycompany.com"
+    resources.requests.cpu: "200m"
+    resources.requests.memory: "256Mi"
+    resources.limits.cpu: "1000m"
+    resources.limits.memory: "512Mi"
+    autoscaling.enabled: "true"
+    autoscaling.minReplicas: "2"
+    autoscaling.maxReplicas: "10"

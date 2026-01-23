@@ -1,0 +1,75 @@
+# tekton-triggers-sa.yaml
+# ServiceAccount for Tekton EventListener to create PipelineRuns
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-triggers-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-triggers-role
+  namespace: default
+rules:
+  # Allow creating and managing PipelineRuns
+  - apiGroups: ["tekton.dev"]
+    resources: ["pipelineruns", "pipelineresources", "taskruns"]
+    verbs: ["create", "get", "list", "watch"]
+  # Allow reading Tekton Triggers resources
+  - apiGroups: ["triggers.tekton.dev"]
+    resources:
+      - "eventlisteners"
+      - "triggerbindings"
+      - "triggertemplates"
+      - "triggers"
+      - "interceptors"
+    verbs: ["get", "list", "watch"]
+  # Allow reading ConfigMaps (for pipeline configuration)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # Allow reading Secrets (for credentials)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-triggers-rolebinding
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: tekton-triggers-sa
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tekton-triggers-role
+---
+# ClusterRole for cluster-scoped Tekton Triggers resources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tekton-triggers-clusterrole
+rules:
+  # Allow reading cluster-scoped Triggers resources
+  - apiGroups: ["triggers.tekton.dev"]
+    resources:
+      - "clusterinterceptors"
+      - "clustertriggerbindings"
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-triggers-clusterrolebinding
+subjects:
+  - kind: ServiceAccount
+    name: tekton-triggers-sa
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-clusterrole

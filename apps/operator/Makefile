@@ -1,3 +1,9 @@
+# Automatically load .env file if it exists
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -28,8 +34,8 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# helios.io/operator-bundle:$VERSION and helios.io/operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= helios.io/operator
+# helios.dev/helios-operator-bundle:$VERSION and helios.dev/helios-operator-catalog:$VERSION.
+IMAGE_TAG_BASE ?= helios.dev/helios-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -48,7 +54,7 @@ endif
 
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= unknown
+OPERATOR_SDK_VERSION ?= v1.41.1
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 
@@ -94,11 +100,10 @@ help: ## Display this help.
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-
+$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths='./api/...,./internal/...' output:crd:artifacts:config=config/crd/bases
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./api/v1"
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -112,34 +117,60 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
-# TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
-# The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
-# CertManager is installed by default; skip with:
-# - CERT_MANAGER_INSTALL_SKIP=true
-KIND_CLUSTER ?= operator-test-e2e
+##@ E2E Testing
+
+KIND_CLUSTER ?= helios-operator-test-e2e
 
 .PHONY: setup-test-e2e
-setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
+setup-test-e2e: ## Create Kind cluster and install all dependencies (Tekton + ArgoCD + Pipeline resources)
+	@echo "🔧 Setting up E2E test environment..."
 	@command -v $(KIND) >/dev/null 2>&1 || { \
-		echo "Kind is not installed. Please install Kind manually."; \
+		echo "❌ Kind is not installed. Install: https://kind.sigs.k8s.io/docs/user/quick-start/"; \
 		exit 1; \
 	}
-	@case "$$($(KIND) get clusters)" in \
-		*"$(KIND_CLUSTER)"*) \
-			echo "Kind cluster '$(KIND_CLUSTER)' already exists. Skipping creation." ;; \
-		*) \
-			echo "Creating Kind cluster '$(KIND_CLUSTER)'..."; \
-			$(KIND) create cluster --name $(KIND_CLUSTER) ;; \
-	esac
+	@if $(KIND) get clusters | grep -q "^$(KIND_CLUSTER)$$"; then \
+		echo "✅ Kind cluster '$(KIND_CLUSTER)' already exists"; \
+	else \
+		echo "📦 Creating Kind cluster '$(KIND_CLUSTER)'..."; \
+		$(KIND) create cluster --name $(KIND_CLUSTER); \
+	fi
+	@echo "📦 Installing Tekton Pipelines..."
+	@kubectl apply -f https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml > /dev/null 2>&1
+	@echo "⏳ Waiting for Tekton Pipelines pods to be created..."
+	@until kubectl get pods -n tekton-pipelines -l app=tekton-pipelines-controller 2>/dev/null | grep -q tekton; do sleep 2; done
+	@kubectl wait --for=condition=ready pod -l app=tekton-pipelines-controller -n tekton-pipelines --timeout=300s
+	@echo "📦 Installing Tekton Triggers..."
+	@kubectl apply -f https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml > /dev/null 2>&1
+	@kubectl apply -f https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml > /dev/null 2>&1
+	@echo "⏳ Waiting for Tekton Triggers pods to be created..."
+	@until kubectl get pods -n tekton-pipelines -l app=tekton-triggers-controller 2>/dev/null | grep -q tekton; do sleep 2; done
+	@kubectl wait --for=condition=ready pod -l app=tekton-triggers-controller -n tekton-pipelines --timeout=300s
+	@echo "📦 Installing ArgoCD..."
+	@kubectl create namespace argocd 2>/dev/null || true
+	@kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml > /dev/null 2>&1
+	@echo "⏳ Waiting for ArgoCD pods to be created..."
+	@until kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server 2>/dev/null | grep -q argocd; do sleep 2; done
+	@kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
+	@echo "📦 Installing Tekton Pipeline resources (Tasks, Pipeline, ServiceAccounts, PVC)..."
+	@kubectl apply -f tekton/ > /dev/null 2>&1 || true
+	@echo "✅ E2E environment ready!"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Install CRDs: make install"
+	@echo "  2. Build and deploy operator: make docker-build IMG=helios-operator:dev"
+	@echo "  3. Load image to Kind: kind load docker-image helios-operator:dev --name $(KIND_CLUSTER)"
+	@echo "  4. Deploy operator: make deploy IMG=helios-operator:dev"
+	@echo "  5. Test with sample: kubectl apply -f config/samples/heliosapp_v1_heliosapp.yaml"
 
 .PHONY: test-e2e
-test-e2e: setup-test-e2e manifests generate fmt vet ## Run the e2e tests. Expected an isolated environment using Kind.
-	KIND_CLUSTER=$(KIND_CLUSTER) go test ./test/e2e/ -v -ginkgo.v
-	$(MAKE) cleanup-test-e2e
-
-.PHONY: cleanup-test-e2e
-cleanup-test-e2e: ## Tear down the Kind cluster used for e2e tests
+test-e2e: setup-test-e2e ## Run complete E2E test suite (setup + test + cleanup)
+	@echo "🧪 Running E2E tests..."
+	@$(MAKE) install
+	@cd test/fixtures && ./setup-e2e.sh
+	@KIND_CLUSTER=$(KIND_CLUSTER) go test ./test/e2e/ -v -ginkgo.v
+	@echo "🧹 Cleaning up..."
 	@$(KIND) delete cluster --name $(KIND_CLUSTER)
+	@echo "✅ E2E tests complete!"
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
@@ -163,12 +194,23 @@ build: manifests generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./cmd/main.go
 
+# Version information
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE ?= $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
+
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
+	DOCKER_BUILDKIT=1 $(CONTAINER_TOOL) build \
+		--build-arg TARGETOS=linux \
+		--build-arg TARGETARCH=$(shell go env GOARCH) \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -180,16 +222,31 @@ docker-push: ## Push docker image with the manager.
 # - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 # - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
 # To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
+PLATFORMS ?= linux/amd64,linux/arm64
 .PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name operator-builder
-	$(CONTAINER_TOOL) buildx use operator-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm operator-builder
-	rm Dockerfile.cross
+docker-buildx: ## Build and push docker image for cross-platform support (amd64, arm64)
+	- $(CONTAINER_TOOL) buildx create --name helios-operator-builder --use
+	$(CONTAINER_TOOL) buildx build \
+		--push \
+		--platform=$(PLATFORMS) \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		--tag ${IMG} \
+		--cache-from=type=registry,ref=${IMG}-buildcache \
+		--cache-to=type=registry,ref=${IMG}-buildcache,mode=max \
+		.
+	- $(CONTAINER_TOOL) buildx rm helios-operator-builder
+
+.PHONY: docker-inspect
+docker-inspect: ## Inspect the built Docker image
+	@echo "==> Image Information"
+	@$(CONTAINER_TOOL) images ${IMG} --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+	@echo "\n==> Security Context"
+	@$(CONTAINER_TOOL) inspect ${IMG} --format='User: {{.Config.User}}'
+	@$(CONTAINER_TOOL) inspect ${IMG} --format='Entrypoint: {{.Config.Entrypoint}}'
+	@echo "\n==> Image Layers (count)"
+	@$(CONTAINER_TOOL) history ${IMG} --format "{{.CreatedBy}}" | wc -l
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
@@ -236,13 +293,15 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.6.0
-CONTROLLER_TOOLS_VERSION ?= v0.18.0
+KUSTOMIZE_VERSION ?= v5.7.1
+CONTROLLER_TOOLS_VERSION ?= v0.19.0
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
-GOLANGCI_LINT_VERSION ?= v2.1.0
+GOLANGCI_LINT_VERSION ?= v2.5.0
+OPM_VERSION ?= v1.60.0
+
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -329,7 +388,7 @@ ifeq (,$(shell which opm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.55.0/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
 else
@@ -360,3 +419,13 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+.PHONY: clean
+clean: ## Clean everything (artifacts, generated files, and downloaded tools)
+	@echo "Cleaning build artifacts and tools..."
+	rm -rf bin/
+	rm -rf dist/
+	rm -f cover.out coverage.html
+	rm -f deploy.yaml
+	rm -rf $(LOCALBIN)
+	@echo "Clean complete!"

@@ -1,0 +1,120 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: create-helios-app
+  title: Create New Helios App
+  description: Scaffold a new GitHub repository and automatically deploy it via Helios Operator.
+  tags:
+    - helios
+    - nodejs
+    - go
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Application Details
+      required:
+        - appName
+        - port
+        - webhookUrl
+      properties:
+        appName:
+          title: Application Name
+          type: string
+          description: "Unique identifier (no spaces, e.g. my-app)"
+        port:
+          title: Service Port
+          type: number
+          default: 80
+          description: "The port your application listens on"
+        githubOwner:
+          title: GitHub Username
+          type: string
+          default: PhamHoangKha1403
+        webhookUrl:
+          title: Webhook URL (Ngrok)
+          type: string
+          description: "Paste your Ngrok URL here (e.g. https://abc123.ngrok.io)"
+        replicas:
+          title: Replicas
+          type: number
+          default: 2
+          description: "Number of pod instances"
+        cpuRequest:
+          title: CPU Request
+          type: string
+          default: "300m"
+          description: "e.g. 100m (0.1 core) or 1 (1 core)"
+        memoryRequest:
+          title: Memory Request
+          type: string
+          default: "128Mi"
+          description: "e.g. 128Mi, 1Gi"
+        cpuLimit:
+          title: CPU Limit
+          type: string
+          default: "500m"
+          description: "Max CPU allowed (e.g. 500m)"
+        memoryLimit:
+          title: Memory Limit
+          type: string
+          default: "512Mi"
+          description: "Max Memory allowed (e.g. 512Mi)"
+        enableAutoOpt:
+          title: Enable Smart Rightsizer (Auto-Optimization)
+          type: boolean
+          default: false
+          description: "Allow Helios to automatically optimize CPU/Memory based on real usage?"
+        envVars:
+          title: Environment Variables
+          type: string
+          description: "Key=Value pairs, one per line"
+
+  steps:
+    - id: fetch-base
+      name: Scaffold Source Code
+      action: fetch:template
+      input:
+        url: ./content
+        values:
+          appName: ${{ parameters.appName }}
+          port: ${{ parameters.port }}
+          replicas: ${{ parameters.replicas }}
+          githubOwner: ${{ parameters.githubOwner }}
+          webhookUrl: ${{ parameters.webhookUrl }}
+          envVars: ${{ parameters.envVars }}
+          cpuRequest: ${{ parameters.cpuRequest }}
+          memoryRequest: ${{ parameters.memoryRequest }}
+          cpuLimit: ${{ parameters.cpuLimit }}
+          memoryLimit: ${{ parameters.memoryLimit }}
+          enableAutoOpt: ${{ parameters.enableAutoOpt }}
+
+    - id: publish
+      name: Publish to GitHub
+      action: publish:github
+      input:
+        description: "Helios App: ${{ parameters.appName }}"
+        repoUrl: 'github.com?owner=${{ parameters.githubOwner }}&repo=${{ parameters.appName }}'
+        defaultBranch: main
+
+    - id: apply-helios
+      name: Deploy to Kubernetes
+      action: kubernetes:apply
+      input:
+        manifestPath: ./helios.yaml
+        namespaced: true
+
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: View HeliosApp
+        url: /catalog/default/component/${{ parameters.appName }}

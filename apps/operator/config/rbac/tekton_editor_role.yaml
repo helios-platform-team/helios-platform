@@ -1,0 +1,35 @@
+# config/rbac/tekton_editor_role.yaml
+
+# Permissions for the Helios Operator to manage Tekton Triggers resources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tekton-triggers-editor-role
+rules:
+- apiGroups:
+  - triggers.tekton.dev
+  resources:
+  - eventlisteners
+  - triggertemplates
+  - triggerbindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: helios-operator-tekton-triggers-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-editor-role
+subjects:
+- kind: ServiceAccount
+  name: helios-operator-controller-manager # Tên mặc định của SA do Kubebuilder tạo
+  namespace: helios-operator-system # Namespace của Operator

@@ -1,0 +1,51 @@
+# permissions for end users to edit heliosapps.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: helios-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: heliosapp-editor-role
+rules:
+  - apiGroups:
+      - platform.helios.io
+    resources:
+      - heliosapps
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - platform.helios.io
+    resources:
+      - heliosapps/status
+    verbs:
+      - get
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - '' # "" đại diện cho core API group
+    resources:
+      - services
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch

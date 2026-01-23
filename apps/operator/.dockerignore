@@ -1,3 +1,50 @@
 # More info: https://docs.docker.com/engine/reference/builder/#dockerignore-file
-# Ignore build and test binaries.
+
+# Build and test artifacts
 bin/
+dist/
+cover.out
+*.test
+*.out
+
+# Generated files (build artifacts)
+deploy.yaml
+
+# Development and CI/CD
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+.devcontainer/
+
+# Documentation
+*.md
+!README.md
+LICENSE
+CONTRIBUTING.md
+
+# Test files
+*_test.go
+test/
+testdata/
+
+# Config and deployment files (not needed in build context)
+config/
+*.yaml
+!go.mod
+!go.sum
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.swp
+*.swo
+*~
+.tmp/
+
+# Go workspace
+go.work
+go.work.sum

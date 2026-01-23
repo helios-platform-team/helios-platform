@@ -1,0 +1,62 @@
+# config/rbac/tekton_triggers_rbac.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-triggers-sa
+
+---
+# Quyền hạn trong namespace (Role)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-triggers-role
+rules:
+# Quyền để đọc các tài nguyên Triggers trong cùng namespace
+- apiGroups: ["triggers.tekton.dev"]
+  resources: ["eventlisteners", "triggerbindings", "triggertemplates", "triggers", "interceptors"]
+  verbs: ["get", "list", "watch"]
+# Quyền để tạo ra PipelineRun
+- apiGroups: ["tekton.dev"]
+  resources: ["pipelineruns", "taskruns"]
+  verbs: ["create"]
+
+---
+# Gắn quyền hạn trong namespace (RoleBinding)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-triggers-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: tekton-triggers-sa
+roleRef:
+  kind: Role
+  name: tekton-triggers-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Quyền hạn trên toàn cluster (ClusterRole) cho ClusterTriggerBindings
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tekton-triggers-cluster-role
+rules:
+- apiGroups: ["triggers.tekton.dev"]
+  resources: ["clustertriggerbindings", "clusterinterceptors"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Gắn quyền hạn trên toàn cluster (ClusterRoleBinding)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-triggers-cluster-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: tekton-triggers-sa
+  namespace: helios-apps # Namespace nơi EventListener đang chạy
+roleRef:
+  kind: ClusterRole
+  name: tekton-triggers-cluster-role
+  apiGroup: rbac.authorization.k8s.io

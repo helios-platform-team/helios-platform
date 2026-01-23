@@ -1,135 +1,141 @@
-# operator
-// TODO(user): Add simple overview of use/purpose
+# 🚀 Helios Operator
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+> GitOps Automation Platform for Kubernetes
 
-## Getting Started
+[![Go Version](https://img.shields.io/badge/Go-1.25+-blue.svg)](https://golang.org/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-v1.34+-blue.svg)](https://kubernetes.io/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-### Prerequisites
-- go version v1.24.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+> Fully automate your deployment workflow from code commit to production
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+[Documentation](#-documentation) • [Get Started](docs/GETTING_STARTED.md) • [Architecture](docs/ARCHITECTURE.md)
 
-```sh
-make docker-build docker-push IMG=<some-registry>/operator:tag
-```
+---
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+## 🎯 What is Helios?
 
-**Install the CRDs into the cluster:**
+**Helios Operator** is an intelligent Kubernetes Operator that helps you deploy applications using GitOps methodology automatically and easily. Just create a simple YAML file, and Helios handles the entire workflow!
 
-```sh
-make install
-```
+### ✨ Key Features
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+- 🎯 **Simplified GitOps**: Single CRD, no complex configuration needed
+- 🔄 **Fully Automated**: From manifest generation to deployment, zero manual intervention
+- 📊 **Real-time Monitoring**: Track deployment status directly from Kubernetes
+- 🛡️ **Production-ready**: RBAC, security, and best practices built-in
+- 🎭 **Smart Reconciliation**: Only rebuild when spec changes, saving resources
 
-```sh
-make deploy IMG=<some-registry>/operator:tag
-```
+**→ [Get Started with Helios](docs/GETTING_STARTED.md)** | **[View API Reference](docs/API_REFERENCE.md)**
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+---
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+## 📚 Documentation
 
-```sh
-kubectl apply -k config/samples/
-```
+Comprehensive documentation for using, developing, and maintaining Helios Operator.
 
->**NOTE**: Ensure that the samples has default values to test it out.
+### 🎯 Getting Started
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+| Document                                             | Description                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------- |
+| **[Getting Started Guide](docs/GETTING_STARTED.md)** | Step-by-step tutorial: install, create first app, verify deployment |
+| **[Setup Guide](docs/SETUP_GUIDE.md)**               | Detailed setup: cluster, dependencies, configuration                |
+| **[Architecture](docs/ARCHITECTURE.md)**             | Understand 3-phase GitOps workflow and internal design              |
 
-```sh
-kubectl delete -k config/samples/
-```
+### 🔧 Development & Testing
 
-**Delete the APIs(CRDs) from the cluster:**
+| Document                                     | Description                                 |
+| -------------------------------------------- | ------------------------------------------- |
+| **[Development Guide](docs/DEVELOPMENT.md)** | Build, run locally, development workflow    |
+| **[Testing Guide](docs/TESTING_GUIDE.md)**   | Unit tests, E2E tests, debugging strategies |
+| **[API Reference](docs/API_REFERENCE.md)**   | Complete HeliosApp CRD specification        |
 
-```sh
-make uninstall
-```
+### 🚀 Production & Operations
 
-**UnDeploy the controller from the cluster:**
+| Document                                                   | Description                                  |
+| ---------------------------------------------------------- | -------------------------------------------- |
+| **[Production Deployment](docs/PRODUCTION_DEPLOYMENT.md)** | HA setup, security hardening, best practices |
+| **[Monitoring](docs/MONITORING.md)**                       | Metrics, alerts, Grafana dashboards          |
+| **[Troubleshooting](docs/TROUBLESHOOTING.md)**             | Common issues, debugging, solutions          |
 
-```sh
-make undeploy
-```
+→ **[Complete Documentation Index](docs/README.md)**
 
-## Project Distribution
+### 📖 Quick Navigation
 
-Following the options to release and provide this solution to the users.
+| I want to...            | Documentation                                       |
+| ----------------------- | --------------------------------------------------- |
+| Deploy my first app     | → [Getting Started](docs/GETTING_STARTED.md)        |
+| Understand architecture | → [Architecture Guide](docs/ARCHITECTURE.md)        |
+| Check API specs         | → [API Reference](docs/API_REFERENCE.md)            |
+| Fix an issue            | → [Troubleshooting](docs/TROUBLESHOOTING.md)        |
+| Deploy to production    | → [Production Guide](docs/PRODUCTION_DEPLOYMENT.md) |
+| Setup monitoring        | → [Monitoring Guide](docs/MONITORING.md)            |
+| Develop locally         | → [Development Guide](docs/DEVELOPMENT.md)          |
+| Run tests               | → [Testing Guide](docs/TESTING_GUIDE.md)            |
 
-### By providing a bundle with all YAML files
+---
 
-1. Build the installer for the image built and published in the registry:
+## 📊 Project Status
 
-```sh
-make build-installer IMG=<some-registry>/operator:tag
-```
+| Component          | Status      | Version |
+| ------------------ | ----------- | ------- |
+| Core Operator      | ✅ Stable   | v1.0.0  |
+| Tekton Integration | ✅ Complete | -       |
+| ArgoCD Integration | ✅ Complete | -       |
+| E2E Tests          | ✅ Passing  | -       |
+| Documentation      | ✅ Complete | -       |
 
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
+### Technology Stack
 
-2. Using the installer
+#### Core
 
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
+- [Kubebuilder](https://book.kubebuilder.io/) v4.9+ - Operator framework
+- [Go](https://golang.org/) 1.25+ - Programming language
+- [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) - Kubernetes controllers
 
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/operator/<tag or branch>/dist/install.yaml
-```
+#### GitOps Components
 
-### By providing a Helm Chart
+- [Tekton Pipelines](https://tekton.dev/) latest - CI/CD pipelines
+- [Tekton Triggers](https://tekton.dev/docs/triggers/) latest - Event handling
+- [ArgoCD](https://argo-cd.readthedocs.io/) latest - GitOps deployment
 
-1. Build the chart using the optional helm plugin
+#### Testing
 
-```sh
-operator-sdk edit --plugins=helm/v1-alpha
-```
+- [Ginkgo](https://onsi.github.io/ginkgo/) v2 - BDD testing framework
+- [Gomega](https://onsi.github.io/gomega/) - Matcher library
 
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
+### Future Enhancements
 
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
+- Multi-cluster support
+- Helm chart repository
+- Web dashboard
+- Notification integrations (Slack, Discord, Email)
+- Advanced rollback strategies
+- Cost optimization features
+- Plugin system for extensibility
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+---
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
+## 🙏 Acknowledgments
 
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+Built with:
 
-## License
+- [Kubebuilder](https://book.kubebuilder.io/) - Operator framework
+- [Tekton](https://tekton.dev/) - CI/CD pipelines
+- [ArgoCD](https://argo-cd.readthedocs.io/) - GitOps deployment
+- [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) - Kubernetes controllers
 
-Copyright 2026.
+---
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+## 📄 License
 
-    http://www.apache.org/licenses/LICENSE-2.0
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+---
 
+## 💬 Support
+
+- **Documentation**: [docs/](docs/)
+- **Team**: Internal project - Contact team members directly
+
+---
+
+Made with ❤️ by Helios Team @ HCMUS

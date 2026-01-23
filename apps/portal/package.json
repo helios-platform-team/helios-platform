@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": "22 || 24"
+    "node": "20 || 22"
   },
   "scripts": {
-    "start": "backstage-cli repo start",
+    "start": "max_old_space_size=4096 NODE_OPTIONS=--no-node-snapshot backstage-cli repo start",
     "build:backend": "yarn workspace backend build",
     "build:all": "backstage-cli repo build --all",
     "build-image": "yarn workspace backend build-image",
@@ -17,7 +17,7 @@
     "test:all": "backstage-cli repo test --coverage",
     "test:e2e": "playwright test",
     "fix": "backstage-cli repo fix",
-    "lint": "backstage-cli repo lint --since origin/main",
+    "lint": "backstage-cli repo lint --since origin/master",
     "lint:all": "backstage-cli repo lint",
     "prettier:check": "prettier --check .",
     "new": "backstage-cli new"
@@ -29,13 +29,9 @@
     ]
   },
   "devDependencies": {
-    "@backstage/cli": "^0.35.0",
+    "@backstage/cli": "^0.34.4",
     "@backstage/e2e-test-utils": "^0.1.1",
-    "@jest/environment-jsdom-abstract": "^30.0.0",
     "@playwright/test": "^1.32.3",
-    "@types/jest": "^30.0.0",
-    "jest": "^30.2.0",
-    "jsdom": "^27.1.0",
     "node-gyp": "^10.0.0",
     "prettier": "^2.3.2",
     "typescript": "~5.8.0"

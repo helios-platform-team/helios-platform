@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- heliosapp_v1_heliosapp.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

@@ -1,0 +1,67 @@
+# Phần này bao gồm TriggerTemplate và EventListener để tự động kích hoạt Pipeline khi có sự kiện (ví dụ: git push).
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  # Operator sẽ điền tên
+  name: <triggertemplate-name>
+spec:
+  params:
+    - name: git-repo-url
+      description: The git repository url
+    - name: git-revision
+      description: The git revision
+    - name: image-repo
+      description: The image repository
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: $(tt.params.image-repo)-run-
+      spec:
+        pipelineRef:
+          # Tên của Pipeline đã tạo ở trên
+          name: <pipeline-name>
+        params:
+          - name: git-repo
+            value: $(tt.params.git-repo-url)
+          - name: git-revision
+            value: $(tt.params.git-revision)
+          - name: image-repo
+            value: $(tt.params.image-repo)
+        workspaces:
+          - name: source-code
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi
+
+---
+# EventListener lắng nghe các sự kiện từ bên ngoài (ví dụ: webhook từ GitHub)
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  # Operator sẽ điền tên
+  name: <eventlistener-name>
+spec:
+  serviceAccountName: tekton-triggers-sa # Cần tạo service account này với quyền hạn phù hợp
+  triggers:
+    - name: git-push-trigger
+      interceptors:
+        - ref:
+            name: "github"
+          params:
+            - name: "secretRef"
+              value:
+                secretName: github-webhook-secret
+                secretKey: secretToken
+            - name: "eventTypes"
+              value: ["push"]
+      bindings:
+        # Binding này trích xuất thông tin từ payload của webhook
+        - ref: "github-push"
+      template:
+        # Tên của TriggerTemplate đã tạo ở trên
+        ref: <triggertemplate-name>

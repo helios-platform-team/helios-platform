@@ -1,0 +1,55 @@
+apiVersion: platform.helios.io/v1
+kind: HeliosApp
+metadata:
+  name: ${{ values.appName }}
+  namespace: default
+  annotations:
+    backstage.io/kubernetes-id: ${{ values.appName }}
+spec:
+  gitRepo: "https://github.com/${{ values.githubOwner }}/${{ values.appName }}.git"
+  gitBranch: "main"
+  imageRepo: "docker.io/phamhoangkha1403/${{ values.appName }}"
+  
+  port: ${{ values.port }}
+  replicas: ${{ values.replicas }}
+  
+  # Smart Rightsizer Feature
+  enableAutoOptimization: ${{ values.enableAutoOpt }}
+
+  # --- THÊM ĐOẠN NÀY (Để sửa lỗi Required value) ---
+  templateRepo: "https://github.com/PhamHoangKha1403/helios-template"
+  templatePath: "templates/simple-app"
+  # ------------------------------------------------
+
+  pipelineName: "from-code-to-cluster"
+  serviceAccount: "pipeline-sa"
+  webhookSecret: "github-webhook-secret"
+  pvcName: "shared-workspace-pvc"
+  
+  gitopsRepo: "https://github.com/PhamHoangKha1403/helios-gitops"
+  gitopsPath: "apps/dev/${{ values.appName }}"
+  contextSubpath: ""
+  
+  values:
+    environment: "dev"
+  
+  # Inject Environment Variables
+  # Inject Environment Variables
+  env:
+    {%- if values.envVars %}
+    {%- for line in values.envVars.split('\n') %}
+      {%- set parts = line.split('=') %}
+      {%- if parts[1] %}
+    - name: {{ parts[0] | trim }}
+      value: {{ parts[1] | trim }}
+      {%- endif %}
+    {%- endfor %}
+    {%- endif %}
+    
+  resources:
+    requests:
+      cpu: "${{ values.cpuRequest }}"
+      memory: "${{ values.memoryRequest }}"
+    limits:
+      cpu: "${{ values.cpuLimit }}"
+      memory: "${{ values.memoryLimit }}"

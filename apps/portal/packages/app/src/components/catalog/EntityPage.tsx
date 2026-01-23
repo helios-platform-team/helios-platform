@@ -34,7 +34,9 @@ import {
   EntityOwnershipCard,
 } from '@backstage/plugin-org';
 import { EntityTechdocsContent } from '@backstage/plugin-techdocs';
-import { EmptyState } from '@backstage/core-components';
+import { InfoCard } from '@backstage/core-components';
+import { useEntity } from '@backstage/plugin-catalog-react';
+import { Typography, Box } from '@material-ui/core';
 import {
   Direction,
   EntityCatalogGraphCard,
@@ -67,33 +69,27 @@ const techdocsContent = (
 );
 
 const cicdContent = (
-  // This is an example of how you can implement your company's logic in entity page.
-  // You can for example enforce that all components of type 'service' should use GitHubActions
-  <EntitySwitch>
-    {/*
-      Here you can add support for different CI/CD services, for example
-      using @backstage-community/plugin-github-actions as follows:
-      <EntitySwitch.Case if={isGithubActionsAvailable}>
-        <EntityGithubActionsContent />
-      </EntitySwitch.Case>
-     */}
-    <EntitySwitch.Case>
-      <EmptyState
-        title="No CI/CD available for this entity"
-        missing="info"
-        description="You need to add an annotation to your component if you want to enable CI/CD for it. You can read more about annotations in Backstage by clicking the button below."
-        action={
-          <Button
-            variant="contained"
-            color="primary"
-            href="https://backstage.io/docs/features/software-catalog/well-known-annotations"
-          >
-            Read more
-          </Button>
-        }
-      />
-    </EntitySwitch.Case>
-  </EntitySwitch>
+  <Grid container spacing={3}>
+    <Grid item xs={12}>
+      <InfoCard title="Helios CI/CD Pipeline">
+        <Typography variant="body1" paragraph>
+          Helios Apps use <strong>Tekton Pipelines</strong> for CI/CD, managed automatically by the Helios Operator.
+        </Typography>
+        <Typography variant="body2" color="textSecondary" paragraph>
+          Pipeline features:
+        </Typography>
+        <ul>
+          <li>Automatic build on Git push (via GitHub webhook)</li>
+          <li>Container image build & push to registry</li>
+          <li>GitOps manifest generation</li>
+          <li>ArgoCD sync for deployment</li>
+        </ul>
+        <Typography variant="body2" style={{ marginTop: 16 }}>
+          View running pipelines in the <strong>Kubernetes</strong> tab → PipelineRuns
+        </Typography>
+      </InfoCard>
+    </Grid>
+  </Grid>
 );
 
 const entityWarningContent = (
@@ -123,6 +119,57 @@ const entityWarningContent = (
     </EntitySwitch>
   </>
 );
+
+
+import { ResourceUtilizationChart } from './ResourceUtilizationChart';
+
+const EntitySettingsContent = () => {
+  const { entity } = useEntity();
+  // Simple heuristic to get repo URL from annotations
+  const sourceLoc = entity.metadata.annotations?.['backstage.io/source-location'] || '';
+  const repoUrl = sourceLoc.startsWith('url:') ? sourceLoc.slice(4) : sourceLoc;
+  
+  // Construct deep link to the template with pre-filled data
+  const spec = (entity as any).spec || {};
+  const resources = spec.resources || {};
+  const requests = resources.requests || {};
+  
+  const formData = JSON.stringify({
+    appName: entity.metadata.name,
+    gitRepo: repoUrl,
+    resourceConfig: {
+      replicas: spec.replicas || 1,
+      cpuRequest: requests.cpu || "200m",
+      memoryRequest: requests.memory || "256Mi",
+    }
+  });
+  const updateLink = `/create/templates/default/update-helios-app?formData=${encodeURIComponent(formData)}`;
+
+  return (
+    <Grid container spacing={3}>
+      <Grid item xs={12} md={6}>
+        <InfoCard title="Configuration Management">
+          <Typography variant="body1" paragraph>
+            Need to adjust resources or environment variables?
+            Use the automated configuration tool to create a Pull Request.
+          </Typography>
+          <Box display="flex" style={{ gap: '16px' }}>
+            <Button
+              variant="contained"
+              color="primary"
+              href={updateLink}
+            >
+              Edit Configuration
+            </Button>
+          </Box>
+        </InfoCard>
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <ResourceUtilizationChart />
+      </Grid>
+    </Grid>
+  );
+};
 
 const overviewContent = (
   <Grid container spacing={3} alignItems="stretch">
@@ -181,6 +228,10 @@ const serviceEntityPage = (
           <EntityDependsOnResourcesCard variant="gridItem" />
         </Grid>
       </Grid>
+    </EntityLayout.Route>
+
+    <EntityLayout.Route path="/settings" title="Settings">
+      <EntitySettingsContent />
     </EntityLayout.Route>
 
     <EntityLayout.Route path="/docs" title="Docs">

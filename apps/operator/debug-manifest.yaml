@@ -1,0 +1,42 @@
+apiVersion: platform.helios.io/v1
+kind: HeliosApp
+metadata:
+  name: helios-test-debug
+  namespace: default
+  annotations:
+    backstage.io/kubernetes-id: helios-test-debug
+spec:
+  gitRepo: "https://github.com/PhamHoangKha1403/demo-app.git"
+  gitBranch: "main"
+  imageRepo: "docker.io/phamhoangkha1403/helios-test-debug"
+  
+  port: 80
+  replicas: 1
+
+  # Smart Rightsizer Feature
+  enableAutoOptimization: true
+
+  templateRepo: "https://github.com/PhamHoangKha1403/helios-template"
+  templatePath: "templates/simple-app"
+
+  pipelineName: "from-code-to-cluster"
+  serviceAccount: "pipeline-sa"
+  webhookSecret: "github-webhook-secret"
+  pvcName: "shared-workspace-pvc"
+  
+  gitopsRepo: "https://github.com/PhamHoangKha1403/helios-gitops"
+  gitopsPath: "apps/dev/helios-test-debug"
+  contextSubpath: ""
+  
+  values:
+    environment: "dev"
+  
+  env:
+    
+  resources:
+    requests:
+      cpu: "300m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
