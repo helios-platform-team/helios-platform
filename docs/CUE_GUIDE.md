@@ -1,34 +1,50 @@
-# Deploying a New Application
+# Deploying a New Application (Updated)
+
+This guide explains how to deploy a new application using the current CUE-based system architecture, which is built around an `app` definition containing multiple components.
+
+---
 
 ## 1. Create a Service Definition File
 
-To deploy a new application, create a `.cue` file inside the `templates/services/` directory with minimal content as shown below:
+To deploy a new application, create a `.cue` file inside the `templates/services/` directory.
+
+Instead of defining a single workload directly, the system now uses an **application structure (`app`)** that contains a list of **components**.
+
+### Example
+
+**File:** `templates/services/myApp.cue`
 
 ```cue
-package services
+package main
 
-import "helios.io/templates/definitions"
-
-myAppName: definitions.#Workload & {
-    name:     "application-name"
-    image:    "docker-image-path:tag"
-    replicas: 3
-    port:     80
+// The user defines application components here.
+// The system engine handles rendering and resource generation.
+app: {
+    name: "my-application-name"
+    components: [
+        {
+            name: "backend"
+            type: "web-service" // Must match a key in the ComponentRegistry
+            properties: {
+                image:      "my-backend-image:v1"
+                replicas:   3      // Optional, default is 1
+                port:       8080   // Container port, default is 8080
+                exposePort: 80     // Service port. If set, a Service is created.
+            }
+        }
+    ]
 }
 ```
 
-- name: The name of the application
-
-- image: Docker image path with tag
-
-- replicas: Number of running replicas
-
-- port: Exposed container port
-
 ## 2. Main Execution Commands
 
-Below are the main commands used when working with the project:
-| Command | Description |
-| ------------- |:-------------:|
-| `cue vet ./templates/...` | Validate logic and data types across the entire project |
-| `cue export ./templates/definitions/... ./templates/services/myApp.cue -e 'myApp.objects' --out yaml` | Render a specific application into YAML |
+Below are the main commands used when working with the project.
+
+| Command                                                                                                    | Description                                             |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `cue vet ./templates/...`                                                                                  | Validate logic and data types across the entire project |
+| `cue export ./templates/system/builder.cue ./templates/services/myApp.cue -e kubernetesObjects --out yaml` | Render the application into standard Kubernetes YAML    |
+
+```
+
+```
