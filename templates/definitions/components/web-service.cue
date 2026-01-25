@@ -3,6 +3,9 @@ package components
 import "helios.io/templates/definitions/bases"
 
 #WebService: {
+    // Alias the top-level parameter to avoid shadowing
+    let Params = parameter
+
     parameter: {
         name:       string
         image:      string
@@ -13,10 +16,11 @@ import "helios.io/templates/definitions/bases"
     outputs: {
         deployment: bases.#Deployment & {
             parameter: {
-                name:     parameter.name
-                image:    parameter.image
-                replicas: parameter.replicas
-                port:     parameter.port
+                // Use the alias here
+                name:     Params.name
+                image:    Params.image
+                replicas: Params.replicas
+                port:     Params.port
             }
         }
     }

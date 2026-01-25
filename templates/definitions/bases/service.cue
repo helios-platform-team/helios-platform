@@ -2,9 +2,10 @@ package bases
 
 #Service: {
     parameter: {
-        name:       string
-        port:       int
-        targetPort: int
+        name:          string
+        componentName: string 
+        port:          int
+        targetPort:    int
     }
 
     output: {
@@ -16,7 +17,7 @@ package bases
         }
         spec: {
             type: "ClusterIP"
-            selector: app: parameter.name
+            selector: app: parameter.componentName 
             ports: [{
                 "port":       parameter.port
                 "targetPort": parameter.targetPort

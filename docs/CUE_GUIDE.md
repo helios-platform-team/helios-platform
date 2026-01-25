@@ -42,7 +42,7 @@ The **Helios Operator** is responsible for:
 #### `templates/definitions/`
 
 Contains definitions for **Components** (e.g. `WebService`) and **Traits** (e.g. `Ingress`, `Service`).  
-These definitions act like *classes* in the system, describing reusable behavior and structure.
+These definitions act like _classes_ in the system, describing reusable behavior and structure.
 
 #### `templates/system/`
 
@@ -63,7 +63,17 @@ These files are used for **testing and development only** and are **not intended
    ```cue
    app: { ... }
    ```
+
 4. The CUE engine (`builder.cue`) evaluates the input data against the component and trait definitions to produce concrete Kubernetes manifests.
 
 5. The Helios Operator then applies the generated Kubernetes objects  
-(e.g. `Deployment`, `Service`, `Ingress`) to the target cluster.
+   (e.g. `Deployment`, `Service`, `Ingress`) to the target cluster.
+
+## 4. Main Execution Commands
+
+Below are the main commands used when working with the project.
+
+| Command                                                                                               | Description                                             |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `cue vet ./templates/...`                                                                             | Validate logic and data types across the entire project |
+| `cue export ./examples/simple-app.cue ./templates/system/builder.cue -e kubernetesObjects --out yaml` | Render the application into standard Kubernetes YAML    |

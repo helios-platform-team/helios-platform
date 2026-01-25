@@ -3,19 +3,23 @@ package traits
 import "helios.io/templates/definitions/bases"
 
 #ServiceTrait: {
-	parameter: {
-		name:       string
-		port:       int
-		targetPort: int
-	}
+    let Params = parameter
 
-	outputs: {
-		service: bases.#Service & {
-			parameter: {
-				name:       parameter.name
-				port:       parameter.port
-				targetPort: parameter.targetPort
-			}
-		}
-	}
+    parameter: {
+        name:          string
+        componentName: string 
+        port:          int
+        targetPort:    int
+    }
+
+    outputs: {
+        service: bases.#Service & {
+            parameter: {
+                name:          Params.name
+                componentName: Params.componentName 
+                port:          Params.port
+                targetPort:    Params.targetPort
+            }
+        }
+    }
 }
