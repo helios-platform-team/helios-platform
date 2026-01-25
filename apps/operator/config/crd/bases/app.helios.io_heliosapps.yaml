@@ -164,6 +164,11 @@ spec:
                 type: string
               phase:
                 description: Phase represents the current phase of the application
+                enum:
+                - Pending
+                - Ready
+                - Failed
+                - Deleting
                 type: string
               resourcesCreated:
                 description: ResourcesCreated lists the resources created by this

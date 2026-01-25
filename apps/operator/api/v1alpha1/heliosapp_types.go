@@ -69,11 +69,23 @@ type Trait struct {
 	Properties *runtime.RawExtension `json:"properties"`
 }
 
+// HeliosAppPhase defines the phase of HeliosApp
+type HeliosAppPhase string
+
+const (
+	PhasePending  HeliosAppPhase = "Pending"
+	PhaseReady    HeliosAppPhase = "Ready"
+	PhaseFailed   HeliosAppPhase = "Failed"
+	PhaseDeleting HeliosAppPhase = "Deleting"
+)
+
 // HeliosAppStatus defines the observed state of HeliosApp
 type HeliosAppStatus struct {
+
 	// Phase represents the current phase of the application
 	// +optional
-	Phase string `json:"phase,omitempty"`
+	// +kubebuilder:validation:Enum=Pending;Ready;Failed;Deleting
+	Phase HeliosAppPhase `json:"phase,omitempty"`
 
 	// Message provides additional information about the status
 	// +optional

@@ -79,7 +79,7 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	objects, err := r.CueEngine.RenderToObjects(appModel)
 	if err != nil {
 		log.Error(err, "Failed to render application via CUE")
-		r.updateStatus(ctx, &heliosApp, "Failed", fmt.Sprintf("CUE rendering failed: %v", err))
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("CUE rendering failed: %v", err))
 		return ctrl.Result{}, err
 	}
 
@@ -97,7 +97,7 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// 5. Update status
-	heliosApp.Status.Phase = "Ready"
+	heliosApp.Status.Phase = appv1alpha1.PhaseReady
 	heliosApp.Status.Message = fmt.Sprintf("Successfully deployed %d resources", len(resourcesCreated))
 	heliosApp.Status.ResourcesCreated = resourcesCreated
 	if err := r.Status().Update(ctx, &heliosApp); err != nil {
@@ -213,7 +213,7 @@ func (r *HeliosAppReconciler) applyResource(ctx context.Context, owner *appv1alp
 }
 
 // updateStatus updates the HeliosApp status
-func (r *HeliosAppReconciler) updateStatus(ctx context.Context, app *appv1alpha1.HeliosApp, phase, message string) {
+func (r *HeliosAppReconciler) updateStatus(ctx context.Context, app *appv1alpha1.HeliosApp, phase appv1alpha1.HeliosAppPhase, message string) {
 	app.Status.Phase = phase
 	app.Status.Message = message
 	if err := r.Status().Update(ctx, app); err != nil {
