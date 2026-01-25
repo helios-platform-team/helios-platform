@@ -36,6 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller"
+	heliosCue "github.com/helios-platform-team/helios-platform/apps/operator/internal/cue"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -47,6 +51,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -198,6 +203,38 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize CUE Engine
+	// For local development: resolve from project root
+	// For production: use HELIOS_CUE_PATH env var or ConfigMap mount
+	cuePath := os.Getenv("HELIOS_CUE_PATH")
+	if cuePath == "" {
+		// Try to find cue directory relative to where we're running
+		// First check if we're in apps/operator (local dev)
+		if _, err := os.Stat(filepath.Join("..", "..", "cue")); err == nil {
+			cuePath = filepath.Join("..", "..", "cue")
+		} else if _, err := os.Stat("cue"); err == nil {
+			// Running from project root
+			cuePath = "cue"
+		} else {
+			// Default for production (ConfigMap mount)
+			cuePath = "/etc/helios/cue"
+		}
+	}
+	cueEngine, err := heliosCue.NewEngine(cuePath)
+	if err != nil {
+		setupLog.Error(err, "unable to create CUE engine", "cuePath", cuePath)
+		os.Exit(1)
+	}
+	setupLog.Info("CUE engine initialized", "cuePath", cuePath)
+
+	if err := (&controller.HeliosAppReconciler{
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		CueEngine: cueEngine,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "HeliosApp")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if metricsCertWatcher != nil {
