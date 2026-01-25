@@ -35,6 +35,18 @@ type HeliosAppSpec struct {
 	// Components define the workloads of the application
 	// +kubebuilder:validation:MinItems=1
 	Components []Component `json:"components"`
+
+	// GitOpsRepo is the URL of the GitOps repository
+	// +kubebuilder:validation:Required
+	GitOpsRepo string `json:"gitopsRepo"`
+
+	// GitOpsPath is the path within the GitOps repository
+	// +kubebuilder:validation:Required
+	GitOpsPath string `json:"gitopsPath"`
+
+	// GitOpsSecretRef is the name of the secret containing git credentials (token)
+	// +optional
+	GitOpsSecretRef string `json:"gitopsSecretRef,omitempty"`
 }
 
 // Component represents an OAM component (WHAT to run)

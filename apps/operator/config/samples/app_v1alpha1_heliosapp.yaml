@@ -24,3 +24,6 @@ spec:
           properties:
             host: "api.example.com"
             port: 3000
+  gitopsRepo: "https://github.com/YOUR_USERNAME/helios-gitops"
+  gitopsPath: "apps/dev/heliosapp"
+  gitopsSecretRef: "github-webhook-secret"

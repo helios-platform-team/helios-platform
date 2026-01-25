@@ -93,11 +93,23 @@ spec:
               description:
                 description: Description of the application
                 type: string
+              gitopsPath:
+                description: GitOpsPath is the path within the GitOps repository
+                type: string
+              gitopsRepo:
+                description: GitOpsRepo is the URL of the GitOps repository
+                type: string
+              gitopsSecretRef:
+                description: GitOpsSecretRef is the name of the secret containing
+                  git credentials (token)
+                type: string
               owner:
                 description: Owner team of the application
                 type: string
             required:
             - components
+            - gitopsPath
+            - gitopsRepo
             type: object
           status:
             description: HeliosAppStatus defines the observed state of HeliosApp
