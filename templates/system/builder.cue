@@ -1,4 +1,4 @@
-package main
+package system
 
 // Import the folders
 import "helios.io/templates/definitions/components"

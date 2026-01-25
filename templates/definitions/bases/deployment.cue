@@ -1,24 +1,26 @@
 package bases
 
 #Deployment: {
-    name:     string
-    image:    string
-    replicas: int
-    port:     int
-    
+    parameter: {
+        name:     string
+        image:    string
+        replicas: int | *1
+        port:     int
+    }
+
     output: {
         apiVersion: "apps/v1"
         kind:       "Deployment"
-        metadata: "name": name
+        metadata: "name": parameter.name
         spec: {
-            "replicas": replicas
-            selector: matchLabels: app: name
+            "replicas": parameter.replicas
+            selector: matchLabels: app: parameter.name
             template: {
-                metadata: labels: app: name
+                metadata: labels: app: parameter.name
                 spec: containers: [{
-                    "name":  name
-                    "image": image
-                    ports: [{containerPort: port}]
+                    "name":  parameter.name
+                    "image": parameter.image
+                    ports: [{containerPort: parameter.port}]
                 }]
             }
         }
