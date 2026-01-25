@@ -1,0 +1,26 @@
+apiVersion: app.helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: sample-app
+  namespace: default
+spec:
+  owner: dev-team
+  description: "Sample web application"
+  components:
+    - name: api-server
+      type: web-service
+      properties:
+        image: "myregistry/api:v1.0.0"
+        port: 3000
+        replicas: 2
+        env:
+          - name: NODE_ENV
+            value: production
+      traits:
+        - type: service
+          properties:
+            port: 3000
+        - type: ingress
+          properties:
+            host: "api.example.com"
+            port: 3000
