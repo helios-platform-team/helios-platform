@@ -1,13 +1,13 @@
 package main
 
 import (
-	// "helios.io/templates/schema"
+	"helios.io/templates/schema"
 	"helios.io/templates/definitions/components"
 	"helios.io/templates/definitions/traits"
 )
 
 // Input application must satisfy the Helios schema
-// schema.#HeliosApp
+app: schema.#HeliosApp
 
 // Component type registry - maps component types to their definitions
 #ComponentRegistry: {

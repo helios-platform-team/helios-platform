@@ -44,6 +44,10 @@ The **Helios Operator** is responsible for:
 Contains definitions for **Components** (e.g. `WebService`) and **Traits** (e.g. `Ingress`, `Service`).  
 These definitions act like _classes_ in the system, describing reusable behavior and structure.
 
+#### `templates/schema/`
+
+Contains **Schema Contracts (heliosapp.cue)**: These files enforce strict typing and validation rules for the input data, ensuring the operator rejects invalid configurations before processing
+
 #### `templates/system/`
 
 Contains `builder.cue`, which acts as the **main function** of the engine.  
@@ -63,10 +67,9 @@ These files are used for **testing and development only** and are **not intended
    ```cue
    app: { ... }
    ```
-
-4. The CUE engine (`builder.cue`) evaluates the input data against the component and trait definitions to produce concrete Kubernetes manifests.
-
-5. The Helios Operator then applies the generated Kubernetes objects  
+4. Validation: The CUE engine validates the input against the schema (#HeliosApp) to ensure all required fields (like name, type) are present.
+5. Execution: The CUE engine (`builder.cue`) evaluates the input data against the component and trait definitions to produce concrete Kubernetes manifests.
+6. The Helios Operator then applies the generated Kubernetes objects  
    (e.g. `Deployment`, `Service`, `Ingress`) to the target cluster.
 
 ## 4. Main Execution Commands
@@ -75,5 +78,5 @@ Below are the main commands used when working with the project.
 
 | Command                                                                                               | Description                                             |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `cue vet ./templates/...`                                                                             | Validate logic and data types across the entire project |
+| `cue vet ./templates/system/builder.cue ./examples/simple-app.cue`                                                                             | Validate that the input matches the Schema requirements (return nothing for no error) |
 | `cue export ./examples/simple-app.cue ./templates/system/builder.cue -e kubernetesObjects --out yaml` | Render the application into standard Kubernetes YAML    |
