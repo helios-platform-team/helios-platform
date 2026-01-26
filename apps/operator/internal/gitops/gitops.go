@@ -54,20 +54,6 @@ func NewGitOpsClient(repoURL, username, token string) *GitOpsClient {
 	}
 }
 
-// NewInMemoryGitOpsClient creates a new client that uses in-memory storage (for testing)
-func NewInMemoryGitOpsClient(repoURL, username, token string) *GitOpsClient {
-	return &GitOpsClient{
-		RepoURL: repoURL,
-		Auth: &http.BasicAuth{
-			Username: username,
-			Password: token,
-		},
-		AuthorName:  "Helios Operator",
-		AuthorEmail: "operator@helios.io",
-		inMemory:    true,
-	}
-}
-
 // SyncManifest clones the repo, updates the manifest file, commits, and pushes the changes.
 // filePath: relative path to the manifest file in the repo (e.g. "apps/my-app/manifest.yaml")
 func (c *GitOpsClient) SyncManifest(ctx context.Context, filePath, content string) error {
