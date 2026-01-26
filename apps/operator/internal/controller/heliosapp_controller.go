@@ -18,6 +18,8 @@ package controller
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -42,7 +44,9 @@ import (
 type HeliosAppReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
-	CueEngine *heliosCue.Engine
+	CueEngine heliosCue.CueEngineInterface
+	// GitFactory allows injecting a custom GitOps client (e.g. for testing)
+	GitFactory func(string, string, string) gitops.GitOpsClientInterface
 }
 
 // +kubebuilder:rbac:groups=app.helios.io,resources=heliosapps,verbs=get;list;watch;create;update;patch;delete
@@ -203,12 +207,16 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 				token = string(p)
 			} else {
 				log.Info("Secret found but 'token' or 'password' key is missing", "Secret", heliosApp.Spec.GitOpsSecretRef)
+				r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Secret %s missing 'token' key", heliosApp.Spec.GitOpsSecretRef))
+				return ctrl.Result{}, nil
 			}
 			if u, ok := secret.Data["username"]; ok {
 				username = string(u)
 			}
 		} else {
 			log.Error(err, "Failed to get GitOps Secret", "Secret", heliosApp.Spec.GitOpsSecretRef)
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Secret %s not found", heliosApp.Spec.GitOpsSecretRef))
+			return ctrl.Result{}, nil
 		}
 	}
 
@@ -221,27 +229,49 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, nil // Don't retry immediately if config is missing
 	}
 
-	gitClient := gitops.NewGitOpsClient(heliosApp.Spec.GitOpsRepo, username, token)
-	targetPath := fmt.Sprintf("%s/manifest.yaml", heliosApp.Spec.GitOpsPath)
+	// OPTIMIZATION: Check Hash
+	currentHash := r.computeHash(manifestBytes)
+	if heliosApp.Status.LastAppliedHash == currentHash {
+		log.Info("Manifest hash unchanged, skipping GitOps sync", "hash", currentHash)
 
-	if err := gitClient.SyncManifest(ctx, targetPath, string(manifestBytes)); err != nil {
-		log.Error(err, "GitOps sync failed")
-		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("GitOps failed: %v", err))
-		return ctrl.Result{}, err
+		// Still ensure status is Ready if it was previously set
+		if heliosApp.Status.Phase != appv1alpha1.PhaseReady {
+			heliosApp.Status.Phase = appv1alpha1.PhaseReady
+			if err := r.Status().Update(ctx, &heliosApp); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// Use GitFactory if available, otherwise default to NewGitOpsClient
+		getGitClient := r.GitFactory
+		if getGitClient == nil {
+			getGitClient = func(repo, user, token string) gitops.GitOpsClientInterface {
+				return gitops.NewGitOpsClient(repo, user, token)
+			}
+		}
+
+		gitClient := getGitClient(heliosApp.Spec.GitOpsRepo, username, token)
+		targetPath := fmt.Sprintf("%s/manifest.yaml", heliosApp.Spec.GitOpsPath)
+
+		if err := gitClient.SyncManifest(ctx, targetPath, string(manifestBytes)); err != nil {
+			log.Error(err, "GitOps sync failed")
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("GitOps failed: %v", err))
+			return ctrl.Result{}, err
+		}
+
+		// 6. Update Status
+		heliosApp.Status.Phase = appv1alpha1.PhaseReady
+		heliosApp.Status.Message = fmt.Sprintf("Manifest pushed to %s/%s", heliosApp.Spec.GitOpsRepo, targetPath)
+		heliosApp.Status.LastAppliedHash = currentHash
+		// We clear ResourcesCreated as we are not managing them directly anymore
+		heliosApp.Status.ResourcesCreated = nil
+
+		if err := r.Status().Update(ctx, &heliosApp); err != nil {
+			log.Error(err, "Failed to update status")
+			return ctrl.Result{}, err
+		}
+		log.Info("Successfully reconciled HeliosApp via GitOps", "newHash", currentHash)
 	}
-
-	// 6. Update Status
-	heliosApp.Status.Phase = appv1alpha1.PhaseReady
-	heliosApp.Status.Message = fmt.Sprintf("Manifest pushed to %s/%s", heliosApp.Spec.GitOpsRepo, targetPath)
-	// We clear ResourcesCreated as we are not managing them directly anymore
-	heliosApp.Status.ResourcesCreated = nil
-
-	if err := r.Status().Update(ctx, &heliosApp); err != nil {
-		log.Error(err, "Failed to update status")
-		return ctrl.Result{}, err
-	}
-
-	log.Info("Successfully reconciled HeliosApp via GitOps")
 
 	// 7. Ensure ArgoCD Application exists
 	log.Info("Ensuring ArgoCD Application exists")
@@ -358,6 +388,12 @@ func (r *HeliosAppReconciler) updateStatus(ctx context.Context, app *appv1alpha1
 	if err := r.Status().Update(ctx, app); err != nil {
 		logf.FromContext(ctx).Error(err, "Failed to update status")
 	}
+}
+
+// computeHash returns SHA256 of data
+func (r *HeliosAppReconciler) computeHash(data []byte) string {
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:])
 }
 
 // SetupWithManager sets up the controller with the Manager

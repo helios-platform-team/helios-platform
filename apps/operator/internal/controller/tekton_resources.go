@@ -20,28 +20,28 @@ func GenerateEventListener(name, namespace, triggerName, gitBindingName, default
 		},
 		"spec": map[string]any{
 			"serviceAccountName": "tekton-triggers-sa",
-			"triggers": []map[string]any{
-				{
+			"triggers": []any{
+				map[string]any{
 					"name": triggerName,
-					"bindings": []map[string]any{
-						{"ref": gitBindingName},
-						{"ref": defaultsBindingName},
+					"bindings": []any{
+						map[string]any{"ref": gitBindingName},
+						map[string]any{"ref": defaultsBindingName},
 					},
 					"template": map[string]any{
 						"ref": templateName,
 					},
-					"interceptors": []map[string]any{
-						{
+					"interceptors": []any{
+						map[string]any{
 							"ref": map[string]any{
 								"name": "github",
 								"kind": "ClusterInterceptor",
 							},
-							"params": []map[string]any{
-								{"name": "secretRef", "value": map[string]any{
+							"params": []any{
+								map[string]any{"name": "secretRef", "value": map[string]any{
 									"secretName": githubSecret,
 									"secretKey":  "secretToken",
 								}},
-								{"name": "eventTypes", "value": []string{"push"}},
+								map[string]any{"name": "eventTypes", "value": []any{"push"}},
 							},
 						},
 					},
@@ -62,10 +62,10 @@ func GenerateTriggerBinding(name, namespace string) (*unstructured.Unstructured,
 			"namespace": namespace,
 		},
 		"spec": map[string]any{
-			"params": []map[string]any{
-				{"name": "git-repo-url", "value": "$(body.repository.clone_url)"},
-				{"name": "git-revision", "value": "$(body.after)"},
-				{"name": "git-repo-name", "value": "$(body.repository.name)"},
+			"params": []any{
+				map[string]any{"name": "git-repo-url", "value": "$(body.repository.clone_url)"},
+				map[string]any{"name": "git-revision", "value": "$(body.after)"},
+				map[string]any{"name": "git-repo-name", "value": "$(body.repository.name)"},
 			},
 		},
 	}
@@ -94,15 +94,15 @@ func GenerateDefaultsTriggerBinding(name, namespace string, app *appv1alpha1.Hel
 			"namespace": namespace,
 		},
 		"spec": map[string]any{
-			"params": []map[string]any{
-				{"name": "image-repo", "value": app.Spec.ImageRepo},
-				{"name": "gitops-repo-url", "value": app.Spec.GitOpsRepo},
-				{"name": "manifest-path-in-gitops-repo", "value": app.Spec.GitOpsPath},
-				{"name": "gitops-repo-branch", "value": gitOpsBranch},
-				{"name": "pvc-name", "value": pvcName},
-				{"name": "context-subpath", "value": contextSubpath},
-				{"name": "replicas", "value": fmt.Sprintf("%d", app.Spec.Replicas)},
-				{"name": "port", "value": fmt.Sprintf("%d", app.Spec.Port)},
+			"params": []any{
+				map[string]any{"name": "image-repo", "value": app.Spec.ImageRepo},
+				map[string]any{"name": "gitops-repo-url", "value": app.Spec.GitOpsRepo},
+				map[string]any{"name": "manifest-path-in-gitops-repo", "value": app.Spec.GitOpsPath},
+				map[string]any{"name": "gitops-repo-branch", "value": gitOpsBranch},
+				map[string]any{"name": "pvc-name", "value": pvcName},
+				map[string]any{"name": "context-subpath", "value": contextSubpath},
+				map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", app.Spec.Replicas)},
+				map[string]any{"name": "port", "value": fmt.Sprintf("%d", app.Spec.Port)},
 			},
 		},
 	}
@@ -119,20 +119,20 @@ func GenerateTriggerTemplate(name, namespace, pipelineRunName, pipelineName, ser
 			"namespace": namespace,
 		},
 		"spec": map[string]any{
-			"params": []map[string]any{
-				{"name": "git-repo-url"},
-				{"name": "git-revision"},
-				{"name": "image-repo"},
-				{"name": "gitops-repo-url"},
-				{"name": "gitops-repo-branch"},
-				{"name": "manifest-path-in-gitops-repo"},
-				{"name": "pvc-name"},
-				{"name": "context-subpath"},
-				{"name": "replicas"},
-				{"name": "port"},
+			"params": []any{
+				map[string]any{"name": "git-repo-url"},
+				map[string]any{"name": "git-revision"},
+				map[string]any{"name": "image-repo"},
+				map[string]any{"name": "gitops-repo-url"},
+				map[string]any{"name": "gitops-repo-branch"},
+				map[string]any{"name": "manifest-path-in-gitops-repo"},
+				map[string]any{"name": "pvc-name"},
+				map[string]any{"name": "context-subpath"},
+				map[string]any{"name": "replicas"},
+				map[string]any{"name": "port"},
 			},
-			"resourcetemplates": []map[string]any{
-				{
+			"resourcetemplates": []any{
+				map[string]any{
 					"apiVersion": "tekton.dev/v1beta1",
 					"kind":       "PipelineRun",
 					"metadata": map[string]any{
@@ -143,20 +143,20 @@ func GenerateTriggerTemplate(name, namespace, pipelineRunName, pipelineName, ser
 							"name": pipelineName,
 						},
 						"serviceAccountName": serviceAccount,
-						"params": []map[string]any{
-							{"name": "app-repo-url", "value": "$(tt.params.git-repo-url)"},
-							{"name": "app-repo-revision", "value": "$(tt.params.git-revision)"},
-							{"name": "image-repo", "value": "$(tt.params.image-repo)"},
-							{"name": "gitops-repo-url", "value": "$(tt.params.gitops-repo-url)"},
-							{"name": "manifest-path-in-gitops-repo", "value": "$(tt.params.manifest-path-in-gitops-repo)"},
-							{"name": "gitops-repo-branch", "value": "$(tt.params.gitops-repo-branch)"},
-							{"name": "context-subpath", "value": "$(tt.params.context-subpath)"},
-							{"name": "replicas", "value": "$(tt.params.replicas)"},
-							{"name": "port", "value": "$(tt.params.port)"},
+						"params": []any{
+							map[string]any{"name": "app-repo-url", "value": "$(tt.params.git-repo-url)"},
+							map[string]any{"name": "app-repo-revision", "value": "$(tt.params.git-revision)"},
+							map[string]any{"name": "image-repo", "value": "$(tt.params.image-repo)"},
+							map[string]any{"name": "gitops-repo-url", "value": "$(tt.params.gitops-repo-url)"},
+							map[string]any{"name": "manifest-path-in-gitops-repo", "value": "$(tt.params.manifest-path-in-gitops-repo)"},
+							map[string]any{"name": "gitops-repo-branch", "value": "$(tt.params.gitops-repo-branch)"},
+							map[string]any{"name": "context-subpath", "value": "$(tt.params.context-subpath)"},
+							map[string]any{"name": "replicas", "value": "$(tt.params.replicas)"},
+							map[string]any{"name": "port", "value": "$(tt.params.port)"},
 						},
-						"workspaces": []map[string]any{
-							{"name": "source-workspace", "persistentVolumeClaim": map[string]any{"claimName": "$(tt.params.pvc-name)"}},
-							{"name": "gitops-workspace", "persistentVolumeClaim": map[string]any{"claimName": "$(tt.params.pvc-name)"}},
+						"workspaces": []any{
+							map[string]any{"name": "source-workspace", "persistentVolumeClaim": map[string]any{"claimName": "$(tt.params.pvc-name)"}},
+							map[string]any{"name": "gitops-workspace", "persistentVolumeClaim": map[string]any{"claimName": "$(tt.params.pvc-name)"}},
 						},
 						"timeouts": map[string]any{
 							"pipeline": "1h",
@@ -184,16 +184,16 @@ func GeneratePipelineRunForManifestGeneration(heliosApp *appv1alpha1.HeliosApp, 
 		gitOpsBranch = "main"
 	}
 
-	params := []map[string]any{
-		{"name": "app-repo-url", "value": heliosApp.Spec.GitRepo},
-		{"name": "app-repo-revision", "value": heliosApp.Spec.GitBranch},
-		{"name": "image-repo", "value": heliosApp.Spec.ImageRepo},
-		{"name": "gitops-repo-url", "value": heliosApp.Spec.GitOpsRepo},
-		{"name": "manifest-path-in-gitops-repo", "value": heliosApp.Spec.GitOpsPath},
-		{"name": "gitops-repo-branch", "value": gitOpsBranch},
-		{"name": "context-subpath", "value": contextSubpath},
-		{"name": "replicas", "value": fmt.Sprintf("%d", heliosApp.Spec.Replicas)},
-		{"name": "port", "value": fmt.Sprintf("%d", heliosApp.Spec.Port)},
+	params := []any{
+		map[string]any{"name": "app-repo-url", "value": heliosApp.Spec.GitRepo},
+		map[string]any{"name": "app-repo-revision", "value": heliosApp.Spec.GitBranch},
+		map[string]any{"name": "image-repo", "value": heliosApp.Spec.ImageRepo},
+		map[string]any{"name": "gitops-repo-url", "value": heliosApp.Spec.GitOpsRepo},
+		map[string]any{"name": "manifest-path-in-gitops-repo", "value": heliosApp.Spec.GitOpsPath},
+		map[string]any{"name": "gitops-repo-branch", "value": gitOpsBranch},
+		map[string]any{"name": "context-subpath", "value": contextSubpath},
+		map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", heliosApp.Spec.Replicas)},
+		map[string]any{"name": "port", "value": fmt.Sprintf("%d", heliosApp.Spec.Port)},
 	}
 
 	// Serialize Env and Resources to JSON
@@ -233,14 +233,14 @@ func GeneratePipelineRunForManifestGeneration(heliosApp *appv1alpha1.HeliosApp, 
 			},
 			"serviceAccountName": heliosApp.Spec.ServiceAccount,
 			"params":             params,
-			"workspaces": []map[string]any{
-				{
+			"workspaces": []any{
+				map[string]any{
 					"name": "source-workspace",
 					"persistentVolumeClaim": map[string]any{
 						"claimName": pvcName,
 					},
 				},
-				{
+				map[string]any{
 					"name": "gitops-workspace",
 					"persistentVolumeClaim": map[string]any{
 						"claimName": pvcName,
@@ -249,7 +249,6 @@ func GeneratePipelineRunForManifestGeneration(heliosApp *appv1alpha1.HeliosApp, 
 			},
 		},
 	}
-
 	return &unstructured.Unstructured{Object: pr}, nil
 }
 
@@ -281,12 +280,12 @@ func GenerateIngress(heliosApp *appv1alpha1.HeliosApp, eventListenerName string)
 			},
 		},
 		"spec": map[string]any{
-			"rules": []map[string]any{
-				{
+			"rules": []any{
+				map[string]any{
 					"host": heliosApp.Spec.WebhookDomain,
 					"http": map[string]any{
-						"paths": []map[string]any{
-							{
+						"paths": []any{
+							map[string]any{
 								"path":     path,
 								"pathType": pathType,
 								"backend": map[string]any{

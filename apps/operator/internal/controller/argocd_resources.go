@@ -48,7 +48,7 @@ func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Un
 					"prune":    true,
 					"selfHeal": true,
 				},
-				"syncOptions": []string{
+				"syncOptions": []any{
 					"CreateNamespace=true",
 				},
 			},

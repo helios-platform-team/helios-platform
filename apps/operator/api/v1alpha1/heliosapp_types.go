@@ -181,6 +181,10 @@ type HeliosAppStatus struct {
 	// ResourcesCreated lists the resources created by this application
 	// +optional
 	ResourcesCreated []ResourceRef `json:"resourcesCreated,omitempty"`
+
+	// LastAppliedHash is the hash of the last successfully synced manifest
+	// +optional
+	LastAppliedHash string `json:"lastAppliedHash,omitempty"`
 }
 
 // ResourceRef references a Kubernetes resource
