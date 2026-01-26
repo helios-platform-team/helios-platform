@@ -40,6 +40,14 @@ import {
   EntityCatalogGraphCard,
 } from '@backstage/plugin-catalog-graph';
 import {
+  TektonCI,
+  isTektonCIAvailable,
+} from '@backstage-community/plugin-tekton';
+import {
+  EntityArgoCDContent,
+  isArgocdAvailable,
+} from '@roadiehq/backstage-plugin-argo-cd';
+import {
   RELATION_API_CONSUMED_BY,
   RELATION_API_PROVIDED_BY,
   RELATION_CONSUMES_API,
@@ -67,33 +75,32 @@ const techdocsContent = (
 );
 
 const cicdContent = (
-  // This is an example of how you can implement your company's logic in entity page.
-  // You can for example enforce that all components of type 'service' should use GitHubActions
-  <EntitySwitch>
-    {/*
-      Here you can add support for different CI/CD services, for example
-      using @backstage-community/plugin-github-actions as follows:
-      <EntitySwitch.Case if={isGithubActionsAvailable}>
-        <EntityGithubActionsContent />
+  <EntityLayout.Route path="/ci-cd" title="CI/CD">
+    <EntitySwitch>
+      <EntitySwitch.Case if={isTektonCIAvailable}>
+        <TektonCI />
       </EntitySwitch.Case>
-     */}
-    <EntitySwitch.Case>
-      <EmptyState
-        title="No CI/CD available for this entity"
-        missing="info"
-        description="You need to add an annotation to your component if you want to enable CI/CD for it. You can read more about annotations in Backstage by clicking the button below."
-        action={
-          <Button
-            variant="contained"
-            color="primary"
-            href="https://backstage.io/docs/features/software-catalog/well-known-annotations"
-          >
-            Read more
-          </Button>
-        }
-      />
-    </EntitySwitch.Case>
-  </EntitySwitch>
+      <EntitySwitch.Case if={isArgocdAvailable}>
+        <EntityArgoCDContent />
+      </EntitySwitch.Case>
+      <EntitySwitch.Case>
+        <EmptyState
+          title="No CI/CD available for this entity"
+          missing="info"
+          description="You need to add an annotation to your component if you want to enable CI/CD for it. You can read more about annotations in Backstage by clicking the button below."
+          action={
+            <Button
+              variant="contained"
+              color="primary"
+              href="https://backstage.io/docs/features/software-catalog/well-known-annotations"
+            >
+              Read more
+            </Button>
+          }
+        />
+      </EntitySwitch.Case>
+    </EntitySwitch>
+  </EntityLayout.Route>
 );
 
 const entityWarningContent = (
@@ -195,9 +202,7 @@ const websiteEntityPage = (
       {overviewContent}
     </EntityLayout.Route>
 
-    <EntityLayout.Route path="/ci-cd" title="CI/CD">
-      {cicdContent}
-    </EntityLayout.Route>
+    {cicdContent}
 
     <EntityLayout.Route
       path="/kubernetes"

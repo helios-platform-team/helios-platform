@@ -116,19 +116,27 @@ func (e *Engine) Render(app Application) ([]byte, error) {
 		return nil, fmt.Errorf("failed to lookup kubernetesObjects: %w", k8sObjects.Err())
 	}
 
-	// 6. Export to JSON
-	jsonBytes, err := k8sObjects.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("failed to export to JSON: %w", err)
+	// 6. Decode to list of objects
+	var objects []interface{}
+	if err := k8sObjects.Decode(&objects); err != nil {
+		return nil, fmt.Errorf("failed to decode objects: %w", err)
 	}
 
-	// 7. Convert to YAML
-	yamlBytes, err := yaml.JSONToYAML(jsonBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert to YAML: %w", err)
+	// 7. Render each object to YAML and join with ---
+	var output []byte
+	for i, obj := range objects {
+		objBytes, err := yaml.Marshal(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal object %d: %w", i, err)
+		}
+
+		if i > 0 {
+			output = append(output, []byte("\n---\n")...)
+		}
+		output = append(output, objBytes...)
 	}
 
-	return yamlBytes, nil
+	return output, nil
 }
 
 // RenderToObjects returns the kubernetes objects as a slice (for direct processing)

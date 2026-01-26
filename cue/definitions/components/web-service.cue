@@ -29,5 +29,12 @@ import "helios.io/cue/definitions/bases"
 				env:      _p.env
 			}
 		}).output
+
+		service: (bases.#Service & {
+			parameter: {
+				name: _p.name
+				port: _p.port
+			}
+		}).output
 	}
 }

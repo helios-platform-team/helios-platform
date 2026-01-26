@@ -108,7 +108,7 @@ catalog:
       githubUrl: https://github.com
       orgs: ['${GITHUB_ORG}']
       schedule:
-        initialDelay: { seconds: 30 }
+        initialDelay: { seconds: 5 }
         frequency: { minutes: 1 }
         timeout: { minutes: 50 }
 

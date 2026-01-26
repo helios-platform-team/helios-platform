@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { Avatar } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';

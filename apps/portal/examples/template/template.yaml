@@ -15,6 +15,8 @@ spec:
     - title: Fill in some steps
       required:
         - name
+        - image
+        - port
       properties:
         name:
           title: Name
@@ -23,6 +25,16 @@ spec:
           ui:autofocus: true
           ui:options:
             rows: 5
+        image:
+          title: Image
+          type: string
+          description: The container image to run (e.g. nginx:latest)
+          default: nginx:latest
+        port:
+          title: Port
+          type: number
+          description: The port to expose
+          default: 80
     - title: Choose a location
       required:
         - repoUrl
@@ -38,35 +50,64 @@ spec:
   # These steps are executed in the scaffolder backend, using data that we gathered
   # via the parameters above.
   steps:
-    # Each step executes an action, in this case one templates files into the working directory.
-    - id: fetch-base
-      name: Fetch Base
+    # 1. Source Repo
+    - id: fetch-source
+      name: Fetch Source Code
       action: fetch:template
       input:
-        url: ./content
+        url: ./content/source
+        targetPath: ./source
         values:
           name: ${{ parameters.name }}
+          image: ${{ parameters.image }}
+          port: ${{ parameters.port }}
+          description: ${{ parameters.description }}
+          owner: ${{ user.entity.metadata.name }}
 
-    # This step publishes the contents of the working directory to GitHub.
-    # If you or your organization prefer another default branch name over 'main'
-    # you can change that here.
-    - id: publish
-      name: Publish
+    - id: publish-source
+      name: Publish Source Code
       action: publish:github
       input:
-        description: This is ${{ parameters.name }}
+        description: Source Code for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}
-        defaultBranch: 'main'
+        sourcePath: ./source
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        repoVisibility: public
 
-    # The final step is to register our new component in the catalog.
+    # 2. GitOps Repo
+    - id: fetch-gitops
+      name: Fetch GitOps Manifests
+      action: fetch:template
+      input:
+        url: ./content/gitops
+        targetPath: ./gitops
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ user.entity.metadata.name }}
+          image: ${{ parameters.image }}
+          port: ${{ parameters.port }}
+          sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
+          gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
+
+    - id: publish-gitops
+      name: Publish GitOps Manifests
+      action: publish:github
+      input:
+        description: GitOps Manifests for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}-gitops
+        sourcePath: ./gitops
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        repoVisibility: public
+
+    # Register Source Component
     - id: register
       name: Register
       action: catalog:register
       input:
-        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
         catalogInfoPath: '/catalog-info.yaml'
 
-    # Let's notify the user that the template has completed using the Notification action
     - id: notify
       name: Notify
       action: notification:send
@@ -78,11 +119,12 @@ spec:
         info: 'Your template has been executed'
         severity: 'normal'
 
-  # Outputs are displayed to the user after a successful execution of the template.
   output:
     links:
-      - title: Repository
-        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: Source Repository
+        url: ${{ steps['publish-source'].output.remoteUrl }}
+      - title: GitOps Repository
+        url: ${{ steps['publish-gitops'].output.remoteUrl }}
       - title: Open in catalog
         icon: catalog
         entityRef: ${{ steps['register'].output.entityRef }}

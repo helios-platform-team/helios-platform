@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: helios-apps
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+  - scmProvider:
+      github:
+        # 1. Why hardcoded? This ApplicationSet defines "My Team's Apps". 
+        # In a real company, you might have one AppSet per Org, or one per Team.
+        # For this demo, it watches *your* personal user.
+        organization: "" 
+        user: hoangphuc841 # <--- REPLACE WITH YOUR USERNAME
+        # optional: only scan repos starting with...
+        # filters:
+        # - repositoryMatch: ^helios-.*
+        tokenRef:
+          secretName: github-token
+          key: token
+  template:
+    metadata:
+      name: '{{ .Repository.Name }}' 
+    spec:
+      project: default
+      source:
+        repoURL: '{{ .Repository.CloneURL }}'
+        targetRevision: '{{ .Repository.DefaultBranch }}'
+        path: . 
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
