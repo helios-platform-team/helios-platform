@@ -67,6 +67,10 @@ auth:
   providers:
     # See https://backstage.io/docs/auth/guest/provider
     guest: {}
+    github:
+      development:
+        clientId: ${AUTH_GITHUB_CLIENT_ID}
+        clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
 
 scaffolder:
   # see https://backstage.io/docs/features/software-templates/configuration for software template options
@@ -97,6 +101,18 @@ catalog:
     ## Uncomment these lines to add more example data
     # - type: url
     #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml
+
+  providers:
+    githubOrg:
+      id: production
+      githubUrl: https://github.com
+      orgs: ['${GITHUB_ORG}']
+      schedule:
+        initialDelay: { seconds: 30 }
+        frequency: { minutes: 1 }
+        timeout: { minutes: 50 }
+
+    ## Uncomment these lines to add an example org
 
     ## Uncomment these lines to add an example org
     # - type: url
