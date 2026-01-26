@@ -20,7 +20,11 @@ go test -v ./internal/...
 
 **Controller Logic Only:**
 ```powershell
-go test -v ./internal/controller/heliosapp_controller_unit_test.go ./internal/controller/heliosapp_controller.go ./internal/controller/tekton_resources.go ./internal/controller/argocd_resources.go
+# option 1: Run all tests in controller package
+go test -v ./internal/controller/...
+
+# option 2: Run specific test file (requires including implementation files or just testing the package)
+go test -v ./internal/controller/
 ```
 
 **GitOps Logic Only:**

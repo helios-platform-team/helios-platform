@@ -33,7 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
 	heliosCue "github.com/helios-platform-team/helios-platform/apps/operator/internal/cue"
@@ -396,6 +398,36 @@ func (r *HeliosAppReconciler) computeHash(data []byte) string {
 	return hex.EncodeToString(hash[:])
 }
 
+// findObjectsForSecret finds HeliosApps that reference a given Secret
+func (r *HeliosAppReconciler) findObjectsForSecret(ctx context.Context, obj client.Object) []reconcile.Request {
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return nil
+	}
+
+	// List all HeliosApps in the same namespace (since secrets are namespaced and currently we expect same-namespace ref)
+	// If cross-namespace support is added later, this needs to change.
+	heliosAppList := &appv1alpha1.HeliosAppList{}
+	if err := r.List(ctx, heliosAppList, client.InNamespace(secret.Namespace)); err != nil {
+		// We cannot log easily here without a logger in context, or usage of global logger
+		// But returning nil is safe (no triggers)
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, app := range heliosAppList.Items {
+		if app.Spec.GitOpsSecretRef == secret.Name {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      app.Name,
+					Namespace: app.Namespace,
+				},
+			})
+		}
+	}
+	return requests
+}
+
 // SetupWithManager sets up the controller with the Manager
 func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -403,6 +435,10 @@ func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&networkingv1.Ingress{}).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
+		).
 		Named("heliosapp").
 		Complete(r)
 }
