@@ -1,0 +1,47 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kaniko-build
+spec:
+  params:
+    - name: IMAGE
+    - name: DOCKERFILE
+      default: Dockerfile
+    - name: CONTEXT_SUBPATH
+      description: "Subdirectory within the workspace where the Dockerfile is located"
+      default: ""
+  workspaces:
+    - name: source
+  results:
+    - name: IMAGE_URL
+  steps:
+    - name: build-and-push
+      image: gcr.io/kaniko-project/executor:latest
+      env:
+        - name: DOCKER_CONFIG
+          value: /kaniko/.docker
+      command:
+        - /kaniko/executor
+      args:
+        - --dockerfile=$(params.DOCKERFILE)
+        - --context=$(workspaces.source.path)/$(params.CONTEXT_SUBPATH)
+        - --destination=$(params.IMAGE)
+        - --digest-file=/tekton/results/IMAGE_DIGEST
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+
+    - name: write-image-url
+      image: alpine:latest
+      script: |
+        #!/bin/sh
+        set -e
+        echo "$(params.IMAGE)@$(cat /tekton/results/IMAGE_DIGEST)" > $(results.IMAGE_URL.path)
+
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: docker-credentials
+        items:
+          - key: .dockerconfigjson
+            path: config.json

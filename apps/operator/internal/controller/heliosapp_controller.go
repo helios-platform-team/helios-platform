@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -96,7 +97,93 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	log.Info("CUE rendered manifest successfully")
+	// ------------------------------------------------------------------
+	// PHASE 0: Setup CI/CD Triggers (Tekton)
+	// ------------------------------------------------------------------
+
+	// Define resource names
+	triggerBindingName := heliosApp.Name + "-git-binding"
+	defaultsBindingName := heliosApp.Name + "-defaults-binding"
+	triggerTemplateName := heliosApp.Name + "-template"
+	eventListenerName := heliosApp.Name + "-listener"
+
+	pipelineName := heliosApp.Spec.PipelineName
+	if pipelineName == "" {
+		pipelineName = "from-code-to-cluster"
+	}
+	serviceAccount := heliosApp.Spec.ServiceAccount
+	if serviceAccount == "" {
+		serviceAccount = "default"
+	}
+	webhookSecret := heliosApp.Spec.WebhookSecret
+	if webhookSecret == "" {
+		webhookSecret = "github-credentials" // Unified secret name
+	}
+
+	// 1. Create/Update TriggerBinding (Git Info)
+	tbGit, _ := GenerateTriggerBinding(triggerBindingName, heliosApp.Namespace)
+	if err := ctrl.SetControllerReference(&heliosApp, tbGit, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for TriggerBinding (Git)")
+	} else {
+		foundTbGit := &unstructured.Unstructured{}
+		foundTbGit.SetGroupVersionKind(tbGit.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: tbGit.GetName(), Namespace: tbGit.GetNamespace()}, foundTbGit); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating TriggerBinding (Git)", "name", tbGit.GetName())
+				r.Client.Create(ctx, tbGit)
+			}
+		}
+	}
+
+	// 2. Create/Update TriggerBinding (Defaults)
+	tbDefaults, _ := GenerateDefaultsTriggerBinding(defaultsBindingName, heliosApp.Namespace, &heliosApp)
+	if err := ctrl.SetControllerReference(&heliosApp, tbDefaults, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for TriggerBinding (Defaults)")
+	} else {
+		foundTbDefaults := &unstructured.Unstructured{}
+		foundTbDefaults.SetGroupVersionKind(tbDefaults.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: tbDefaults.GetName(), Namespace: tbDefaults.GetNamespace()}, foundTbDefaults); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating TriggerBinding (Defaults)", "name", tbDefaults.GetName())
+				r.Client.Create(ctx, tbDefaults)
+			}
+		}
+	}
+
+	// 3. Create/Update TriggerTemplate
+	workspaceConfig := map[string]any{} // Placeholder
+	tt, _ := GenerateTriggerTemplate(triggerTemplateName, heliosApp.Namespace, heliosApp.Name+"-run", pipelineName, serviceAccount, workspaceConfig)
+	if err := ctrl.SetControllerReference(&heliosApp, tt, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for TriggerTemplate")
+	} else {
+		foundTt := &unstructured.Unstructured{}
+		foundTt.SetGroupVersionKind(tt.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: tt.GetName(), Namespace: tt.GetNamespace()}, foundTt); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating TriggerTemplate", "name", tt.GetName())
+				r.Client.Create(ctx, tt)
+			}
+		}
+	}
+
+	// 4. Create/Update EventListener
+	el, _ := GenerateEventListener(eventListenerName, heliosApp.Namespace, "github-push", triggerBindingName, defaultsBindingName, triggerTemplateName, webhookSecret)
+	if err := ctrl.SetControllerReference(&heliosApp, el, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for EventListener")
+	} else {
+		foundEl := &unstructured.Unstructured{}
+		foundEl.SetGroupVersionKind(el.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: el.GetName(), Namespace: el.GetNamespace()}, foundEl); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating EventListener", "name", el.GetName())
+				r.Client.Create(ctx, el)
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 1: Render & GitOps (Moved below)
+	// ------------------------------------------------------------------
 
 	// 4. GitOps Helper: Get Token & Username
 	token := os.Getenv("GITHUB_TOKEN")
@@ -111,8 +198,11 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if err := r.Get(ctx, types.NamespacedName{Name: heliosApp.Spec.GitOpsSecretRef, Namespace: heliosApp.Namespace}, &secret); err == nil {
 			if t, ok := secret.Data["token"]; ok {
 				token = string(t)
+			} else if p, ok := secret.Data["password"]; ok {
+				// Fallback to 'password' key (standard basic-auth secret from Tekton setup)
+				token = string(p)
 			} else {
-				log.Info("Secret found but 'token' key is missing", "Secret", heliosApp.Spec.GitOpsSecretRef)
+				log.Info("Secret found but 'token' or 'password' key is missing", "Secret", heliosApp.Spec.GitOpsSecretRef)
 			}
 			if u, ok := secret.Data["username"]; ok {
 				username = string(u)
@@ -152,6 +242,65 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	log.Info("Successfully reconciled HeliosApp via GitOps")
+
+	// 7. Ensure ArgoCD Application exists
+	log.Info("Ensuring ArgoCD Application exists")
+	argoApp, err := GenerateArgoApplication(&heliosApp)
+	if err != nil {
+		log.Error(err, "Failed to generate ArgoCD Application manifest")
+		// We don't return error here to avoid loop if GitOps was successful, just log it.
+		// Or maybe we should retry? Let's log and continue for now.
+	} else {
+		// Define ArgoCD Application identity
+		argoApp.SetGroupVersionKind(argoApp.GroupVersionKind())
+		// We use Sever-Side Apply or Create/Update logic
+		// Since ArgoCD app is in "argocd" namespace usually, we need permissions there.
+		// For simplicity/demo: Try to get, if not found create.
+
+		foundArgoApp := &unstructured.Unstructured{}
+		foundArgoApp.SetGroupVersionKind(argoApp.GroupVersionKind())
+
+		key := client.ObjectKey{
+			Name:      argoApp.GetName(),
+			Namespace: argoApp.GetNamespace(),
+		}
+
+		if err := r.Client.Get(ctx, key, foundArgoApp); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating ArgoCD Application", "name", argoApp.GetName())
+				if err := r.Client.Create(ctx, argoApp); err != nil {
+					log.Error(err, "Failed to create ArgoCD Application")
+				}
+			} else {
+				log.Error(err, "Failed to get ArgoCD Application")
+			}
+		} else {
+			// Optional: Update if needed (checkout 'spec' diff)
+			log.Info("ArgoCD Application already exists", "name", argoApp.GetName())
+		}
+	}
+
+	// 8. Ensure Ingress for EventListener (if configured)
+	if heliosApp.Spec.WebhookDomain != "" {
+		log.Info("Ensuring Ingress for EventListener")
+		// Correctly use the EventListener name defined in Phase 0
+		ing, err := GenerateIngress(&heliosApp, eventListenerName)
+		if err != nil {
+			log.Error(err, "Failed to generate Ingress")
+		} else if ing != nil {
+			ing.SetGroupVersionKind(ing.GroupVersionKind())
+			foundIng := &unstructured.Unstructured{}
+			foundIng.SetGroupVersionKind(ing.GroupVersionKind())
+			key := client.ObjectKey{Name: ing.GetName(), Namespace: ing.GetNamespace()}
+			if err := r.Client.Get(ctx, key, foundIng); err != nil {
+				if errors.IsNotFound(err) {
+					log.Info("Creating Ingress", "name", ing.GetName())
+					r.Client.Create(ctx, ing)
+				}
+			}
+		}
+	}
+
 	return ctrl.Result{}, nil
 }
 

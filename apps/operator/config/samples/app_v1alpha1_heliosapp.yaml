@@ -24,6 +24,31 @@ spec:
           properties:
             host: "api.example.com"
             port: 3000
-  gitopsRepo: "https://github.com/YOUR_USERNAME/helios-gitops"
-  gitopsPath: "apps/dev/heliosapp"
-  gitopsSecretRef: "github-webhook-secret"
+  gitopsRepo: "https://github.com/YOUR_USERNAME/YOUR_GITOPS_REPO"
+  gitopsPath: "apps/dev/your-app"
+  gitopsBranch: "main"
+  gitopsSecretRef: "github-credentials" # Unified secret
+
+  # Source Code & Docker Info
+  gitRepo: "https://github.com/YOUR_USERNAME/YOUR_REPO"
+  gitBranch: "main"
+  imageRepo: "docker.io/YOUR_DOCKER_USER/YOUR_IMAGE_NAME"
+
+  # Tekton & Ingress Config
+  # Note: Hostname only, no https:// prefix
+  webhookDomain: "YOUR-NGROK-DOMAIN.ngrok-free.dev"
+  webhookSecret: "github-credentials" # Unified secret
+  pipelineName: "from-code-to-cluster"
+  serviceAccount: "default"
+  
+  # Resource & Port Config
+  port: 8080
+  replicas: 1
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "64Mi"
+
