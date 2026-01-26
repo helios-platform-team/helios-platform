@@ -57,6 +57,8 @@ const SidebarLogo = () => {
   );
 };
 
+import { UserHeader } from './UserHeader';
+
 export const Root = ({ children }: PropsWithChildren<{}>) => (
   <SidebarPage>
     <Sidebar>
@@ -94,6 +96,7 @@ export const Root = ({ children }: PropsWithChildren<{}>) => (
         <SidebarSettings />
       </SidebarGroup>
     </Sidebar>
+    <UserHeader />
     {children}
   </SidebarPage>
 );

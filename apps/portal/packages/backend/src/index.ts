@@ -6,7 +6,12 @@
  * Happy hacking!
  */
 
+import { resolve } from 'path';
+import * as dotenv from 'dotenv';
 import { createBackend } from '@backstage/backend-defaults';
+
+// Load env vars from root .env
+dotenv.config({ path: resolve(__dirname, '../../../.env'), debug: true });
 
 const backend = createBackend();
 
@@ -16,16 +21,14 @@ backend.add(import('@backstage/plugin-proxy-backend'));
 // scaffolder plugin
 backend.add(import('@backstage/plugin-scaffolder-backend'));
 backend.add(import('@backstage/plugin-scaffolder-backend-module-github'));
-backend.add(
-  import('@backstage/plugin-scaffolder-backend-module-notifications'),
-);
+import { customAuth } from './extensions/auth';
 
-// techdocs plugin
-backend.add(import('@backstage/plugin-techdocs-backend'));
+backend.add(import('@backstage/plugin-scaffolder-backend-module-notifications'),
+);
 
 // auth plugin
 backend.add(import('@backstage/plugin-auth-backend'));
-// See https://backstage.io/docs/backend-system/building-backends/migrating#the-auth-plugin
+backend.add(customAuth);
 backend.add(import('@backstage/plugin-auth-backend-module-guest-provider'));
 // See https://backstage.io/docs/auth/guest/provider
 
@@ -34,6 +37,9 @@ backend.add(import('@backstage/plugin-catalog-backend'));
 backend.add(
   import('@backstage/plugin-catalog-backend-module-scaffolder-entity-model'),
 );
+
+// GitHub Org Entity Provider
+backend.add(import('@backstage/plugin-catalog-backend-module-github-org'));
 
 // See https://backstage.io/docs/features/software-catalog/configuration#subscribing-to-catalog-errors
 backend.add(import('@backstage/plugin-catalog-backend-module-logs'));
