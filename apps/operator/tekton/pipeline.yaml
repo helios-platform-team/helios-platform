@@ -17,6 +17,8 @@ spec:
       default: "2"
     - name: port
       default: "8080"
+    - name: docker-secret
+      default: "docker-credentials"
 
   # CHANGE 1: Define two separate workspaces for the pipeline
   workspaces:
@@ -52,6 +54,8 @@ spec:
           value: "$(params.image-repo):$(params.app-repo-revision)"
         - name: CONTEXT_SUBPATH
           value: "$(params.context-subpath)"
+        - name: docker-secret
+          value: "$(params.docker-secret)"
 
     - name: update-gitops-manifest
       taskRef:

@@ -404,6 +404,10 @@ spec:
                   - type
                   type: object
                 type: array
+              lastAppliedHash:
+                description: LastAppliedHash is the hash of the last successfully
+                  synced manifest
+                type: string
               message:
                 description: Message provides additional information about the status
                 type: string

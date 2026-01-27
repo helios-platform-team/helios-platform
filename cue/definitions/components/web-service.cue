@@ -30,11 +30,6 @@ import "helios.io/cue/definitions/bases"
 			}
 		}).output
 
-		service: (bases.#Service & {
-			parameter: {
-				name: _p.name
-				port: _p.port
-			}
-		}).output
+
 	}
 }

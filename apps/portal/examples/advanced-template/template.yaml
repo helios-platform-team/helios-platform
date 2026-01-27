@@ -1,21 +1,18 @@
 apiVersion: scaffolder.backstage.io/v1beta3
-# https://backstage.io/docs/features/software-catalog/descriptor-format#kind-template
 kind: Template
 metadata:
-  name: example-nodejs-template
-  title: Example Node.js Template
-  description: An example template for the scaffolder that creates a simple Node.js service
+  name: advanced-nodejs-template
+  title: Advanced Node.js Template (GitOps + Webhooks)
+  description: Scaffolds a Node.js Service with Source Code, GitOps manifests (ArgoCD + Tekton), and Webhook configuration.
 spec:
   owner: user:guest
   type: service
 
-  # These parameters are used to generate the input form in the frontend, and are
-  # used to gather input data for the execution of the template.
   parameters:
-    - title: Fill in some steps
+    - title: Component Information
       required:
         - name
-        - image
+        - owner
         - port
       properties:
         name:
@@ -23,24 +20,37 @@ spec:
           type: string
           description: Unique name of the component
           ui:autofocus: true
-          ui:options:
-            rows: 5
-        image:
-          title: Image
+        owner:
+          title: Owner
           type: string
-          description: The container image to run (e.g. nginx:latest)
-          default: nginx:latest
+          description: Owner of the component
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [Group, User]
         port:
           title: Port
           type: number
           description: The port to expose
-          default: 80
-    - title: Choose a location
+          default: 8080
+        dockerOrg:
+            title: Docker Registry Org/User
+            type: string
+            description: Your Docker Hub username or Organization
+            default: myuser
+        repoName:
+            title: Docker Repository Name
+            type: string
+            description: The name of the repository (e.g. my-service)
+
+    - title: Repository & Webhook
       required:
         - repoUrl
+        - webhookUrl
+        - webhookSecret
       properties:
         repoUrl:
-          title: Repository Location
+          title: Source Repository Location
           type: string
           ui:field: RepoUrlPicker
           ui:options:
@@ -54,12 +64,10 @@ spec:
           title: Webhook Secret
           type: string
           description: The secret to use for the webhook
-          ui:widget: password
+          ui:field: Secret
 
-  # These steps are executed in the scaffolder backend, using data that we gathered
-  # via the parameters above.
   steps:
-    # 1. Source Repo
+    # 1. Source Code Logic
     - id: fetch-source
       name: Fetch Source Code
       action: fetch:template
@@ -68,10 +76,10 @@ spec:
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
-          image: ${{ parameters.image }}
+          owner: ${{ parameters.owner }}
           port: ${{ parameters.port }}
-          description: ${{ parameters.description }}
-          owner: ${{ user.entity.metadata.name }}
+          description: "Service for ${{ parameters.name }}"
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
 
     - id: publish-source
       name: Publish Source Code
@@ -82,6 +90,7 @@ spec:
         sourcePath: ./source
         token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoVisibility: public
+        protectDefaultBranch: false
 
     - id: create-webhook
       name: Create Webhook
@@ -93,9 +102,10 @@ spec:
         events:
           - push
         active: true
+        contentType: json
         token: ${{ secrets.USER_OAUTH_TOKEN }}
 
-    # 2. GitOps Repo
+    # 2. GitOps Logic
     - id: fetch-gitops
       name: Fetch GitOps Manifests
       action: fetch:template
@@ -104,12 +114,13 @@ spec:
         targetPath: ./gitops
         values:
           name: ${{ parameters.name }}
-          description: ${{ parameters.description }}
-          owner: ${{ user.entity.metadata.name }}
-          image: ${{ parameters.image }}
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          dockerOrg: ${{ parameters.dockerOrg }}
+          repoName: ${{ parameters.repoName }}
           port: ${{ parameters.port }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
+          webhookUrl: ${{ parameters.webhookUrl }}
 
     - id: publish-gitops
       name: Publish GitOps Manifests
@@ -120,25 +131,52 @@ spec:
         sourcePath: ./gitops
         token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoVisibility: public
+        protectDefaultBranch: false
 
-    # Register Source Component
+    - id: apply-helios
+      name: Deploy to Kubernetes
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/helios-app.yaml
+        namespaced: true
+
+    # 2.1 Secret Creation
+    - id: fetch-secret
+      name: Generate Secret Manifest
+      action: fetch:template
+      input:
+        url: ./content/deploy
+        targetPath: ./deploy
+        values:
+          name: ${{ parameters.name }}
+          token: ${{ secrets.USER_OAUTH_TOKEN }}
+          username: git # Standard placeholder for PAT auth
+          webhookSecret: ${{ parameters.webhookSecret }}
+
+    - id: apply-secret
+      name: Apply Secret
+      action: kubernetes:apply
+      input:
+        manifestPath: ./deploy/secret.yaml
+        namespaced: true
+
+    # 3. Registration
     - id: register
-      name: Register
+      name: Register Component
       action: catalog:register
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
         catalogInfoPath: '/catalog-info.yaml'
 
     - id: notify
-      name: Notify
+      name: Notify User
       action: notification:send
       input:
         recipients: entity
         entityRefs:
           - user:default/guest
-        title: 'Template executed'
-        info: 'Your template has been executed'
-        severity: 'normal'
+        title: 'Advanced Template Executed'
+        info: 'Your advanced Node.js service has been scaffolded with GitOps and Webhooks!'
 
   output:
     links:
@@ -146,6 +184,6 @@ spec:
         url: ${{ steps['publish-source'].output.remoteUrl }}
       - title: GitOps Repository
         url: ${{ steps['publish-gitops'].output.remoteUrl }}
-      - title: Open in catalog
+      - title: Open in Catalog
         icon: catalog
         entityRef: ${{ steps['register'].output.entityRef }}

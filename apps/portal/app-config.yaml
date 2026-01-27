@@ -98,6 +98,12 @@ catalog:
       rules:
         - allow: [User, Group]
 
+    # Advanced Node.js Template
+    - type: file
+      target: ../../examples/advanced-template/template.yaml
+      rules:
+        - allow: [Template]
+
     ## Uncomment these lines to add more example data
     # - type: url
     #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml

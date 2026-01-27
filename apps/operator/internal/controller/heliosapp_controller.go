@@ -102,6 +102,88 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// ------------------------------------------------------------------
+	// PHASE -1: Ensure Base Tekton Resources (SA, RBAC, Tasks, Pipeline)
+	// ------------------------------------------------------------------
+
+	// 1. ServiceAccount
+	sa := GenerateServiceAccount(heliosApp.Namespace)
+	if err := ctrl.SetControllerReference(&heliosApp, sa, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for ServiceAccount")
+	} else {
+		foundSA := &unstructured.Unstructured{}
+		foundSA.SetGroupVersionKind(sa.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: sa.GetName(), Namespace: sa.GetNamespace()}, foundSA); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating ServiceAccount", "name", sa.GetName())
+				r.Client.Create(ctx, sa)
+			}
+		}
+	}
+
+	// 2. RoleBinding
+	rb := GenerateRoleBinding(heliosApp.Namespace)
+	if err := ctrl.SetControllerReference(&heliosApp, rb, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for RoleBinding")
+	} else {
+		foundRB := &unstructured.Unstructured{}
+		foundRB.SetGroupVersionKind(rb.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: rb.GetName(), Namespace: rb.GetNamespace()}, foundRB); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating RoleBinding", "name", rb.GetName())
+				r.Client.Create(ctx, rb)
+			}
+		}
+	}
+
+	// 3. ClusterRoleBinding
+	crb := GenerateClusterRoleBinding(heliosApp.Namespace)
+	// We cannot set OwnerReference on ClusterRoleBinding (Cluster-scoped) from HeliosApp (Namespaced)
+	foundCrb := &unstructured.Unstructured{}
+	foundCrb.SetGroupVersionKind(crb.GroupVersionKind())
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: crb.GetName()}, foundCrb); err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Creating ClusterRoleBinding", "name", crb.GetName())
+			r.Client.Create(ctx, crb)
+		}
+	}
+
+	// 3. Tasks
+	tasks := []*unstructured.Unstructured{
+		GenerateGitCloneTask(heliosApp.Namespace),
+		GenerateKanikoBuildTask(heliosApp.Namespace),
+		GenerateGitUpdateManifestTask(heliosApp.Namespace),
+	}
+	for _, task := range tasks {
+		if err := ctrl.SetControllerReference(&heliosApp, task, r.Scheme); err != nil {
+			log.Error(err, "Failed to set owner reference for Task", "task", task.GetName())
+		} else {
+			foundTask := &unstructured.Unstructured{}
+			foundTask.SetGroupVersionKind(task.GroupVersionKind())
+			if err := r.Client.Get(ctx, client.ObjectKey{Name: task.GetName(), Namespace: task.GetNamespace()}, foundTask); err != nil {
+				if errors.IsNotFound(err) {
+					log.Info("Creating Task", "name", task.GetName())
+					r.Client.Create(ctx, task)
+				}
+			}
+		}
+	}
+
+	// 4. Pipeline
+	pl := GeneratePipeline(heliosApp.Namespace)
+	if err := ctrl.SetControllerReference(&heliosApp, pl, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for Pipeline")
+	} else {
+		foundPl := &unstructured.Unstructured{}
+		foundPl.SetGroupVersionKind(pl.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: pl.GetName(), Namespace: pl.GetNamespace()}, foundPl); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating Pipeline", "name", pl.GetName())
+				r.Client.Create(ctx, pl)
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------
 	// PHASE 0: Setup CI/CD Triggers (Tekton)
 	// ------------------------------------------------------------------
 

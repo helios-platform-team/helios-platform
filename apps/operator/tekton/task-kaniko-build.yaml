@@ -10,6 +10,9 @@ spec:
     - name: CONTEXT_SUBPATH
       description: "Subdirectory within the workspace where the Dockerfile is located"
       default: ""
+    - name: docker-secret
+      description: "Name of the secret containing docker credentials"
+      default: "docker-credentials"
   workspaces:
     - name: source
   results:
@@ -41,7 +44,7 @@ spec:
   volumes:
     - name: docker-config
       secret:
-        secretName: docker-credentials
+        secretName: $(params.docker-secret)
         items:
           - key: .dockerconfigjson
             path: config.json

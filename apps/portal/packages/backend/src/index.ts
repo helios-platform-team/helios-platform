@@ -21,6 +21,8 @@ backend.add(import('@backstage/plugin-proxy-backend'));
 // scaffolder plugin
 backend.add(import('@backstage/plugin-scaffolder-backend'));
 backend.add(import('@backstage/plugin-scaffolder-backend-module-github'));
+import { scaffolderModuleCustomActions } from './extensions/scaffolder';
+backend.add(scaffolderModuleCustomActions);
 import { customAuth } from './extensions/auth';
 
 backend.add(import('@backstage/plugin-scaffolder-backend-module-notifications'),
