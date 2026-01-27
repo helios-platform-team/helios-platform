@@ -5,6 +5,7 @@
 // TODO(user): An in-depth paragraph about your project and overview of use
 
 ## Getting Started
+See [GIT_OPS_GUIDE.md](GIT_OPS_GUIDE.md) for detailed GitOps setup instructions.
 
 ### Prerequisites
 - go version v1.24.0+

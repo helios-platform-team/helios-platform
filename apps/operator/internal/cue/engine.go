@@ -50,6 +50,12 @@ type Engine struct {
 	cuePath string
 }
 
+// CueEngineInterface defines the methods for CUE rendering
+type CueEngineInterface interface {
+	Render(app Application) ([]byte, error)
+	RenderToObjects(app Application) ([]map[string]interface{}, error)
+}
+
 // NewEngine creates a new CUE engine
 // cuePath is the path to the cue/ directory containing definitions and engine
 func NewEngine(cuePath string) (*Engine, error) {
