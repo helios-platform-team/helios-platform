@@ -16,8 +16,8 @@ spec:
   
   # Webhook Config
   webhookDomain: ${{ values.webhookUrl | replace("https://", "") | replace("/hooks/" + values.name, "") }}
-  webhookSecret: "github-credentials"
-  gitopsSecretRef: "github-credentials"
+  webhookSecret: "github-credentials-${{ values.name }}"
+  gitopsSecretRef: "github-credentials-${{ values.name }}"
 
   components:
     - name: ${{ values.name }}-backend

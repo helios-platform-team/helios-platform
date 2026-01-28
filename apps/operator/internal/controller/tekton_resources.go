@@ -103,6 +103,7 @@ func GenerateDefaultsTriggerBinding(name, namespace string, app *appv1alpha1.Hel
 				map[string]any{"name": "context-subpath", "value": contextSubpath},
 				map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", app.Spec.Replicas)},
 				map[string]any{"name": "port", "value": fmt.Sprintf("%d", app.Spec.Port)},
+				map[string]any{"name": "gitops-secret-name", "value": app.Spec.GitOpsSecretRef},
 			},
 		},
 	}
@@ -130,6 +131,7 @@ func GenerateTriggerTemplate(name, namespace, pipelineRunName, pipelineName, ser
 				map[string]any{"name": "context-subpath"},
 				map[string]any{"name": "replicas"},
 				map[string]any{"name": "port"},
+				map[string]any{"name": "gitops-secret-name"},
 			},
 			"resourcetemplates": []any{
 				map[string]any{
@@ -153,10 +155,12 @@ func GenerateTriggerTemplate(name, namespace, pipelineRunName, pipelineName, ser
 							map[string]any{"name": "context-subpath", "value": "$(tt.params.context-subpath)"},
 							map[string]any{"name": "replicas", "value": "$(tt.params.replicas)"},
 							map[string]any{"name": "port", "value": "$(tt.params.port)"},
+							map[string]any{"name": "gitops-secret-name", "value": "$(tt.params.gitops-secret-name)"},
 						},
 						"workspaces": []any{
 							map[string]any{"name": "source-workspace", "persistentVolumeClaim": map[string]any{"claimName": "$(tt.params.pvc-name)"}},
 							map[string]any{"name": "gitops-workspace", "persistentVolumeClaim": map[string]any{"claimName": "$(tt.params.pvc-name)"}},
+							map[string]any{"name": "git-credentials-workspace", "secret": map[string]any{"secretName": "$(tt.params.gitops-secret-name)"}},
 						},
 						"timeouts": map[string]any{
 							"pipeline": "1h",
@@ -471,15 +475,16 @@ func GenerateGitUpdateManifestTask(namespace string) *unstructured.Unstructured 
 					map[string]any{"name": "GITOPS_REPO_BRANCH"},
 					map[string]any{"name": "REPLICAS", "default": "2"},
 					map[string]any{"name": "PORT", "default": "8080"},
+					map[string]any{"name": "GITOPS_SECRET_NAME", "default": "github-credentials"},
 				},
 				"workspaces": []any{
 					map[string]any{"name": "gitops-repo"},
+					map[string]any{"name": "git-credentials", "optional": true},
 				},
 				"steps": []any{
 					map[string]any{
-						"name":    "update-manifest",
-						"image":   "alpine:latest",
-						"envFrom": []any{map[string]any{"secretRef": map[string]any{"name": "github-credentials", "optional": true}}},
+						"name":  "update-manifest",
+						"image": "alpine:latest",
 						"script": `#!/bin/sh
 set -e
 apk add --no-cache git yq
@@ -493,13 +498,17 @@ git clone "$(params.GITOPS_REPO_URL)" .
 git checkout -B "$(params.GITOPS_REPO_BRANCH)"
 git config user.email "tekton-pipeline@helios.dev"
 git config user.name "Tekton Pipeline"
-if [ -n "${username:-}" ] && [ -n "${password:-}" ]; then
+# Read credentials from mounted workspace (secret)
+CREDS_PATH="$(workspaces.git-credentials.path)"
+if [ -f "${CREDS_PATH}/username" ] && [ -f "${CREDS_PATH}/password" ]; then
+  username=$(cat "${CREDS_PATH}/username")
+  password=$(cat "${CREDS_PATH}/password")
   RAW_URL=$(echo "$(params.GITOPS_REPO_URL)" | sed 's|https://.*@|https://|')
   REPO_URL_WITH_AUTH="$(echo "$RAW_URL" | sed "s|https://|https://${username}:${password}@|")"
   git remote set-url origin "${REPO_URL_WITH_AUTH}"
-  echo "Updated git remote with credentials."
+  echo "Updated git remote with credentials from mounted secret."
 else
-    echo "WARNING: username or password env vars not set. Push might fail."
+    echo "WARNING: Git credentials secret not mounted or missing keys. Push might fail."
 fi
 export IMAGE_URL="$(params.NEW_IMAGE_URL)"
 export REPLICAS="$(params.REPLICAS)"
@@ -572,10 +581,12 @@ func GeneratePipeline(namespace string) *unstructured.Unstructured {
 					map[string]any{"name": "replicas", "default": "2"},
 					map[string]any{"name": "port", "default": "8080"},
 					map[string]any{"name": "docker-secret", "default": "docker-credentials"},
+					map[string]any{"name": "gitops-secret-name", "default": "github-credentials"},
 				},
 				"workspaces": []any{
 					map[string]any{"name": "source-workspace"},
 					map[string]any{"name": "gitops-workspace"},
+					map[string]any{"name": "git-credentials-workspace", "optional": true},
 				},
 				"tasks": []any{
 					map[string]any{
@@ -614,6 +625,7 @@ func GeneratePipeline(namespace string) *unstructured.Unstructured {
 						},
 						"workspaces": []any{
 							map[string]any{"name": "gitops-repo", "workspace": "gitops-workspace"},
+							map[string]any{"name": "git-credentials", "workspace": "git-credentials-workspace"},
 						},
 						"params": []any{
 							map[string]any{"name": "GITOPS_REPO_URL", "value": "$(params.gitops-repo-url)"},
@@ -622,6 +634,7 @@ func GeneratePipeline(namespace string) *unstructured.Unstructured {
 							map[string]any{"name": "GITOPS_REPO_BRANCH", "value": "$(params.gitops-repo-branch)"},
 							map[string]any{"name": "REPLICAS", "value": "$(params.replicas)"},
 							map[string]any{"name": "PORT", "value": "$(params.port)"},
+							map[string]any{"name": "GITOPS_SECRET_NAME", "value": "$(params.gitops-secret-name)"},
 						},
 					},
 				},

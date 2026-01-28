@@ -37,7 +37,7 @@ spec:
             title: Docker Registry Org/User
             type: string
             description: Your Docker Hub username or Organization
-            default: myuser
+            default: phamhoangkha1403
         repoName:
             title: Docker Repository Name
             type: string
@@ -64,7 +64,9 @@ spec:
           title: Webhook Secret
           type: string
           description: The secret to use for the webhook
+
           ui:field: Secret
+
 
   steps:
     # 1. Source Code Logic
@@ -88,7 +90,7 @@ spec:
         description: Source Code for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}
         sourcePath: ./source
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         repoVisibility: public
         protectDefaultBranch: false
 
@@ -103,7 +105,7 @@ spec:
           - push
         active: true
         contentType: json
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     # 2. GitOps Logic
     - id: fetch-gitops
@@ -129,7 +131,7 @@ spec:
         description: GitOps Manifests for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}-gitops
         sourcePath: ./gitops
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         repoVisibility: public
         protectDefaultBranch: false
 
@@ -149,8 +151,8 @@ spec:
         targetPath: ./deploy
         values:
           name: ${{ parameters.name }}
-          token: ${{ secrets.USER_OAUTH_TOKEN }}
-          username: git # Standard placeholder for PAT auth
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
           webhookSecret: ${{ parameters.webhookSecret }}
 
     - id: apply-secret
