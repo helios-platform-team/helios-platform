@@ -185,6 +185,10 @@ type HeliosAppStatus struct {
 	// LastAppliedHash is the hash of the last successfully synced manifest
 	// +optional
 	LastAppliedHash string `json:"lastAppliedHash,omitempty"`
+
+	// InitialBuildTriggered indicates if the initial PipelineRun was created
+	// +optional
+	InitialBuildTriggered bool `json:"initialBuildTriggered,omitempty"`
 }
 
 // ResourceRef references a Kubernetes resource

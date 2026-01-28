@@ -216,7 +216,7 @@ func GeneratePipelineRunForManifestGeneration(heliosApp *appv1alpha1.HeliosApp, 
 	// PVC workspace - Pipeline expects two workspaces
 	pvcName := heliosApp.Spec.PVCName
 	if pvcName == "" {
-		pvcName = "pvc-" + heliosApp.Name
+		pvcName = "shared-workspace-pvc"
 	}
 
 	pr := map[string]any{
@@ -308,6 +308,28 @@ func GenerateIngress(heliosApp *appv1alpha1.HeliosApp, eventListenerName string)
 		},
 	}
 	return &unstructured.Unstructured{Object: ing}, nil
+}
+
+// GeneratePVC creates a PersistentVolumeClaim for pipeline workspaces
+func GeneratePVC(name, namespace string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "PersistentVolumeClaim",
+			"metadata": map[string]any{
+				"name":      name,
+				"namespace": namespace,
+			},
+			"spec": map[string]any{
+				"accessModes": []any{"ReadWriteOnce"},
+				"resources": map[string]any{
+					"requests": map[string]any{
+						"storage": "1Gi",
+					},
+				},
+			},
+		},
+	}
 }
 
 // GenerateServiceAccount creates the tekton-triggers-sa service account

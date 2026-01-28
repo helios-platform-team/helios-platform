@@ -268,6 +268,59 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// ------------------------------------------------------------------
+	// PHASE 0.5: Ensure PVC exists for pipeline workspaces
+	// ------------------------------------------------------------------
+	pvcName := heliosApp.Spec.PVCName
+	if pvcName == "" {
+		pvcName = "shared-workspace-pvc"
+	}
+	pvc := GeneratePVC(pvcName, heliosApp.Namespace)
+	if err := ctrl.SetControllerReference(&heliosApp, pvc, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for PVC")
+	} else {
+		foundPVC := &unstructured.Unstructured{}
+		foundPVC.SetGroupVersionKind(pvc.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: pvc.GetName(), Namespace: pvc.GetNamespace()}, foundPVC); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating PVC for pipeline workspaces", "name", pvc.GetName())
+				if err := r.Client.Create(ctx, pvc); err != nil {
+					log.Error(err, "Failed to create PVC")
+				}
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.6: Trigger Initial PipelineRun (if not already done)
+	// ------------------------------------------------------------------
+	if !heliosApp.Status.InitialBuildTriggered {
+		log.Info("Triggering initial PipelineRun for new HeliosApp")
+
+		pr, err := GeneratePipelineRunForManifestGeneration(&heliosApp, pipelineName)
+		if err != nil {
+			log.Error(err, "Failed to generate initial PipelineRun")
+		} else {
+			if err := ctrl.SetControllerReference(&heliosApp, pr, r.Scheme); err != nil {
+				log.Error(err, "Failed to set owner reference for PipelineRun")
+			}
+
+			if err := r.Client.Create(ctx, pr); err != nil {
+				if !errors.IsAlreadyExists(err) {
+					log.Error(err, "Failed to create initial PipelineRun")
+				}
+			} else {
+				log.Info("Created initial PipelineRun", "name", pr.GetName())
+			}
+
+			// Mark as triggered to avoid creating multiple PipelineRuns
+			heliosApp.Status.InitialBuildTriggered = true
+			if err := r.Status().Update(ctx, &heliosApp); err != nil {
+				log.Error(err, "Failed to update InitialBuildTriggered status")
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------
 	// PHASE 1: Render & GitOps (Moved below)
 	// ------------------------------------------------------------------
 
