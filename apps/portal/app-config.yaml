@@ -52,9 +52,11 @@ proxy:
   #     changeOrigin: true
 
   # ArgoCD API Proxy - handles CORS and hides the admin token
+  # Production: Uses internal K8s DNS (ArgoCD in same cluster)
+  # Local dev: Overridden in app-config.local.yaml
   endpoints:
     '/argocd/api':
-      target: ${ARGOCD_SERVER_URL}/api/v1/
+      target: http://argocd-server.argocd.svc.cluster.local/api/v1/
       changeOrigin: true
       secure: false
       headers:
@@ -137,24 +139,25 @@ catalog:
 
 kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
+  # Production: In-cluster auth with ServiceAccount
+  # Local dev: Overridden in app-config.local.yaml to use localKubectlProxy
   serviceLocatorMethod:
     type: 'multiTenant'
   clusterLocatorMethods:
     - type: 'config'
       clusters:
-        - url: ${K8S_CLUSTER_URL}
-          name: local-k8s
+        - url: https://kubernetes.default.svc
+          name: in-cluster
           authProvider: 'serviceAccount'
-          serviceAccountToken: ${K8S_SA_TOKEN}
           skipTLSVerify: true
-          # Required for Tekton visibility - enables fetching PipelineRuns and TaskRuns
-          customResources:
-            - group: 'tekton.dev'
-              apiVersion: 'v1'
-              plural: 'pipelineruns'
-            - group: 'tekton.dev'
-              apiVersion: 'v1'
-              plural: 'taskruns'
+  # Required for Tekton visibility - enables fetching PipelineRuns and TaskRuns
+  customResources:
+    - group: 'tekton.dev'
+      apiVersion: 'v1'
+      plural: 'pipelineruns'
+    - group: 'tekton.dev'
+      apiVersion: 'v1'
+      plural: 'taskruns'
 
 # see https://backstage.io/docs/permissions/getting-started for more on the permission framework
 permission:
