@@ -23,8 +23,13 @@ spec:
     value: ./deployment.yaml
   - name: docker-secret
     value: docker-credentials 
+  - name: test-command
+    value: ${{ values.testCommand }}
+  # (Optional override – can be omitted to use the pipeline default)
+  # - name: test-image
+  #   value: node:20
   workspaces:
-  - name: source
+  - name: source-workspace
     volumeClaimTemplate:
       spec:
         accessModes:

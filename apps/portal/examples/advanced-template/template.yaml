@@ -123,6 +123,7 @@ spec:
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           webhookUrl: ${{ parameters.webhookUrl }}
+          testCommand: "npm ci && npm test"
 
     - id: publish-gitops
       name: Publish GitOps Manifests
