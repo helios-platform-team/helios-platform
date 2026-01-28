@@ -90,7 +90,7 @@ spec:
         description: Source Code for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}
         sourcePath: ./source
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoVisibility: public
         protectDefaultBranch: false
 
@@ -105,7 +105,7 @@ spec:
           - push
         active: true
         contentType: json
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
 
     # 2. GitOps Logic
     - id: fetch-gitops
@@ -131,18 +131,11 @@ spec:
         description: GitOps Manifests for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}-gitops
         sourcePath: ./gitops
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoVisibility: public
         protectDefaultBranch: false
 
-    - id: apply-helios
-      name: Deploy to Kubernetes
-      action: kubernetes:apply
-      input:
-        manifestPath: ./gitops/helios-app.yaml
-        namespaced: true
-
-    # 2.1 Secret Creation
+    # 2.1 Secret Creation (MUST be before apply-helios so operator can find it)
     - id: fetch-secret
       name: Generate Secret Manifest
       action: fetch:template
@@ -151,7 +144,7 @@ spec:
         targetPath: ./deploy
         values:
           name: ${{ parameters.name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.USER_OAUTH_TOKEN }}
           username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
           webhookSecret: ${{ parameters.webhookSecret }}
 
@@ -160,6 +153,14 @@ spec:
       action: kubernetes:apply
       input:
         manifestPath: ./deploy/secret.yaml
+        namespaced: true
+
+    # 2.2 Deploy HeliosApp (after secret exists)
+    - id: apply-helios
+      name: Deploy to Kubernetes
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/helios-app.yaml
         namespaced: true
 
     # 3. Registration
