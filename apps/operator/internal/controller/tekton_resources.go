@@ -198,6 +198,7 @@ func GeneratePipelineRunForManifestGeneration(heliosApp *appv1alpha1.HeliosApp, 
 		map[string]any{"name": "context-subpath", "value": contextSubpath},
 		map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", heliosApp.Spec.Replicas)},
 		map[string]any{"name": "port", "value": fmt.Sprintf("%d", heliosApp.Spec.Port)},
+		map[string]any{"name": "test-command", "value": heliosApp.Spec.TestCommand},
 	}
 
 	// Serialize Env and Resources to JSON
@@ -229,6 +230,7 @@ func GeneratePipelineRunForManifestGeneration(heliosApp *appv1alpha1.HeliosApp, 
 				"app.kubernetes.io/name":       heliosApp.Name,
 				"app.kubernetes.io/managed-by": "helios-operator",
 				"helios.io/pipeline-type":      "manifest-generation",
+				"janus-idp.io/tekton":          heliosApp.Name,
 			},
 		},
 		"spec": map[string]any{

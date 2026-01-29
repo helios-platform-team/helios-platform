@@ -13,6 +13,9 @@ spec:
   gitRepo: "${{ values.sourceRepo }}"
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: "apps/${{ values.name }}" # Assumed path
+  port: ${{ values.port }}
+  replicas: 1
+  testCommand: ${{ values.testCommand }}
   
   # Webhook Config
   webhookDomain: ${{ values.webhookUrl | replace("https://", "") | replace("/hooks/" + values.name, "") }}

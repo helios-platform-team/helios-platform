@@ -65,6 +65,12 @@ spec:
           type: string
           description: The secret to use for the webhook
 
+        githubToken:
+          title: GitHub Token
+          type: string
+          description: Personal Access Token with repo and workflow scopes
+          ui:field: Secret
+
           ui:field: Secret
 
 
@@ -90,7 +96,7 @@ spec:
         description: Source Code for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}
         sourcePath: ./source
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ parameters.githubToken }}
         repoVisibility: public
         protectDefaultBranch: false
 
@@ -105,7 +111,7 @@ spec:
           - push
         active: true
         contentType: json
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ parameters.githubToken }}
 
     # 2. GitOps Logic
     - id: fetch-gitops
@@ -123,7 +129,7 @@ spec:
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           webhookUrl: ${{ parameters.webhookUrl }}
-          testCommand: "npm ci && npm test"
+          testCommand: "npm install && npm test"
 
     - id: publish-gitops
       name: Publish GitOps Manifests
@@ -132,7 +138,7 @@ spec:
         description: GitOps Manifests for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}-gitops
         sourcePath: ./gitops
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        token: ${{ parameters.githubToken }}
         repoVisibility: public
         protectDefaultBranch: false
 
@@ -145,7 +151,7 @@ spec:
         targetPath: ./deploy
         values:
           name: ${{ parameters.name }}
-          token: ${{ secrets.USER_OAUTH_TOKEN }}
+          token: ${{ parameters.githubToken }}
           username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
           webhookSecret: ${{ parameters.webhookSecret }}
 

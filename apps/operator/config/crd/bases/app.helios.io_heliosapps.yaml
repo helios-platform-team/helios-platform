@@ -328,6 +328,9 @@ spec:
               serviceAccount:
                 description: ServiceAccount to run the application (and pipeline)
                 type: string
+              testCommand:
+                description: TestCommand is the command to run tests (e.g. "npm test")
+                type: string
               webhookDomain:
                 description: WebhookDomain is the external domain (e.g., ngrok) for
                   Git webhooks
@@ -404,6 +407,10 @@ spec:
                   - type
                   type: object
                 type: array
+              initialBuildTriggered:
+                description: InitialBuildTriggered indicates if the initial PipelineRun
+                  was created
+                type: boolean
               lastAppliedHash:
                 description: LastAppliedHash is the hash of the last successfully
                   synced manifest

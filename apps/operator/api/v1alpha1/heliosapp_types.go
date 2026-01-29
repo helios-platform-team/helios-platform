@@ -96,6 +96,10 @@ type HeliosAppSpec struct {
 	// +optional
 	Port int32 `json:"port,omitempty"`
 
+	// TestCommand is the command to run tests (e.g. "npm test")
+	// +optional
+	TestCommand string `json:"testCommand,omitempty"`
+
 	// Env variables for the application
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`

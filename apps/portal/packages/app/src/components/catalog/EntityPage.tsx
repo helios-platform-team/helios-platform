@@ -46,6 +46,8 @@ import {
 import {
   EntityArgoCDContent,
   isArgocdAvailable,
+  EntityArgoCDOverviewCard,
+  EntityArgoCDHistoryCard,
 } from '@roadiehq/backstage-plugin-argo-cd';
 import {
   RELATION_API_CONSUMED_BY,
@@ -156,8 +158,21 @@ const serviceEntityPage = (
       {overviewContent}
     </EntityLayout.Route>
 
-    <EntityLayout.Route path="/ci-cd" title="CI/CD">
-      {cicdContent}
+    {cicdContent}
+
+    <EntityLayout.Route path="/argo-cd" title="ArgoCD">
+      <EntitySwitch>
+        <EntitySwitch.Case if={isArgocdAvailable}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <EntityArgoCDOverviewCard />
+            </Grid>
+            <Grid item xs={12}>
+              <EntityArgoCDHistoryCard />
+            </Grid>
+          </Grid>
+        </EntitySwitch.Case>
+      </EntitySwitch>
     </EntityLayout.Route>
 
     <EntityLayout.Route

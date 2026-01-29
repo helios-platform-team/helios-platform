@@ -445,26 +445,8 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
-	// 8. Ensure Ingress for EventListener (if configured)
-	if heliosApp.Spec.WebhookDomain != "" {
-		log.Info("Ensuring Ingress for EventListener")
-		// Correctly use the EventListener name defined in Phase 0
-		ing, err := GenerateIngress(&heliosApp, eventListenerName)
-		if err != nil {
-			log.Error(err, "Failed to generate Ingress")
-		} else if ing != nil {
-			ing.SetGroupVersionKind(ing.GroupVersionKind())
-			foundIng := &unstructured.Unstructured{}
-			foundIng.SetGroupVersionKind(ing.GroupVersionKind())
-			key := client.ObjectKey{Name: ing.GetName(), Namespace: ing.GetNamespace()}
-			if err := r.Client.Get(ctx, key, foundIng); err != nil {
-				if errors.IsNotFound(err) {
-					log.Info("Creating Ingress", "name", ing.GetName())
-					r.Client.Create(ctx, ing)
-				}
-			}
-		}
-	}
+	// NOTE: Ingress removed - use port-forwarding for EventListener:
+	// kubectl port-forward svc/el-<app>-listener 8080:8080
 
 	return ctrl.Result{}, nil
 }

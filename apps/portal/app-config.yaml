@@ -82,6 +82,9 @@ auth:
       development:
         clientId: ${AUTH_GITHUB_CLIENT_ID}
         clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+        additionalScopes:
+          - repo
+          - workflow
 
 scaffolder:
   # see https://backstage.io/docs/features/software-templates/configuration for software template options
@@ -118,6 +121,10 @@ catalog:
     ## Uncomment these lines to add more example data
     # - type: url
     #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml
+
+    # Registered applications (auto-discovered from GitHub)
+    - type: url
+      target: https://github.com/hoangphuc841/advanced-nodejs-app-v22/blob/main/catalog-info.yaml
 
   providers:
     githubOrg:
