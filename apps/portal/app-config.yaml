@@ -88,6 +88,9 @@ auth:
 
 scaffolder:
   # see https://backstage.io/docs/features/software-templates/configuration for software template options
+  defaultEnvironment:
+    secrets:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
 
 catalog:
   import:

@@ -64,13 +64,6 @@ spec:
           title: Webhook Secret
           type: string
           description: The secret to use for the webhook
-
-        githubToken:
-          title: GitHub Token
-          type: string
-          description: Personal Access Token with repo and workflow scopes
-          ui:field: Secret
-
           ui:field: Secret
 
 
@@ -96,7 +89,7 @@ spec:
         description: Source Code for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}
         sourcePath: ./source
-        token: ${{ parameters.githubToken }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         repoVisibility: public
         protectDefaultBranch: false
 
@@ -111,7 +104,7 @@ spec:
           - push
         active: true
         contentType: json
-        token: ${{ parameters.githubToken }}
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     # 2. GitOps Logic
     - id: fetch-gitops
@@ -138,29 +131,20 @@ spec:
         description: GitOps Manifests for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}-gitops
         sourcePath: ./gitops
-        token: ${{ parameters.githubToken }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         repoVisibility: public
         protectDefaultBranch: false
 
     # 2.1 Secret Creation (MUST be before apply-helios so operator can find it)
-    - id: fetch-secret
-      name: Generate Secret Manifest
-      action: fetch:template
+    # Uses custom action that reads GITHUB_TOKEN from server environment
+    - id: create-secret
+      name: Create GitHub Credentials Secret
+      action: kubernetes:create-github-secret
       input:
-        url: ./content/deploy
-        targetPath: ./deploy
-        values:
-          name: ${{ parameters.name }}
-          token: ${{ parameters.githubToken }}
-          username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-          webhookSecret: ${{ parameters.webhookSecret }}
-
-    - id: apply-secret
-      name: Apply Secret
-      action: kubernetes:apply
-      input:
-        manifestPath: ./deploy/secret.yaml
-        namespaced: true
+        name: ${{ parameters.name }}
+        namespace: default
+        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+        webhookSecret: ${{ parameters.webhookSecret }}
 
     # 2.2 Deploy HeliosApp (after secret exists)
     - id: apply-helios
