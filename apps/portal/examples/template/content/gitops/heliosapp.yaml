@@ -1,0 +1,16 @@
+apiVersion: app.helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.name | dump }}
+  description: ${{ values.description | dump }}
+spec:
+  owner: ${{ values.owner | dump }}
+  gitopsRepo: ${{ values.gitopsRepo }}
+  gitopsPath: "./"
+  components:
+    - name: ${{ values.name }}-service
+      type: web-service
+      properties:
+        image: ${{ values.image }}
+        port: ${{ values.port }}
+        replicas: 1

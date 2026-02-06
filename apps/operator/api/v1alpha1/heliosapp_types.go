@@ -96,6 +96,10 @@ type HeliosAppSpec struct {
 	// +optional
 	Port int32 `json:"port,omitempty"`
 
+	// TestCommand is the command to run tests (e.g. "npm test")
+	// +optional
+	TestCommand string `json:"testCommand,omitempty"`
+
 	// Env variables for the application
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
@@ -185,6 +189,10 @@ type HeliosAppStatus struct {
 	// LastAppliedHash is the hash of the last successfully synced manifest
 	// +optional
 	LastAppliedHash string `json:"lastAppliedHash,omitempty"`
+
+	// InitialBuildTriggered indicates if the initial PipelineRun was created
+	// +optional
+	InitialBuildTriggered bool `json:"initialBuildTriggered,omitempty"`
 }
 
 // ResourceRef references a Kubernetes resource

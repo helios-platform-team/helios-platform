@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name | dump }}
+  annotations:
+    argocd/app-name: ${{ values.name }}-service
+    janus-idp.io/tekton: ${{ values.name }}-service
+spec:
+  type: service
+  owner: ${{ values.owner }}
+  lifecycle: experimental

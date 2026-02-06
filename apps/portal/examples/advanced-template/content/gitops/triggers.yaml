@@ -1,0 +1,92 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: ${{ values.name }}-git-binding
+spec:
+  params:
+    - name: git-repo-url
+      value: $(body.repository.clone_url)
+    - name: git-revision
+      value: $(body.head_commit.id)
+    - name: git-repo-name
+      value: $(body.repository.name)
+    - name: git-owner
+      value: $(body.repository.owner.login)
+
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: ${{ values.name }}-git-template
+spec:
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: ${{ values.name }}-run-
+        labels:
+          tekton.dev/pipeline: from-code-to-cluster
+          app.kubernetes.io/instance: ${{ values.name }}
+      spec:
+        serviceAccountName: pipeline
+        pipelineRef:
+          name: from-code-to-cluster
+        params:
+          - name: app-repo-url
+            value: $(tt.params.git-repo-url)
+          - name: app-repo-revision
+            value: $(tt.params.git-revision)
+          - name: image-repo
+            value: "index.docker.io/${{ values.dockerOrg }}/${{ values.repoName }}" 
+          - name: gitops-repo-url
+            value: "$(tt.params.git-repo-url)-gitops"
+          - name: gitops-repo-branch
+            value: "main"
+          - name: manifest-path-in-gitops-repo
+            value: "deployment.yaml"
+          - name: docker-secret
+            value: "docker-credentials"
+
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: ${{ values.name }}-listener
+spec:
+  serviceAccountName: ${{ values.name }}-sa
+  triggers:
+    - binding:
+        name: ${{ values.name }}-git-binding
+      template:
+        name: ${{ values.name }}-git-template
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${{ values.name }}-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${{ values.name }}-listener-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-roles
+subjects:
+  - kind: ServiceAccount
+    name: ${{ values.name }}-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ${{ values.name }}-listener-clusterbinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-clusterroles
+subjects:
+  - kind: ServiceAccount
+    name: ${{ values.name }}-sa
+    namespace: default

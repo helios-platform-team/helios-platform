@@ -1,5 +1,8 @@
 import { PropsWithChildren } from 'react';
 import { makeStyles } from '@material-ui/core';
+import { useApi, identityApiRef } from '@backstage/core-plugin-api';
+import useAsync from 'react-use/lib/useAsync';
+import { Avatar } from '@backstage/core-components';
 import HomeIcon from '@material-ui/icons/Home';
 import ExtensionIcon from '@material-ui/icons/Extension';
 import LibraryBooks from '@material-ui/icons/LibraryBooks';
@@ -57,43 +60,70 @@ const SidebarLogo = () => {
   );
 };
 
-export const Root = ({ children }: PropsWithChildren<{}>) => (
-  <SidebarPage>
-    <Sidebar>
-      <SidebarLogo />
-      <SidebarGroup label="Search" icon={<SearchIcon />} to="/search">
-        <SidebarSearchModal />
-      </SidebarGroup>
-      <SidebarDivider />
-      <SidebarGroup label="Menu" icon={<MenuIcon />}>
-        {/* Global nav, not org-specific */}
-        <SidebarItem icon={HomeIcon} to="catalog" text="Home" />
-        <MyGroupsSidebarItem
-          singularTitle="My Group"
-          pluralTitle="My Groups"
-          icon={GroupIcon}
-        />
-        <SidebarItem icon={ExtensionIcon} to="api-docs" text="APIs" />
-        <SidebarItem icon={LibraryBooks} to="docs" text="Docs" />
-        <SidebarItem icon={CreateComponentIcon} to="create" text="Create..." />
-        {/* End global nav */}
+
+
+export const Root = ({ children }: PropsWithChildren<{}>) => {
+  const identity = useApi(identityApiRef);
+  const { value: profile } = useAsync(async () => {
+    return await identity.getProfileInfo();
+  }, []);
+
+  return (
+    <SidebarPage>
+      <Sidebar>
+        <SidebarLogo />
+        <SidebarGroup label="Search" icon={<SearchIcon />} to="/search">
+          <SidebarSearchModal />
+        </SidebarGroup>
         <SidebarDivider />
-        <SidebarScrollWrapper>
-          {/* Items in this group will be scrollable if they run out of space */}
-        </SidebarScrollWrapper>
-      </SidebarGroup>
-      <SidebarSpace />
-      <SidebarDivider />
-      <NotificationsSidebarItem />
-      <SidebarDivider />
-      <SidebarGroup
-        label="Settings"
-        icon={<UserSettingsSignInAvatar />}
-        to="/settings"
-      >
-        <SidebarSettings />
-      </SidebarGroup>
-    </Sidebar>
-    {children}
-  </SidebarPage>
-);
+        <SidebarGroup label="Menu" icon={<MenuIcon />}>
+          {/* Global nav, not org-specific */}
+          <SidebarItem icon={HomeIcon} to="catalog" text="Home" />
+          <MyGroupsSidebarItem
+            singularTitle="My Group"
+            pluralTitle="My Groups"
+            icon={GroupIcon}
+          />
+          <SidebarItem icon={ExtensionIcon} to="api-docs" text="APIs" />
+          <SidebarItem icon={LibraryBooks} to="docs" text="Docs" />
+          <SidebarItem icon={CreateComponentIcon} to="create" text="Create..." />
+          {/* End global nav */}
+          <SidebarDivider />
+          <SidebarScrollWrapper>
+            {/* Items in this group will be scrollable if they run out of space */}
+          </SidebarScrollWrapper>
+        </SidebarGroup>
+        <SidebarSpace />
+        <SidebarDivider />
+        <NotificationsSidebarItem />
+        <SidebarDivider />
+        <SidebarGroup label="Settings" icon={<UserSettingsSignInAvatar />} to="/settings">
+          <SidebarSettings />
+        </SidebarGroup>
+        <SidebarItem
+          icon={
+            profile?.picture
+              ? () => (
+                <Avatar
+                  picture={profile?.picture}
+                  customStyles={{ width: 24, height: 24, margin: 0 }}
+                />
+              )
+              : // Fallback icon if no picture, though Avatar handles this internally too
+              () => (
+                <Avatar
+                  displayName={
+                    profile?.displayName || profile?.email || 'User'
+                  }
+                  customStyles={{ width: 24, height: 24, margin: 0 }}
+                />
+              )
+          }
+          text={profile?.displayName || profile?.email || 'User'}
+          to="/settings"
+        />
+      </Sidebar>
+      {children}
+    </SidebarPage>
+  );
+};
