@@ -17,6 +17,12 @@ spec:
       default: "2"
     - name: port
       default: "8080"
+    - name: docker-secret
+      default: "docker-credentials"
+    - name: test-command
+      default: ""          # Empty => no tests (no-op)
+    - name: test-image
+      default: "node:20"   # Default image for tests; can be overridden per app
 
   # CHANGE 1: Define two separate workspaces for the pipeline
   workspaces:
@@ -37,12 +43,46 @@ spec:
         - name: revision
           value: $(params.app-repo-revision)
 
+    - name: run-tests
+      runAfter: [fetch-source-code]
+      workspaces:
+        - name: source
+          workspace: source-workspace
+      params:
+        - name: test-command
+          value: $(params.test-command)
+        - name: test-image
+          value: $(params.test-image)
+      taskSpec:
+        params:
+          - name: test-command
+            type: string
+            default: ""
+          - name: test-image
+            type: string
+        workspaces:
+          - name: source
+        steps:
+          - name: run-tests
+            image: $(params.test-image)
+            workingDir: $(workspaces.source.path)
+            script: |
+              #!/usr/bin/env sh
+              set -e
 
+              if [ -z "$(params.test-command)" ]; then
+                echo "No test command provided; skipping tests."
+                exit 0
+              fi
+
+              echo "Running tests with command: $(params.test-command)"
+              # Use 'sh -lc' so that compound commands and PATH work
+              sh -lc "$(params.test-command)"
 
     - name: build-and-push-image
       taskRef:
         name: kaniko-build
-      runAfter: [fetch-source-code] # Only build if source code is fetched
+      runAfter: [run-tests]
       workspaces:
         # CHANGE 3: The build task also uses 'source-workspace'
         - name: source
@@ -52,6 +92,8 @@ spec:
           value: "$(params.image-repo):$(params.app-repo-revision)"
         - name: CONTEXT_SUBPATH
           value: "$(params.context-subpath)"
+        - name: docker-secret
+          value: "$(params.docker-secret)"
 
     - name: update-gitops-manifest
       taskRef:

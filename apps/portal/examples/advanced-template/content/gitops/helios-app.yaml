@@ -1,0 +1,39 @@
+apiVersion: app.helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.name }}
+  namespace: default
+spec:
+
+  description: "Managed by Helios Operator"
+  owner: ${{ values.owner }}
+  
+  # Required Git/Docker Info
+  imageRepo: ${{ values.dockerOrg }}/${{ values.repoName }}
+  gitRepo: "${{ values.sourceRepo }}"
+  gitopsRepo: ${{ values.gitopsRepo }}
+  gitopsPath: "apps/${{ values.name }}" # Assumed path
+  port: ${{ values.port }}
+  replicas: 1
+  testCommand: ${{ values.testCommand }}
+  
+  # Webhook Config
+  webhookDomain: ${{ values.webhookUrl | replace("https://", "") | replace("/hooks/" + values.name, "") }}
+  webhookSecret: "github-credentials-${{ values.name }}"
+  gitopsSecretRef: "github-credentials-${{ values.name }}"
+
+  components:
+    - name: ${{ values.name }}-backend
+      type: web-service
+      properties:
+        image: ${{ values.dockerOrg }}/${{ values.repoName }}:latest
+        port: ${{ values.port }}
+        replicas: 1
+        env:
+          - name: NODE_ENV
+            value: "production"
+      traits:
+        - type: service
+          properties:
+            port: ${{ values.port }}
+            targetPort: ${{ values.port }}

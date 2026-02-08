@@ -12,6 +12,13 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: example-website
+  annotations:
+    # ArgoCD: Links to the App name in ArgoCD
+    argocd/app-name: example-website
+    # Tekton: Label selector to find relevant PipelineRuns
+    janus-idp.io/tekton: example-website
+    # Kubernetes label selector for workload visibility
+    backstage.io/kubernetes-label-selector: 'app.kubernetes.io/part-of=example-website'
 spec:
   type: website
   lifecycle: experimental

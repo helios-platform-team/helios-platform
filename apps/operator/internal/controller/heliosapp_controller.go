@@ -104,6 +104,88 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// ------------------------------------------------------------------
+	// PHASE -1: Ensure Base Tekton Resources (SA, RBAC, Tasks, Pipeline)
+	// ------------------------------------------------------------------
+
+	// 1. ServiceAccount
+	sa := GenerateServiceAccount(heliosApp.Namespace)
+	if err := ctrl.SetControllerReference(&heliosApp, sa, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for ServiceAccount")
+	} else {
+		foundSA := &unstructured.Unstructured{}
+		foundSA.SetGroupVersionKind(sa.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: sa.GetName(), Namespace: sa.GetNamespace()}, foundSA); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating ServiceAccount", "name", sa.GetName())
+				r.Client.Create(ctx, sa)
+			}
+		}
+	}
+
+	// 2. RoleBinding
+	rb := GenerateRoleBinding(heliosApp.Namespace)
+	if err := ctrl.SetControllerReference(&heliosApp, rb, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for RoleBinding")
+	} else {
+		foundRB := &unstructured.Unstructured{}
+		foundRB.SetGroupVersionKind(rb.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: rb.GetName(), Namespace: rb.GetNamespace()}, foundRB); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating RoleBinding", "name", rb.GetName())
+				r.Client.Create(ctx, rb)
+			}
+		}
+	}
+
+	// 3. ClusterRoleBinding
+	crb := GenerateClusterRoleBinding(heliosApp.Namespace)
+	// We cannot set OwnerReference on ClusterRoleBinding (Cluster-scoped) from HeliosApp (Namespaced)
+	foundCrb := &unstructured.Unstructured{}
+	foundCrb.SetGroupVersionKind(crb.GroupVersionKind())
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: crb.GetName()}, foundCrb); err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Creating ClusterRoleBinding", "name", crb.GetName())
+			r.Client.Create(ctx, crb)
+		}
+	}
+
+	// 3. Tasks
+	tasks := []*unstructured.Unstructured{
+		GenerateGitCloneTask(heliosApp.Namespace),
+		GenerateKanikoBuildTask(heliosApp.Namespace),
+		GenerateGitUpdateManifestTask(heliosApp.Namespace),
+	}
+	for _, task := range tasks {
+		if err := ctrl.SetControllerReference(&heliosApp, task, r.Scheme); err != nil {
+			log.Error(err, "Failed to set owner reference for Task", "task", task.GetName())
+		} else {
+			foundTask := &unstructured.Unstructured{}
+			foundTask.SetGroupVersionKind(task.GroupVersionKind())
+			if err := r.Client.Get(ctx, client.ObjectKey{Name: task.GetName(), Namespace: task.GetNamespace()}, foundTask); err != nil {
+				if errors.IsNotFound(err) {
+					log.Info("Creating Task", "name", task.GetName())
+					r.Client.Create(ctx, task)
+				}
+			}
+		}
+	}
+
+	// 4. Pipeline
+	pl := GeneratePipeline(heliosApp.Namespace)
+	if err := ctrl.SetControllerReference(&heliosApp, pl, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for Pipeline")
+	} else {
+		foundPl := &unstructured.Unstructured{}
+		foundPl.SetGroupVersionKind(pl.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: pl.GetName(), Namespace: pl.GetNamespace()}, foundPl); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating Pipeline", "name", pl.GetName())
+				r.Client.Create(ctx, pl)
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------
 	// PHASE 0: Setup CI/CD Triggers (Tekton)
 	// ------------------------------------------------------------------
 
@@ -183,6 +265,59 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			if errors.IsNotFound(err) {
 				log.Info("Creating EventListener", "name", el.GetName())
 				r.Client.Create(ctx, el)
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.5: Ensure PVC exists for pipeline workspaces
+	// ------------------------------------------------------------------
+	pvcName := heliosApp.Spec.PVCName
+	if pvcName == "" {
+		pvcName = "shared-workspace-pvc"
+	}
+	pvc := GeneratePVC(pvcName, heliosApp.Namespace)
+	if err := ctrl.SetControllerReference(&heliosApp, pvc, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for PVC")
+	} else {
+		foundPVC := &unstructured.Unstructured{}
+		foundPVC.SetGroupVersionKind(pvc.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: pvc.GetName(), Namespace: pvc.GetNamespace()}, foundPVC); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating PVC for pipeline workspaces", "name", pvc.GetName())
+				if err := r.Client.Create(ctx, pvc); err != nil {
+					log.Error(err, "Failed to create PVC")
+				}
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.6: Trigger Initial PipelineRun (if not already done)
+	// ------------------------------------------------------------------
+	if !heliosApp.Status.InitialBuildTriggered {
+		log.Info("Triggering initial PipelineRun for new HeliosApp")
+
+		pr, err := GeneratePipelineRunForManifestGeneration(&heliosApp, pipelineName)
+		if err != nil {
+			log.Error(err, "Failed to generate initial PipelineRun")
+		} else {
+			if err := ctrl.SetControllerReference(&heliosApp, pr, r.Scheme); err != nil {
+				log.Error(err, "Failed to set owner reference for PipelineRun")
+			}
+
+			if err := r.Client.Create(ctx, pr); err != nil {
+				if !errors.IsAlreadyExists(err) {
+					log.Error(err, "Failed to create initial PipelineRun")
+				}
+			} else {
+				log.Info("Created initial PipelineRun", "name", pr.GetName())
+			}
+
+			// Mark as triggered to avoid creating multiple PipelineRuns
+			heliosApp.Status.InitialBuildTriggered = true
+			if err := r.Status().Update(ctx, &heliosApp); err != nil {
+				log.Error(err, "Failed to update InitialBuildTriggered status")
 			}
 		}
 	}
@@ -312,26 +447,8 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
-	// 8. Ensure Ingress for EventListener (if configured)
-	if heliosApp.Spec.WebhookDomain != "" {
-		log.Info("Ensuring Ingress for EventListener")
-		// Correctly use the EventListener name defined in Phase 0
-		ing, err := GenerateIngress(&heliosApp, eventListenerName)
-		if err != nil {
-			log.Error(err, "Failed to generate Ingress")
-		} else if ing != nil {
-			ing.SetGroupVersionKind(ing.GroupVersionKind())
-			foundIng := &unstructured.Unstructured{}
-			foundIng.SetGroupVersionKind(ing.GroupVersionKind())
-			key := client.ObjectKey{Name: ing.GetName(), Namespace: ing.GetNamespace()}
-			if err := r.Client.Get(ctx, key, foundIng); err != nil {
-				if errors.IsNotFound(err) {
-					log.Info("Creating Ingress", "name", ing.GetName())
-					r.Client.Create(ctx, ing)
-				}
-			}
-		}
-	}
+	// NOTE: Ingress removed - use port-forwarding for EventListener:
+	// kubectl port-forward svc/el-<app>-listener 8080:8080
 
 	return ctrl.Result{}, nil
 }
@@ -396,36 +513,6 @@ func (r *HeliosAppReconciler) updateStatus(ctx context.Context, app *appv1alpha1
 func (r *HeliosAppReconciler) computeHash(data []byte) string {
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
-}
-
-// findObjectsForSecret finds HeliosApps that reference a given Secret
-func (r *HeliosAppReconciler) findObjectsForSecret(ctx context.Context, obj client.Object) []reconcile.Request {
-	secret, ok := obj.(*corev1.Secret)
-	if !ok {
-		return nil
-	}
-
-	// List all HeliosApps in the same namespace (since secrets are namespaced and currently we expect same-namespace ref)
-	// If cross-namespace support is added later, this needs to change.
-	heliosAppList := &appv1alpha1.HeliosAppList{}
-	if err := r.List(ctx, heliosAppList, client.InNamespace(secret.Namespace)); err != nil {
-		// We cannot log easily here without a logger in context, or usage of global logger
-		// But returning nil is safe (no triggers)
-		return nil
-	}
-
-	var requests []reconcile.Request
-	for _, app := range heliosAppList.Items {
-		if app.Spec.GitOpsSecretRef == secret.Name {
-			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      app.Name,
-					Namespace: app.Namespace,
-				},
-			})
-		}
-	}
-	return requests
 }
 
 // SetupWithManager sets up the controller with the Manager

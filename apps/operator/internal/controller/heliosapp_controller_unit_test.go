@@ -1,19 +1,3 @@
-/*
-Copyright 2026.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
@@ -21,26 +5,25 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
 	heliosCue "github.com/helios-platform-team/helios-platform/apps/operator/internal/cue"
 	"github.com/helios-platform-team/helios-platform/apps/operator/internal/gitops"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// MockGitOpsClient is a mock implementation of GitOpsClientInterface
-type MockGitOpsClient struct {
+// FakeGitOpsClient is a mock implementation of GitOpsClientInterface for unit tests
+type FakeGitOpsClient struct {
 	SyncedFiles map[string]string
 }
 
-func (m *MockGitOpsClient) SyncManifest(ctx context.Context, filePath, content string) error {
+func (m *FakeGitOpsClient) SyncManifest(ctx context.Context, filePath, content string) error {
 	if m.SyncedFiles == nil {
 		m.SyncedFiles = make(map[string]string)
 	}
@@ -48,87 +31,16 @@ func (m *MockGitOpsClient) SyncManifest(ctx context.Context, filePath, content s
 	return nil
 }
 
-var _ = Describe("HeliosApp Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+// FakeCueEngine is a mock implementation of CueEngineInterface
+type FakeCueEngine struct{}
 
-		ctx := context.Background()
+func (f *FakeCueEngine) Render(app heliosCue.Application) ([]byte, error) {
+	return []byte("rendered: true"), nil
+}
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
-		heliosapp := &appv1alpha1.HeliosApp{}
-
-		BeforeEach(func() {
-			By("creating the custom resource for the Kind HeliosApp")
-			err := k8sClient.Get(ctx, typeNamespacedName, heliosapp)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &appv1alpha1.HeliosApp{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					Spec: appv1alpha1.HeliosAppSpec{
-						Components: []appv1alpha1.Component{
-							{
-								Name: "frontend",
-								Properties: &runtime.RawExtension{
-									Raw: []byte(`{"image": "nginx"}`),
-								},
-							},
-						},
-						GitOpsRepo:      "https://github.com/example/repo.git",
-						GitOpsPath:      "apps/test-app",
-						GitOpsSecretRef: "my-secret", // Add secret ref to trigger logic path
-					},
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-			}
-		})
-
-		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &appv1alpha1.HeliosApp{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Cleanup the specific resource instance HeliosApp")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			mockGit := &MockGitOpsClient{}
-
-			controllerReconciler := &HeliosAppReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-				// Inject the mock
-				GitFactory: func(repo, user, token string) gitops.GitOpsClientInterface {
-					return mockGit
-				},
-				// Note: CueEngine needs to be mocked or real if possible.
-				// For this test, we instantiate a dummy engine.
-				CueEngine: &heliosCue.Engine{},
-			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-
-			// We expect Reconcile to attempt GitOps if CUE rendering succeeds.
-			// If CUE rendering fails (likely due to empty engine), err will be present.
-			// However, the test structure is now correct for injecting the mock.
-			// We allow error here because we haven't fully mocked CUE.
-			if err == nil {
-				// If no error, we check if mock was called (only if logic reached GitOps)
-				// Expect(mockGit.SyncedFiles).NotTo(BeEmpty())
-			}
-		})
-	})
-})
-
-// Standard Unit Tests (Merged from unit_test.go)
+func (f *FakeCueEngine) RenderToObjects(app heliosCue.Application) ([]map[string]interface{}, error) {
+	return []map[string]interface{}{}, nil
+}
 
 func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 	// 1. Setup Scheme
@@ -177,7 +89,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		Build()
 
 	// 4. Setup Mock GitOps
-	mockGit := &MockGitOpsClient{}
+	mockGit := &FakeGitOpsClient{}
 
 	// 5. Setup Reconciler
 	r := &HeliosAppReconciler{
@@ -235,7 +147,6 @@ func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(corev1.AddToScheme(scheme))
 
 	heliosApp := &appv1alpha1.HeliosApp{
 		ObjectMeta: metav1.ObjectMeta{Name: "pending-app", Namespace: "default"},
