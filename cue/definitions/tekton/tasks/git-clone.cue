@@ -1,15 +1,18 @@
-package tasks
+package tekton
 
-import (
-	"helios.io/cue/definitions/tekton/bases"
-)
+// Git Clone Task
+#GitClone: #TektonTask & {
+	parameter: {
+		name: "git-clone"
+	}
 
-#GitClone: bases.#TektonTask & {
-	metadata: name: "git-clone"
-	spec: {
+	// Alias config for internal use
+	_config: #Defaults
+
+	output: spec: {
 		params: [
-			bases.#CommonParams.git_url,
-			bases.#CommonParams.git_revision,
+			#CommonParams.git.url,
+			#CommonParams.git.revision,
 		]
 		workspaces: [{
 			name:        "output"
@@ -17,7 +20,7 @@ import (
 		}]
 		steps: [{
 			name:  "clone"
-			image: "alpine/git:latest"
+			image: _config.images.gitClone
 			script: """
 				#!/bin/sh
 				set -e

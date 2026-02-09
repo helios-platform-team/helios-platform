@@ -1,31 +1,21 @@
-package tasks
+package tekton
 
-import (
-	"helios.io/cue/definitions/tekton/bases"
-)
+// Kaniko Build Task
+#KanikoBuild: #TektonTask & {
+	parameter: {
+		name: "kaniko-build"
+	}
 
-#KanikoBuild: bases.#TektonTask & {
-	metadata: name: "kaniko-build"
-	spec: {
-		params: [{
-			name:        "IMAGE"
-			description: "Name (reference) of the image to build."
-			type:        "string"
-		}, {
-			name:    "DOCKERFILE"
-			default: "Dockerfile"
-			type:    "string"
-		}, {
-			name:        "CONTEXT_SUBPATH"
-			description: "Subdirectory within the workspace where the Dockerfile is located"
-			default:     ""
-			type:        "string"
-		}, {
-			name:        "docker-secret"
-			description: "Name of the secret containing docker credentials"
-			default:     "docker-credentials"
-			type:        "string"
-		}]
+	// Alias config for internal use
+	_config: #Defaults
+
+	output: spec: {
+		params: [
+			#CommonParams.image.name,
+			#CommonParams.image.dockerfile,
+			#CommonParams.image.contextSubpath,
+			#CommonParams.image.dockerSecret,
+		]
 		workspaces: [{
 			name: "source"
 		}]
@@ -34,7 +24,7 @@ import (
 		}]
 		steps: [{
 			name:  "build-and-push"
-			image: "gcr.io/kaniko-project/executor:latest"
+			image: _config.images.kaniko
 			env: [{
 				name:  "DOCKER_CONFIG"
 				value: "/kaniko/.docker"
@@ -52,7 +42,7 @@ import (
 			}]
 		}, {
 			name:  "write-image-url"
-			image: "alpine:latest"
+			image: _config.images.alpine
 			script: """
 				#!/bin/sh
 				set -e

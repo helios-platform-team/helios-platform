@@ -1,132 +1,110 @@
-// Base template for Tekton Task resources.
-// Concrete tasks extend this template.
 package tekton
 
-// #TektonTask: Base template for all Tekton Tasks
+// Base schema for Tekton Task using the Config/Output pattern
 #TektonTask: {
-	// === INPUT (required) ===
+	// Input configuration
+	config: #Defaults
+
+	// Task-specific parameters
 	parameter: {
-		name:      string
-		namespace: string
+		name: string
+		...
 	}
 
-	// === CONFIG (task-specific) ===
-	config: {
-		description?: string
-		params: [...#TaskParam] | *[]
-		workspaces: [...#TaskWorkspace] | *[]
-		results: [...#TaskResult] | *[]
-		steps: [...#TaskStep] // At least one step required
-		volumes: [...#TaskVolume] | *[]
-		stepTemplate?: #StepTemplate
-	}
-
-	// === OUTPUT (auto-generated) ===
+	// Output Kubernetes Resource
 	output: {
-		apiVersion: #Defaults.tekton.apiVersion
+		apiVersion: "tekton.dev/v1beta1"
 		kind:       "Task"
 		metadata: {
-			name:      parameter.name
-			namespace: parameter.namespace
-			labels: (#AppLabels & {_appName: parameter.name}).labels
+			name: parameter.name
+			// Allow additional fields like namespace, labels, annotations
+			...
 		}
 		spec: {
-			if config.description != _|_ {
-				description: config.description
-			}
-			if len(config.params) > 0 {
-				params: config.params
-			}
-			if len(config.workspaces) > 0 {
-				workspaces: config.workspaces
-			}
-			if len(config.results) > 0 {
-				results: config.results
-			}
-			steps: config.steps
-			if len(config.volumes) > 0 {
-				volumes: config.volumes
-			}
-			if config.stepTemplate != _|_ {
-				stepTemplate: config.stepTemplate
-			}
+			params?: [...#TaskParam]
+			workspaces?: [...#TaskWorkspace]
+			results?: [...#TaskResult]
+			volumes?: [...#TaskVolume]
+			steps: [...#TaskStep]
 		}
 	}
 }
 
-// =====================================================
-// SUPPORTING TYPES
-// =====================================================
+// --- Supporting Definitions ---
 
 #TaskParam: {
-	name:         string
+	name:        string
 	description?: string
-	type?:        "string" | "array"
-	default?:     string
+	type?:       "string" | "array"
+	default?:    string | [...string]
 }
 
 #TaskWorkspace: {
-	name:         string
+	name:        string
 	description?: string
-	optional?:    bool
-	readOnly?:    bool
-	mountPath?:   string
+	mountPath?:  string
+	readOnly?:   bool
+	optional?:   bool
 }
 
 #TaskResult: {
-	name:         string
+	name:        string
 	description?: string
-}
-
-#TaskStep: {
-	name:  string
-	image: string
-
-	// Either script OR command (not both)
-	script?: string
-	command?: [...string]
-	args?: [...string]
-
-	workingDir?: string
-	env?: [...#EnvVar]
-	volumeMounts?: [...#VolumeMount]
-	resources?: #ResourceRequirements
-	securityContext?: {
-		runAsUser?:                int
-		runAsGroup?:               int
-		allowPrivilegeEscalation?: bool
-	}
-}
-
-#StepTemplate: {
-	env?: [...#EnvVar]
-	resources?: #ResourceRequirements
-	securityContext?: {...}
 }
 
 #TaskVolume: {
 	name: string
-	// One of the following volume sources
 	secret?: {
 		secretName: string
-		items?: [...{key: string, path: string}]
+		items?: [...{
+			key:  string
+			path: string
+		}]
+	}
+	configMap?: {
+		name: string
 	}
 	emptyDir?: {}
-	configMap?: {name: string}
-	persistentVolumeClaim?: {claimName: string}
+}
+
+#TaskStep: {
+	name:    string
+	image:   string
+	command?: [...string]
+	args?:    [...string]
+	entrypoint?: [...string]
+	script?:  string
+	env?:     [...#EnvVar]
+	envFrom?: [...#EnvFromSource]
+	volumeMounts?: [...#VolumeMount]
+	workingDir?: string
+}
+
+#EnvFromSource: {
+	prefix?: string
+	configMapRef?: {
+		name:      string
+		optional?: bool
+	}
+	secretRef?: {
+		name:      string
+		optional?: bool
+	}
 }
 
 #EnvVar: {
-	name:   string
+	name: string
 	value?: string
 	valueFrom?: {
 		secretKeyRef?: {
 			name: string
 			key:  string
+			optional?: bool
 		}
 		configMapKeyRef?: {
 			name: string
 			key:  string
+			optional?: bool
 		}
 	}
 }
@@ -138,13 +116,3 @@ package tekton
 	subPath?:  string
 }
 
-#ResourceRequirements: {
-	limits?: {
-		cpu?:    string
-		memory?: string
-	}
-	requests?: {
-		cpu?:    string
-		memory?: string
-	}
-}
