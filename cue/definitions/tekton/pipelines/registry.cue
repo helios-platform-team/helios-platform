@@ -1,7 +1,9 @@
 // Pipeline registry for managing multiple pipeline definitions.
 // Provides a central lookup and rendering mechanism.
 // Follows the same pattern as #TaskRegistry from tasks/_registry.cue
-package tekton
+package pipelines
+
+import "helios.io/cue/definitions/tekton"
 
 // =====================================================
 // PIPELINE REGISTRY
@@ -51,7 +53,7 @@ package tekton
 	_definition: #PipelineRegistry[_type]
 
 	// Use #TektonPipeline base to generate output
-	_pipeline: #TektonPipeline & {
+	_pipeline: tekton.#TektonPipeline & {
 		parameter: {
 			name:      _type
 			namespace: _ns

@@ -1,20 +1,22 @@
-package tekton
+package tasks
+
+import "helios.io/cue/definitions/tekton"
 
 // Git Update Manifest Task
-#GitUpdateManifest: #TektonTask & {
+#GitUpdateManifest: tekton.#TektonTask & {
 	parameter: {
 		name: "git-update-manifest"
 	}
 
 	// Alias config for internal use
-	_config: #Defaults
+	_config: tekton.#Defaults
 
 	output: spec: {
 		params: [
-			#CommonParams.gitops.repoUrl,
-			#CommonParams.gitops.manifestPath,
-			#CommonParams.gitops.newImageUrl,
-			#CommonParams.gitops.branch, {
+			tekton.#CommonParams.gitops.repoUrl,
+			tekton.#CommonParams.gitops.manifestPath,
+			tekton.#CommonParams.gitops.newImageUrl,
+			tekton.#CommonParams.gitops.branch, {
 			name:    "REPLICAS"
 			default: "2"
 			type:    "string"

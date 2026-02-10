@@ -1,20 +1,22 @@
-package tekton
+package tasks
+
+import "helios.io/cue/definitions/tekton"
 
 // Kaniko Build Task
-#KanikoBuild: #TektonTask & {
+#KanikoBuild: tekton.#TektonTask & {
 	parameter: {
 		name: "kaniko-build"
 	}
 
 	// Alias config for internal use
-	_config: #Defaults
+	_config: tekton.#Defaults
 
 	output: spec: {
 		params: [
-			#CommonParams.image.name,
-			#CommonParams.image.dockerfile,
-			#CommonParams.image.contextSubpath,
-			#CommonParams.image.dockerSecret,
+			tekton.#CommonParams.image.name,
+			tekton.#CommonParams.image.dockerfile,
+			tekton.#CommonParams.image.contextSubpath,
+			tekton.#CommonParams.image.dockerSecret,
 		]
 		workspaces: [{
 			name: "source"

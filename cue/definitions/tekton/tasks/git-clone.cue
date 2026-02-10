@@ -1,18 +1,20 @@
-package tekton
+package tasks
+
+import "helios.io/cue/definitions/tekton"
 
 // Git Clone Task
-#GitClone: #TektonTask & {
+#GitClone: tekton.#TektonTask & {
 	parameter: {
 		name: "git-clone"
 	}
 
 	// Alias config for internal use
-	_config: #Defaults
+	_config: tekton.#Defaults
 
 	output: spec: {
 		params: [
-			#CommonParams.git.url,
-			#CommonParams.git.revision,
+			tekton.#CommonParams.git.url,
+			tekton.#CommonParams.git.revision,
 		]
 		workspaces: [{
 			name:        "output"
