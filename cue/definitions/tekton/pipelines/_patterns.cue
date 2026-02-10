@@ -1,41 +1,41 @@
 // Reusable pipeline patterns for composing Tekton pipelines.
 // These patterns encapsulate common task configurations.
+// Uses #CommonParams and #Defaults from _common.cue as single source of truth.
 package tekton
 
 // =====================================================
-// STANDARD PIPELINE PARAMS
-// Common parameters used across CI/CD pipelines
+// TASK NAMES: Must match #TaskRegistry entries
 // =====================================================
-#StandardPipelineParams: {
-	// Source code params
-	appRepoUrl: {
-		name: "app-repo-url"
-	}
-	appRepoRevision: {
-		name: "app-repo-revision"
-	}
-	imageRepo: {
-		name: "image-repo"
-	}
+#TaskNames: {
+	gitClone:          "git-clone"
+	kanikoBuild:       "kaniko-build"
+	gitUpdateManifest: "git-update-manifest"
+}
 
-	// GitOps params
-	gitopsRepoUrl: {
-		name: "gitops-repo-url"
-	}
-	manifestPath: {
-		name: "manifest-path-in-gitops-repo"
-	}
-	gitopsBranch: {
-		name: "gitops-repo-branch"
-	}
+// =====================================================
+// PIPELINE PARAMS: Reuse #CommonParams from _common.cue
+// Single source of truth for parameter definitions
+// =====================================================
+#PipelineParams: {
+	// App source params - from #CommonParams.app
+	appRepoUrl:     #CommonParams.app.repoUrl
+	appRepoRevision: #CommonParams.app.repoRevision
+	imageRepo:      #CommonParams.app.imageRepo
 
-	// Build context param
-	contextSubpath: {
-		name:    "context-subpath"
-		default: ""
-	}
+	// GitOps params - from #CommonParams.gitops
+	gitopsRepoUrl: #CommonParams.gitops.repoUrl
+	manifestPath:  #CommonParams.gitops.manifestPath
+	gitopsBranch:  #CommonParams.gitops.branch
 
-	// App config params
+	// Image params - from #CommonParams.image
+	contextSubpath: #CommonParams.image.contextSubpath
+	dockerSecret:   #CommonParams.image.dockerSecret
+
+	// Testing params - from #CommonParams.test
+	testCommand: #CommonParams.test.command
+	testImage:   #CommonParams.test.image
+
+	// App config params (pipeline-specific, not in #CommonParams)
 	replicas: {
 		name:    "replicas"
 		default: "2"
@@ -44,56 +44,39 @@ package tekton
 		name:    "port"
 		default: "8080"
 	}
-
-	// Secret params
-	dockerSecret: {
-		name:    "docker-secret"
-		default: "docker-credentials"
-	}
-
-	// Testing params
-	testCommand: {
-		name:    "test-command"
-		default: ""
-	}
-	testImage: {
-		name:    "test-image"
-		default: "node:20"
-	}
 }
 
 // Convert params definition to list format for pipeline spec
-#StandardPipelineParamsList: [
-	#StandardPipelineParams.appRepoUrl,
-	#StandardPipelineParams.appRepoRevision,
-	#StandardPipelineParams.imageRepo,
-	#StandardPipelineParams.gitopsRepoUrl,
-	#StandardPipelineParams.manifestPath,
-	#StandardPipelineParams.gitopsBranch,
-	#StandardPipelineParams.contextSubpath,
-	#StandardPipelineParams.replicas,
-	#StandardPipelineParams.port,
-	#StandardPipelineParams.dockerSecret,
-	#StandardPipelineParams.testCommand,
-	#StandardPipelineParams.testImage,
+#PipelineParamsList: [
+	#PipelineParams.appRepoUrl,
+	#PipelineParams.appRepoRevision,
+	#PipelineParams.imageRepo,
+	#PipelineParams.gitopsRepoUrl,
+	#PipelineParams.manifestPath,
+	#PipelineParams.gitopsBranch,
+	#PipelineParams.contextSubpath,
+	#PipelineParams.replicas,
+	#PipelineParams.port,
+	#PipelineParams.dockerSecret,
+	#PipelineParams.testCommand,
+	#PipelineParams.testImage,
 ]
 
 // =====================================================
-// STANDARD WORKSPACES
-// Common workspace definitions
+// WORKSPACES: Reuse #Defaults.workspaces from _common.cue
 // =====================================================
-#StandardWorkspaces: {
+#PipelineWorkspaces: {
 	source: {
-		name: "source-workspace"
+		name: #Defaults.workspaces.source
 	}
 	gitops: {
-		name: "gitops-workspace"
+		name: #Defaults.workspaces.gitops
 	}
 }
 
-#StandardWorkspacesList: [
-	#StandardWorkspaces.source,
-	#StandardWorkspaces.gitops,
+#PipelineWorkspacesList: [
+	#PipelineWorkspaces.source,
+	#PipelineWorkspaces.gitops,
 ]
 
 // =====================================================
@@ -110,17 +93,17 @@ package tekton
 	// Output: pipeline task configuration
 	task: {
 		name: _name
-		taskRef: name: "git-clone"
+		taskRef: name: #TaskNames.gitClone
 		if len(_runAfter) > 0 {
 			runAfter: _runAfter
 		}
 		workspaces: [{
 			name:      "output"
-			workspace: #StandardWorkspaces.source.name
+			workspace: #PipelineWorkspaces.source.name
 		}]
 		params: [
-			{name: "url", value:      "$(params.\(#StandardPipelineParams.appRepoUrl.name))"},
-			{name: "revision", value: "$(params.\(#StandardPipelineParams.appRepoRevision.name))"},
+			{name: #CommonParams.git.url.name, value:      "$(params.\(#PipelineParams.appRepoUrl.name))"},
+			{name: #CommonParams.git.revision.name, value: "$(params.\(#PipelineParams.appRepoRevision.name))"},
 		]
 	}
 }
@@ -137,34 +120,34 @@ package tekton
 		runAfter: _runAfter
 		workspaces: [{
 			name:      "source"
-			workspace: #StandardWorkspaces.source.name
+			workspace: #PipelineWorkspaces.source.name
 		}]
 		params: [
-			{name: "test-command", value: "$(params.\(#StandardPipelineParams.testCommand.name))"},
-			{name: "test-image", value:   "$(params.\(#StandardPipelineParams.testImage.name))"},
+			{name: #CommonParams.test.command.name, value: "$(params.\(#PipelineParams.testCommand.name))"},
+			{name: #CommonParams.test.image.name, value:   "$(params.\(#PipelineParams.testImage.name))"},
 		]
 		taskSpec: {
 			params: [
-				{name: "test-command", type: "string", default: ""},
-				{name: "test-image", type:   "string"},
+				{name: #CommonParams.test.command.name, type: "string", default: #CommonParams.test.command.default},
+				{name: #CommonParams.test.image.name, type:   "string"},
 			]
 			workspaces: [{name: "source"}]
 			steps: [{
 				name:       "run-tests"
-				image:      "$(params.test-image)"
+				image:      "$(params.\(#CommonParams.test.image.name))"
 				workingDir: "$(workspaces.source.path)"
 				script: """
 					#!/usr/bin/env sh
 					set -e
 
-					if [ -z "$(params.test-command)" ]; then
+					if [ -z "$(params.\(#CommonParams.test.command.name))" ]; then
 					  echo "No test command provided; skipping tests."
 					  exit 0
 					fi
 
-					echo "Running tests with command: $(params.test-command)"
+					echo "Running tests with command: $(params.\(#CommonParams.test.command.name))"
 					# Use 'sh -lc' so that compound commands and PATH work
-					sh -lc "$(params.test-command)"
+					sh -lc "$(params.\(#CommonParams.test.command.name))"
 					"""
 			}]
 		}
@@ -180,16 +163,16 @@ package tekton
 	// Output: pipeline task configuration
 	task: {
 		name: _name
-		taskRef: name: "kaniko-build"
+		taskRef: name: #TaskNames.kanikoBuild
 		runAfter: _runAfter
 		workspaces: [{
 			name:      "source"
-			workspace: #StandardWorkspaces.source.name
+			workspace: #PipelineWorkspaces.source.name
 		}]
 		params: [
-			{name: "IMAGE", value:          "$(params.\(#StandardPipelineParams.imageRepo.name)):$(params.\(#StandardPipelineParams.appRepoRevision.name))"},
-			{name: "CONTEXT_SUBPATH", value: "$(params.\(#StandardPipelineParams.contextSubpath.name))"},
-			{name: "docker-secret", value:  "$(params.\(#StandardPipelineParams.dockerSecret.name))"},
+			{name: #CommonParams.image.name.name, value:        "$(params.\(#PipelineParams.imageRepo.name)):$(params.\(#PipelineParams.appRepoRevision.name))"},
+			{name: #CommonParams.image.contextSubpath.name, value: "$(params.\(#PipelineParams.contextSubpath.name))"},
+			{name: #CommonParams.image.dockerSecret.name, value:  "$(params.\(#PipelineParams.dockerSecret.name))"},
 		]
 	}
 }
@@ -204,19 +187,19 @@ package tekton
 	// Output: pipeline task configuration
 	task: {
 		name: _name
-		taskRef: name: "git-update-manifest"
+		taskRef: name: #TaskNames.gitUpdateManifest
 		runAfter: _runAfter
 		workspaces: [{
 			name:      "gitops-repo"
-			workspace: #StandardWorkspaces.gitops.name
+			workspace: #PipelineWorkspaces.gitops.name
 		}]
 		params: [
-			{name: "GITOPS_REPO_URL", value:    "$(params.\(#StandardPipelineParams.gitopsRepoUrl.name))"},
-			{name: "MANIFEST_PATH", value:      "$(params.\(#StandardPipelineParams.manifestPath.name))"},
-			{name: "NEW_IMAGE_URL", value:      "$(tasks.\(_imageSourceTask).results.IMAGE_URL)"},
-			{name: "GITOPS_REPO_BRANCH", value: "$(params.\(#StandardPipelineParams.gitopsBranch.name))"},
-			{name: "REPLICAS", value:           "$(params.\(#StandardPipelineParams.replicas.name))"},
-			{name: "PORT", value:               "$(params.\(#StandardPipelineParams.port.name))"},
+			{name: #CommonParams.gitops.repoUrl.name, value:      "$(params.\(#PipelineParams.gitopsRepoUrl.name))"},
+			{name: #CommonParams.gitops.manifestPath.name, value: "$(params.\(#PipelineParams.manifestPath.name))"},
+			{name: #CommonParams.gitops.newImageUrl.name, value:  "$(tasks.\(_imageSourceTask).results.IMAGE_URL)"},
+			{name: #CommonParams.gitops.branch.name, value:       "$(params.\(#PipelineParams.gitopsBranch.name))"},
+			{name: "REPLICAS", value:                             "$(params.\(#PipelineParams.replicas.name))"},
+			{name: "PORT", value:                                 "$(params.\(#PipelineParams.port.name))"},
 		]
 	}
 }

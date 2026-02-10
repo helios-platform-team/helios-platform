@@ -11,11 +11,11 @@ package tekton
 _fromCodeToClusterConfig: {
 	description: "Complete CI/CD pipeline: fetch source, run tests, build image, update GitOps"
 
-	// Use standard params
-	params: #StandardPipelineParamsList
+	// Use pipeline params from _patterns.cue (references #CommonParams)
+	params: #PipelineParamsList
 
-	// Use standard workspaces
-	workspaces: #StandardWorkspacesList
+	// Use pipeline workspaces from _patterns.cue (references #Defaults.workspaces)
+	workspaces: #PipelineWorkspacesList
 
 	// Compose tasks from patterns
 	tasks: [
@@ -41,7 +41,7 @@ _fromCodeToClusterConfig: {
 }
 
 // Register pipeline in the registry
-Registry: "from-code-to-cluster": {
+#PipelineRegistry: "from-code-to-cluster": {
 	name:        "from-code-to-cluster"
 	description: "Complete CI/CD pipeline from source to deployment"
 	config:      _fromCodeToClusterConfig
@@ -54,6 +54,6 @@ Registry: "from-code-to-cluster": {
 
 // Convenience: render pipeline for default namespace
 FromCodeToCluster: (#RenderPipeline & {
-	_pipelineName: "from-code-to-cluster"
-	_namespace:    "default"
+	pipelineType: "from-code-to-cluster"
+	namespace:    "default"
 }).output

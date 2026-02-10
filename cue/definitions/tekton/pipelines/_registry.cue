@@ -1,5 +1,6 @@
 // Pipeline registry for managing multiple pipeline definitions.
 // Provides a central lookup and rendering mechanism.
+// Follows the same pattern as #TaskRegistry from tasks/_registry.cue
 package tekton
 
 // =====================================================
@@ -13,8 +14,7 @@ package tekton
 	name:         string
 	description?: string
 
-	// Pipeline configuration function
-	// Takes namespace and returns configured pipeline
+	// Pipeline configuration
 	config: {
 		description?: string
 		params: [...] | *[]
@@ -25,35 +25,36 @@ package tekton
 }
 
 // #PipelineRegistry: Map of pipeline names to their definitions
+// Pipelines register themselves here via unification
+// Usage: #PipelineRegistry: "my-pipeline": { ... }
 #PipelineRegistry: {
 	[Name=string]: #PipelineDefinition & {name: Name}
-}
-
-// Global registry instance - pipelines register themselves here
-Registry: #PipelineRegistry & {
-	// Pipelines will be added here via unification
-	// e.g., "from-code-to-cluster": FromCodeToClusterPipeline
 }
 
 // =====================================================
 // RENDER HELPER
 // Renders a pipeline from the registry
+// Interface matches design doc section 5.9
 // =====================================================
 
 // #RenderPipeline: Helper to render a pipeline from registry
 #RenderPipeline: {
-	// Input parameters
-	_pipelineName: string
-	_namespace:    string
+	// Input parameters (matches #RenderTask interface)
+	pipelineType: string
+	namespace:    string
 
-	// Lookup pipeline from registry  
-	_definition: Registry[_pipelineName]
+	// Capture inputs for inner scope
+	let _type = pipelineType
+	let _ns = namespace
+
+	// Lookup pipeline from registry
+	_definition: #PipelineRegistry[_type]
 
 	// Use #TektonPipeline base to generate output
 	_pipeline: #TektonPipeline & {
 		parameter: {
-			name:      _pipelineName
-			namespace: _namespace
+			name:      _type
+			namespace: _ns
 		}
 		config: _definition.config
 	}
@@ -64,13 +65,15 @@ Registry: #PipelineRegistry & {
 
 // #RenderAllPipelines: Renders all pipelines in registry for a namespace
 #RenderAllPipelines: {
-	_namespace: string
+	namespace: string
+
+	let _ns = namespace
 
 	pipelines: {
-		for name, _ in Registry {
+		for name, _ in #PipelineRegistry {
 			(name): (#RenderPipeline & {
-				_pipelineName: name
-				_namespace:    _namespace
+				pipelineType: name
+				namespace:    _ns
 			}).output
 		}
 	}

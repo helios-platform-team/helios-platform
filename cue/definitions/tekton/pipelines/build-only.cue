@@ -8,20 +8,20 @@ package tekton
 // Composed from reusable patterns - proves patterns work
 // =====================================================
 
-// Simplified params for build-only pipeline
+// Simplified params for build-only pipeline (references #CommonParams via #PipelineParams)
 #BuildOnlyParams: [
-	#StandardPipelineParams.appRepoUrl,
-	#StandardPipelineParams.appRepoRevision,
-	#StandardPipelineParams.imageRepo,
-	#StandardPipelineParams.contextSubpath,
-	#StandardPipelineParams.dockerSecret,
-	#StandardPipelineParams.testCommand,
-	#StandardPipelineParams.testImage,
+	#PipelineParams.appRepoUrl,
+	#PipelineParams.appRepoRevision,
+	#PipelineParams.imageRepo,
+	#PipelineParams.contextSubpath,
+	#PipelineParams.dockerSecret,
+	#PipelineParams.testCommand,
+	#PipelineParams.testImage,
 ]
 
-// Only needs source workspace
+// Only needs source workspace (references #Defaults.workspaces via #PipelineWorkspaces)
 #BuildOnlyWorkspaces: [
-	#StandardWorkspaces.source,
+	#PipelineWorkspaces.source,
 ]
 
 // Define the pipeline configuration using patterns
@@ -49,7 +49,7 @@ _buildOnlyConfig: {
 }
 
 // Register pipeline in the registry
-Registry: "build-only": {
+#PipelineRegistry: "build-only": {
 	name:        "build-only"
 	description: "CI pipeline that builds without GitOps deployment"
 	config:      _buildOnlyConfig
@@ -60,6 +60,6 @@ Registry: "build-only": {
 // =====================================================
 
 BuildOnly: (#RenderPipeline & {
-	_pipelineName: "build-only"
-	_namespace:    "default"
+	pipelineType: "build-only"
+	namespace:    "default"
 }).output
