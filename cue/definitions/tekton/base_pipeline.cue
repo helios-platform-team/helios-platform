@@ -67,7 +67,36 @@ package tekton
 
 #PipelineTask: {
 	name: string
-	taskRef: {name: string}
+
+	// Either taskRef OR taskSpec (not both)
+	taskRef?: {name: string}
+	taskSpec?: {
+		params?: [...{
+			name:     string
+			type?:    string
+			default?: string
+		}]
+		workspaces?: [...{
+			name:         string
+			description?: string
+			optional?:    bool
+			readOnly?:    bool
+			mountPath?:   string
+		}]
+		steps: [...{
+			name:        string
+			image:       string
+			script?:     string
+			command?: [...string]
+			args?: [...string]
+			workingDir?: string
+			env?: [...]
+		}]
+		results?: [...{
+			name:         string
+			description?: string
+		}]
+	}
 
 	// Execution order
 	runAfter?: [...string]

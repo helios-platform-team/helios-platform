@@ -143,7 +143,7 @@ package tekton
 			name:        "test-image"
 			description: "Image to use for running tests"
 			type:        "string"
-			default:     "node:18-alpine"
+			default:     "node:20"
 		}
 	}
 }
