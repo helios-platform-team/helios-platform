@@ -10,6 +10,7 @@ import (
 // =====================================================
 
 #TriggerRegistry: {
+	// FIX: Remove 'tekton.' prefix. This is a local definition in the same package.
 	"github-push": #GitHubPushTriggerBundle
 }
 
@@ -24,28 +25,8 @@ import (
 	webhookDomain: string | *""
 	
 	// Data passed to the Bundle
-	bundleParams: {
-		appName:        string
-		namespace:      string
-		pipelineName:   string
-		webhookDomain:  string
-		webhookSecret:  string
-		gitRepo:        string
-		gitBranch:      string
-		imageRepo:      string
-		gitopsRepo:     string
-		gitopsPath:     string
-		gitopsBranch:   string
-		gitopsSecret:   string
-		pvcName:        string
-		contextSubpath: string
-		replicas:       int
-		port:           int
-		testCommand:    string
-		testImage:      string
-		serviceAccount: string
-		dockerSecret:   string
-	}
+	// Inherit contract from Base Trigger Bundle (Validation + Defaults)
+	bundleParams: tekton.#TriggerBundle.parameter
 
 	// Lookup Bundle
 	_bundleDef: #TriggerRegistry[triggerType]
@@ -56,15 +37,14 @@ import (
 	}
 
 	// Optional: Render Ingress if webhookDomain is provided
-	// FIX: Use List Comprehension to force value binding.
-	// This ensures 'd' is treated as a concrete string inside the struct.
+	// Use List Comprehension to force value binding for 'd'
 	_ingress: [
 		for d in [webhookDomain] if d != "" {
 			(tekton.#WebhookIngress & {
 				parameter: {
 					name:          "\(bundleParams.appName)-webhook"
 					namespace:     bundleParams.namespace
-					webhookDomain: d // Use the bound variable 'd'
+					webhookDomain: d
 					serviceName:   "el-\(bundleParams.appName)-listener"
 					servicePort:   8080
 				}

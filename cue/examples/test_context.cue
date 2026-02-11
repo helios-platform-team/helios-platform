@@ -24,7 +24,7 @@ tektonInput: {
 	triggerType:    "github-push"
 	
 	// Webhook (Optional - uncomment to test ingress)
-	webhookDomain: "hooks.helios.dev"
+	//webhookDomain: "hooks.helios.dev"
 	
 	// Other defaults
 	serviceAccount: "tekton-sa"

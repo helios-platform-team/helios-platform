@@ -151,6 +151,14 @@ package tekton
 		gitopsSecret:   string | *"github-credentials"
 		pvcName:        string | *"shared-workspace-pvc"
 		contextSubpath: string | *""
+		
+		// === Added per Code Review ===
+		replicas:       int | *1
+		port:           int | *8080
+		testCommand:    string | *""
+		testImage:      string | *"node:20"
+		serviceAccount: string | *"default"
+		dockerSecret:   string | *"docker-credentials"
 	}
 
 	// === OUTPUTS (multiple resources) ===

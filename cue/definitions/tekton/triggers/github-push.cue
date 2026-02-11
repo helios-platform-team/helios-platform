@@ -39,7 +39,7 @@ import (
                 {name: "git-revision", description: "From Webhook"},
             ]
 
-            // FIX: Inline the PipelineRun resource to avoid abstraction errors
+            // Inline PipelineRun to avoid abstraction issues with labels/uid
             resourcetemplates: [{
                 apiVersion: "tekton.dev/v1beta1"
                 kind:       "PipelineRun"
@@ -108,6 +108,18 @@ import (
                 name: "github-push"
                 bindings: [{ref: _binding.parameter.name}]
                 template: {ref: _template.parameter.name}
+                
+                // Add GitHub Interceptor for security (Validates webhook secret)
+                interceptors: [{
+                    ref: {name: "github", kind: "ClusterInterceptor"}
+                    params: [
+                        {name: "secretRef", value: {
+                            secretName: bundleParams.webhookSecret
+                            secretKey: "secret"
+                        }},
+                        {name: "eventTypes", value: ["push"]},
+                    ]
+                }]
             }]
         }
     }

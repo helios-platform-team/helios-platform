@@ -86,7 +86,8 @@ _triggers: (triggers.#RenderTriggers & {
 		// Use the pre-calculated concrete string
 		testCommand:    _testCommand
 
-		testImage:      "node:20" 
+		// Updated per Code Review: Use default from CommonParams
+		testImage:      tekton.#CommonParams.test.image.default 
 		serviceAccount: tektonInput.serviceAccount
 		dockerSecret:   tektonInput.dockerSecret
 	}
