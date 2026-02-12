@@ -1,4 +1,5 @@
-package tekton
+package tasks
+
 
 // Registry mapping task names to their definitions
 #TaskRegistry: {

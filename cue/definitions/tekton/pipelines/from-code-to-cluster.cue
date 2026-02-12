@@ -1,6 +1,5 @@
 // from-code-to-cluster pipeline definition.
-// A complete CI/CD pipeline that clones code, runs tests, builds image, and updates GitOps manifests.
-package tekton
+package pipelines
 
 // =====================================================
 // PIPELINE DEFINITION
@@ -11,10 +10,10 @@ package tekton
 _fromCodeToClusterConfig: {
 	description: "Complete CI/CD pipeline: fetch source, run tests, build image, update GitOps"
 
-	// Use pipeline params from _patterns.cue (references #CommonParams)
+	// Use pipeline params from patterns.cue
 	params: #PipelineParamsList
 
-	// Use pipeline workspaces from _patterns.cue (references #Defaults.workspaces)
+	// Use pipeline workspaces from patterns.cue
 	workspaces: #PipelineWorkspacesList
 
 	// Compose tasks from patterns
@@ -49,7 +48,6 @@ _fromCodeToClusterConfig: {
 
 // =====================================================
 // DIRECT EXPORT
-// For standalone usage: cue export ./definitions/tekton/pipelines/from-code-to-cluster.cue
 // =====================================================
 
 // Convenience: render pipeline for default namespace

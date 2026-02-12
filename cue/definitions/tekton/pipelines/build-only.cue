@@ -1,26 +1,28 @@
 // build-only pipeline definition.
-// A simple CI pipeline that only clones and builds (no GitOps).
-// Demonstrates pattern reusability.
-package tekton
+package pipelines
+
+import "helios.io/cue/definitions/tekton"
 
 // =====================================================
 // BUILD-ONLY PIPELINE
 // Composed from reusable patterns - proves patterns work
 // =====================================================
 
-// Simplified params for build-only pipeline (references #CommonParams via #PipelineParams)
+// Simplified params for build-only pipeline
 #BuildOnlyParams: [
-	#PipelineParams.appRepoUrl,
-	#PipelineParams.appRepoRevision,
-	#PipelineParams.imageRepo,
-	#PipelineParams.contextSubpath,
-	#PipelineParams.dockerSecret,
-	#PipelineParams.testCommand,
-	#PipelineParams.testImage,
+	// #PipelineParams is local (patterns.cue), but references tekton.#CommonParams inside itself
+	tekton.#CommonParams.app.repoUrl,
+	tekton.#CommonParams.app.repoRevision,
+	tekton.#CommonParams.app.imageRepo,
+	tekton.#CommonParams.image.contextSubpath,
+	tekton.#CommonParams.image.dockerSecret,
+	tekton.#CommonParams.test.command,
+	tekton.#CommonParams.test.image,
 ]
 
-// Only needs source workspace (references #Defaults.workspaces via #PipelineWorkspaces)
+// Only needs source workspace
 #BuildOnlyWorkspaces: [
+	// #PipelineWorkspaces is local (patterns.cue)
 	#PipelineWorkspaces.source,
 ]
 
@@ -33,15 +35,15 @@ _buildOnlyConfig: {
 
 	// Compose tasks from EXISTING patterns - proves reusability
 	tasks: [
-		// Reuse #FetchSourcePattern
+		// Reuse #FetchSourcePattern (Local)
 		(#FetchSourcePattern & {}).task,
 
-		// Reuse #RunTestsPattern
+		// Reuse #RunTestsPattern (Local)
 		(#RunTestsPattern & {
 			_runAfter: ["fetch-source-code"]
 		}).task,
 
-		// Reuse #BuildImagePattern
+		// Reuse #BuildImagePattern (Local)
 		(#BuildImagePattern & {
 			_runAfter: ["run-tests"]
 		}).task,
