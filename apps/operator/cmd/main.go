@@ -227,10 +227,19 @@ func main() {
 	}
 	setupLog.Info("CUE engine initialized", "cuePath", cuePath)
 
+	// Initialize Tekton CUE Renderer (uses the same cuePath)
+	tektonRenderer, err := heliosCue.NewTektonRenderer(cuePath)
+	if err != nil {
+		setupLog.Error(err, "unable to create Tekton CUE renderer", "cuePath", cuePath)
+		os.Exit(1)
+	}
+	setupLog.Info("Tekton CUE renderer initialized", "cuePath", cuePath)
+
 	if err := (&controller.HeliosAppReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		CueEngine: cueEngine,
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		CueEngine:      cueEngine,
+		TektonRenderer: tektonRenderer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HeliosApp")
 		os.Exit(1)
