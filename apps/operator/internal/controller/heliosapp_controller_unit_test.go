@@ -10,6 +10,7 @@ import (
 	"github.com/helios-platform-team/helios-platform/apps/operator/internal/gitops"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -40,6 +41,14 @@ func (f *FakeCueEngine) Render(app heliosCue.Application) ([]byte, error) {
 
 func (f *FakeCueEngine) RenderToObjects(app heliosCue.Application) ([]map[string]interface{}, error) {
 	return []map[string]interface{}{}, nil
+}
+
+// FakeTektonRenderer is a mock implementation of TektonRendererInterface.
+// Returns empty resource list (sufficient for controller unit tests).
+type FakeTektonRenderer struct{}
+
+func (f *FakeTektonRenderer) RenderTektonResources(input heliosCue.TektonInput) ([]*unstructured.Unstructured, error) {
+	return []*unstructured.Unstructured{}, nil
 }
 
 func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
@@ -93,9 +102,10 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 
 	// 5. Setup Reconciler
 	r := &HeliosAppReconciler{
-		Client:    client,
-		Scheme:    scheme,
-		CueEngine: &FakeCueEngine{},
+		Client:         client,
+		Scheme:         scheme,
+		CueEngine:      &FakeCueEngine{},
+		TektonRenderer: &FakeTektonRenderer{},
 		GitFactory: func(repo, user, token string) gitops.GitOpsClientInterface {
 			return mockGit
 		},
@@ -164,9 +174,10 @@ func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(heliosApp).WithStatusSubresource(heliosApp).Build()
 
 	r := &HeliosAppReconciler{
-		Client:    client,
-		Scheme:    scheme,
-		CueEngine: &FakeCueEngine{},
+		Client:         client,
+		Scheme:         scheme,
+		CueEngine:      &FakeCueEngine{},
+		TektonRenderer: &FakeTektonRenderer{},
 	}
 
 	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Name: "pending-app", Namespace: "default"}})
