@@ -1,0 +1,68 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: custom-field-demo
+  title: Custom Field Extension Demo
+  description: Demo template using DatabasePicker custom field extension
+  tags:
+    - demo
+    - custom-field
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Basic Information
+      required:
+        - name
+      properties:
+        name:
+          title: Service Name
+          type: string
+          description: Name of your service
+          ui:autofocus: true
+        description:
+          title: Description
+          type: string
+          description: A brief description of your service
+
+    - title: Database Configuration (Custom Field)
+      description: |
+        This step uses a Custom Field Extension (DatabasePicker).
+        The field dynamically shows different inputs based on your selection.
+      properties:
+        database:
+          title: Database Settings
+          type: object
+          description: Configure your database using our custom picker
+          ui:field: DatabasePicker
+
+  steps:
+    - id: log
+      name: Log Parameters
+      action: debug:log
+      input:
+        message: |
+          ========================================
+          Service: ${{ parameters.name }}
+          Description: ${{ parameters.description }}
+          ----------------------------------------
+          Database Type: ${{ parameters.database.type }}
+          Database Host: ${{ parameters.database.host }}
+          Database Port: ${{ parameters.database.port }}
+          Connection String: ${{ parameters.database.connectionString }}
+          ========================================
+
+  output:
+    text:
+      - title: Service Configuration
+        content: |
+          ## Created Service: ${{ parameters.name }}
+          
+          **Description:** ${{ parameters.description }}
+          
+          ### Database Configuration
+          - **Type:** ${{ parameters.database.type }}
+          ${{ parameters.database.type === 'postgres' and '- **Host:** ' + parameters.database.host or '' }}
+          ${{ parameters.database.type === 'postgres' and '- **Port:** ' + parameters.database.port or '' }}
+          ${{ parameters.database.type === 'mongodb' and '- **Connection:** ' + parameters.database.connectionString or '' }}

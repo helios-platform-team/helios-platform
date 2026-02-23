@@ -1,0 +1,86 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: hello-world-conditional
+  title: Hello World - Conditional Fields Demo
+  description: Demo template showing conditional fields based on user selection
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Basic Information
+      required:
+        - name
+      properties:
+        name:
+          title: Service Name
+          type: string
+          description: Name of your service
+          ui:autofocus: true
+
+    - title: Database Configuration
+      required:
+        - databaseType
+      properties:
+        databaseType:
+          title: Database Type
+          type: string
+          description: Select your database
+          enum:
+            - postgres
+            - mongodb
+            - none
+          enumNames:
+            - PostgreSQL
+            - MongoDB
+            - No Database
+      dependencies:
+        databaseType:
+          oneOf:
+            - properties:
+                databaseType:
+                  const: postgres
+                dbHost:
+                  title: Database Host
+                  type: string
+                  default: localhost
+                dbPort:
+                  title: Database Port
+                  type: number
+                  default: 5432
+                dbPassword:
+                  title: Database Password
+                  type: string
+                  ui:widget: password
+              required:
+                - dbHost
+                - dbPassword
+            - properties:
+                databaseType:
+                  const: mongodb
+                connectionString:
+                  title: MongoDB Connection String
+                  type: string
+                  description: "Format: mongodb://user:pass@host:port/db"
+              required:
+                - connectionString
+            - properties:
+                databaseType:
+                  const: none
+
+  steps:
+    - id: log
+      name: Log Parameters
+      action: debug:log
+      input:
+        message: |
+          Service: ${{ parameters.name }}
+          Database Type: ${{ parameters.databaseType }}
+
+  output:
+    text:
+      - title: Service Created
+        content: |
+          **Service Name:** ${{ parameters.name }}
+          **Database:** ${{ parameters.databaseType }}
