@@ -3,14 +3,17 @@ package traits
 import "strings"
 
 // DatabaseTrait — provisions database connection resources for a Component.
-// Renders a ConfigMap (connection metadata) and a Secret (credentials).
+// Renders a ConfigMap (connection metadata) and optionally a Secret (credentials).
 //
 // Usage via the trait system:
 //   traits: [{
 //       type: "database"
 //       properties: {
-//           dbType: "postgres"
-//           dbName: "my_custom_db"
+//           dbType:     "postgres"
+//           dbName:     "my_custom_db"
+//           version:    "16"
+//           dbUser:     "app_user"
+//           dbPassword: "s3cur3-p@ss"
 //       }
 //   }]
 
@@ -31,8 +34,15 @@ _#defaultPorts: {
 		dbType!: #DatabaseType
 		dbName:  string | *""
 		port:    int & >0 & <=65535 | *_#defaultPorts[dbType]
-		version: string | *"latest"
+
+		// Required — pinned version avoids non-reproducible deployments.
+		version!: string & strings.MinRunes(1)
+
 		storage: string & =~"^[0-9]+(Mi|Gi|Ti)$" | *"1Gi"
+
+		// Credentials — required when no external secret is provided.
+		dbUser:     string | *""
+		dbPassword: string | *""
 
 		// If non-empty, the trait skips Secret generation and references
 		// this existing secret instead.
@@ -67,12 +77,13 @@ _#defaultPorts: {
 				}
 			}
 			data: {
-				DB_TYPE:    _p.dbType
-				DB_HOST:    "\(_p.name)-db"
-				DB_PORT:    "\(_p.port)"
-				DB_NAME:    _effectiveDBName
-				DB_VERSION: _p.version
-				DB_STORAGE: _p.storage
+				DB_TYPE:        _p.dbType
+				DB_HOST:        "\(_p.name)-db"
+				DB_PORT:        "\(_p.port)"
+				DB_NAME:        _effectiveDBName
+				DB_VERSION:     _p.version
+				DB_STORAGE:     _p.storage
+				DB_SECRET_NAME: _effectiveSecretName
 			}
 		}
 
@@ -91,8 +102,8 @@ _#defaultPorts: {
 				}
 				type: "Opaque"
 				stringData: {
-					DB_USER:     "admin"
-					DB_PASSWORD: "changeme"
+					DB_USER:     _p.dbUser
+					DB_PASSWORD: _p.dbPassword
 				}
 			}
 		}

@@ -172,8 +172,11 @@ func TestEngine_RenderWithDatabaseTrait(t *testing.T) {
 						{
 							Type: "database",
 							Properties: map[string]any{
-								"dbType": "postgres",
-								"dbName": "my_custom_db",
+								"dbType":     "postgres",
+								"dbName":     "my_custom_db",
+								"version":    "16",
+								"dbUser":     "app_user",
+								"dbPassword": "s3cur3-p@ss",
 							},
 						},
 					},
@@ -224,20 +227,22 @@ func TestEngine_RenderWithDatabaseTrait(t *testing.T) {
 				if data["DB_PORT"] != "5432" {
 					t.Errorf("DB_PORT: expected %q, got %q", "5432", data["DB_PORT"])
 				}
+				if data["DB_SECRET_NAME"] != "api-server-db-secret" {
+					t.Errorf("DB_SECRET_NAME: expected %q, got %q", "api-server-db-secret", data["DB_SECRET_NAME"])
+				}
 
 			case kind == "Secret" && name == "api-server-db-secret":
 				foundSecret = true
-				// Verify secret has credential keys
 				stringData, ok := obj["stringData"].(map[string]any)
 				if !ok {
 					t.Error("Secret stringData is not a map")
 					continue
 				}
-				if _, hasUser := stringData["DB_USER"]; !hasUser {
-					t.Error("Secret missing DB_USER")
+				if stringData["DB_USER"] != "app_user" {
+					t.Errorf("DB_USER: expected %q, got %q", "app_user", stringData["DB_USER"])
 				}
-				if _, hasPassword := stringData["DB_PASSWORD"]; !hasPassword {
-					t.Error("Secret missing DB_PASSWORD")
+				if stringData["DB_PASSWORD"] != "s3cur3-p@ss" {
+					t.Errorf("DB_PASSWORD: expected %q, got %q", "s3cur3-p@ss", stringData["DB_PASSWORD"])
 				}
 			}
 		}
@@ -247,6 +252,66 @@ func TestEngine_RenderWithDatabaseTrait(t *testing.T) {
 		}
 		if !foundSecret {
 			t.Error("Secret 'api-server-db-secret' not found in rendered objects")
+		}
+	})
+
+	t.Run("RenderDatabaseTraitWithExternalSecret", func(t *testing.T) {
+		// When secretName is provided, Secret generation should be skipped
+		appExtSecret := Application{
+			App: AppSpec{
+				Name:      "test-db-app",
+				Namespace: "default",
+				Components: []Component{
+					{
+						Name: "api-server",
+						Type: "web-service",
+						Properties: map[string]any{
+							"image": "myregistry/api:v1.0.0",
+							"port":  3000,
+						},
+						Traits: []Trait{
+							{
+								Type: "service",
+								Properties: map[string]any{
+									"port": 3000,
+								},
+							},
+							{
+								Type: "database",
+								Properties: map[string]any{
+									"dbType":     "postgres",
+									"dbName":     "my_custom_db",
+									"version":    "16",
+									"secretName": "my-existing-secret",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		objects, err := engine.RenderToObjects(appExtSecret)
+		if err != nil {
+			t.Fatalf("Failed to render: %v", err)
+		}
+
+		// Expect: Deployment + Service + ConfigMap = 3 (no Secret)
+		if len(objects) != 3 {
+			t.Fatalf("Expected 3 objects (no Secret), got %d", len(objects))
+		}
+
+		for _, obj := range objects {
+			kind, _ := obj["kind"].(string)
+			if kind == "Secret" {
+				t.Error("Secret should NOT be generated when secretName is provided")
+			}
+			if kind == "ConfigMap" {
+				data, _ := obj["data"].(map[string]any)
+				if data["DB_SECRET_NAME"] != "my-existing-secret" {
+					t.Errorf("DB_SECRET_NAME: expected %q, got %q", "my-existing-secret", data["DB_SECRET_NAME"])
+				}
+			}
 		}
 	})
 

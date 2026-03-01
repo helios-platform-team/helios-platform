@@ -30,8 +30,11 @@ appWithDatabase: schema.#HeliosApp & {
 				{
 					type: "database"
 					properties: {
-						dbType: "postgres"
-						dbName: "my_custom_db"
+						dbType:     "postgres"
+						dbName:     "my_custom_db"
+						version:    "16"
+						dbUser:     "app_user"
+						dbPassword: "s3cur3-p@ss"
 					}
 				},
 			]
