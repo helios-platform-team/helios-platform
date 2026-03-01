@@ -32,24 +32,24 @@ func TestEngine_Render(t *testing.T) {
 				{
 					Name: "api-server",
 					Type: "web-service",
-					Properties: map[string]interface{}{
+					Properties: map[string]any{
 						"image":    "myregistry/api:v1.0.0",
 						"port":     3000,
 						"replicas": 2,
-						"env": []map[string]interface{}{
+						"env": []map[string]any{
 							{"name": "NODE_ENV", "value": "production"},
 						},
 					},
 					Traits: []Trait{
 						{
 							Type: "service",
-							Properties: map[string]interface{}{
+							Properties: map[string]any{
 								"port": 3000,
 							},
 						},
 						{
 							Type: "ingress",
-							Properties: map[string]interface{}{
+							Properties: map[string]any{
 								"host": "api.example.com",
 								"port": 3000,
 							},
@@ -82,19 +82,19 @@ func TestEngine_Render(t *testing.T) {
 			switch kind {
 			case "Deployment":
 				foundDeployment = true
-				metadata := obj["metadata"].(map[string]interface{})
+				metadata := obj["metadata"].(map[string]any)
 				if metadata["name"] != "api-server" {
 					t.Errorf("Expected deployment name 'api-server', got '%v'", metadata["name"])
 				}
 			case "Service":
 				foundService = true
-				metadata := obj["metadata"].(map[string]interface{})
+				metadata := obj["metadata"].(map[string]any)
 				if metadata["name"] != "api-server" {
 					t.Errorf("Expected service name 'api-server', got '%v'", metadata["name"])
 				}
 			case "Ingress":
 				foundIngress = true
-				metadata := obj["metadata"].(map[string]interface{})
+				metadata := obj["metadata"].(map[string]any)
 				if metadata["name"] != "api-server-ingress" {
 					t.Errorf("Expected ingress name 'api-server-ingress', got '%v'", metadata["name"])
 				}

@@ -135,7 +135,7 @@ func (r *TektonRenderer) RenderTektonResources(input TektonInput) ([]*unstructur
 	}
 
 	// 6. Decode to slice of generic maps
-	var rawObjects []map[string]interface{}
+	var rawObjects []map[string]any
 	if err := tektonObjects.Decode(&rawObjects); err != nil {
 		return nil, fmt.Errorf("failed to decode tektonObjects: %w", err)
 	}
