@@ -23,7 +23,11 @@ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/st
 # 3. Helios Operator Resources
 cd apps/operator
 kubectl apply -f tekton/pvc.yaml
-kubectl apply -f tekton/
+kubectl apply -f tekton/pvc.yaml
+
+# Generate & Apply Tasks from CUE
+cue export ../../cue/definitions/tekton/tasks/*.cue --out yaml > tekton/tasks.yaml
+kubectl apply -f tekton/tasks.yaml
 ```
 
 ### 2.2. Setup Secret (Quan Trọng Nhất)

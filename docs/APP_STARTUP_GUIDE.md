@@ -99,7 +99,11 @@ make -C apps/operator run
 > This installs: `git-clone`, `kaniko-build`, `git-update-manifest`, and the pipeline itself.
 
 ```bash
-kubectl apply -f apps/operator/tekton/
+# Generate YAML from CUE
+cue export ./cue/definitions/tekton/tasks/*.cue --out yaml > apps/operator/tekton/tasks.yaml
+
+# Apply the generated file
+kubectl apply -f apps/operator/tekton/tasks.yaml
 ```
 
 ---

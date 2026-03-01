@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -47,6 +48,8 @@ type HeliosAppReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
 	CueEngine heliosCue.CueEngineInterface
+	// TektonRenderer renders Tekton CI/CD resources via CUE engine.
+	TektonRenderer heliosCue.TektonRendererInterface
 	// GitFactory allows injecting a custom GitOps client (e.g. for testing)
 	GitFactory func(string, string, string) gitops.GitOpsClientInterface
 }
@@ -104,192 +107,13 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// ------------------------------------------------------------------
-	// PHASE -1: Ensure Base Tekton Resources (SA, RBAC, Tasks, Pipeline)
+	// PHASE -1 & 0: Tekton CI/CD Resources (Tasks, Pipeline, Triggers)
+	// All Tekton resources are rendered via CUE engine.
 	// ------------------------------------------------------------------
-
-	// 1. ServiceAccount
-	sa := GenerateServiceAccount(heliosApp.Namespace)
-	if err := ctrl.SetControllerReference(&heliosApp, sa, r.Scheme); err != nil {
-		log.Error(err, "Failed to set owner reference for ServiceAccount")
-	} else {
-		foundSA := &unstructured.Unstructured{}
-		foundSA.SetGroupVersionKind(sa.GroupVersionKind())
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: sa.GetName(), Namespace: sa.GetNamespace()}, foundSA); err != nil {
-			if errors.IsNotFound(err) {
-				log.Info("Creating ServiceAccount", "name", sa.GetName())
-				r.Client.Create(ctx, sa)
-			}
-		}
-	}
-
-	// 2. RoleBinding
-	rb := GenerateRoleBinding(heliosApp.Namespace)
-	if err := ctrl.SetControllerReference(&heliosApp, rb, r.Scheme); err != nil {
-		log.Error(err, "Failed to set owner reference for RoleBinding")
-	} else {
-		foundRB := &unstructured.Unstructured{}
-		foundRB.SetGroupVersionKind(rb.GroupVersionKind())
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: rb.GetName(), Namespace: rb.GetNamespace()}, foundRB); err != nil {
-			if errors.IsNotFound(err) {
-				log.Info("Creating RoleBinding", "name", rb.GetName())
-				r.Client.Create(ctx, rb)
-			}
-		}
-	}
-
-	// 3. ClusterRoleBinding
-	crb := GenerateClusterRoleBinding(heliosApp.Namespace)
-	// We cannot set OwnerReference on ClusterRoleBinding (Cluster-scoped) from HeliosApp (Namespaced)
-	foundCrb := &unstructured.Unstructured{}
-	foundCrb.SetGroupVersionKind(crb.GroupVersionKind())
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: crb.GetName()}, foundCrb); err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("Creating ClusterRoleBinding", "name", crb.GetName())
-			r.Client.Create(ctx, crb)
-		}
-	}
-
-	// 3. Tasks
-	tasks := []*unstructured.Unstructured{
-		GenerateGitCloneTask(heliosApp.Namespace),
-		GenerateKanikoBuildTask(heliosApp.Namespace),
-		GenerateGitUpdateManifestTask(heliosApp.Namespace),
-	}
-	for _, task := range tasks {
-		if err := ctrl.SetControllerReference(&heliosApp, task, r.Scheme); err != nil {
-			log.Error(err, "Failed to set owner reference for Task", "task", task.GetName())
-		} else {
-			foundTask := &unstructured.Unstructured{}
-			foundTask.SetGroupVersionKind(task.GroupVersionKind())
-			if err := r.Client.Get(ctx, client.ObjectKey{Name: task.GetName(), Namespace: task.GetNamespace()}, foundTask); err != nil {
-				if errors.IsNotFound(err) {
-					log.Info("Creating Task", "name", task.GetName())
-					r.Client.Create(ctx, task)
-				}
-			}
-		}
-	}
-
-	// 4. Pipeline
-	pl := GeneratePipeline(heliosApp.Namespace)
-	if err := ctrl.SetControllerReference(&heliosApp, pl, r.Scheme); err != nil {
-		log.Error(err, "Failed to set owner reference for Pipeline")
-	} else {
-		foundPl := &unstructured.Unstructured{}
-		foundPl.SetGroupVersionKind(pl.GroupVersionKind())
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: pl.GetName(), Namespace: pl.GetNamespace()}, foundPl); err != nil {
-			if errors.IsNotFound(err) {
-				log.Info("Creating Pipeline", "name", pl.GetName())
-				r.Client.Create(ctx, pl)
-			}
-		}
-	}
-
-	// ------------------------------------------------------------------
-	// PHASE 0: Setup CI/CD Triggers (Tekton)
-	// ------------------------------------------------------------------
-
-	// Define resource names
-	triggerBindingName := heliosApp.Name + "-git-binding"
-	defaultsBindingName := heliosApp.Name + "-defaults-binding"
-	triggerTemplateName := heliosApp.Name + "-template"
-	eventListenerName := heliosApp.Name + "-listener"
-
-	pipelineName := heliosApp.Spec.PipelineName
-	if pipelineName == "" {
-		pipelineName = "from-code-to-cluster"
-	}
-	serviceAccount := heliosApp.Spec.ServiceAccount
-	if serviceAccount == "" {
-		serviceAccount = "default"
-	}
-	webhookSecret := heliosApp.Spec.WebhookSecret
-	if webhookSecret == "" {
-		webhookSecret = "github-credentials" // Unified secret name
-	}
-
-	// 1. Create/Update TriggerBinding (Git Info)
-	tbGit, _ := GenerateTriggerBinding(triggerBindingName, heliosApp.Namespace)
-	if err := ctrl.SetControllerReference(&heliosApp, tbGit, r.Scheme); err != nil {
-		log.Error(err, "Failed to set owner reference for TriggerBinding (Git)")
-	} else {
-		foundTbGit := &unstructured.Unstructured{}
-		foundTbGit.SetGroupVersionKind(tbGit.GroupVersionKind())
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: tbGit.GetName(), Namespace: tbGit.GetNamespace()}, foundTbGit); err != nil {
-			if errors.IsNotFound(err) {
-				log.Info("Creating TriggerBinding (Git)", "name", tbGit.GetName())
-				r.Client.Create(ctx, tbGit)
-			}
-		}
-	}
-
-	// 2. Create/Update TriggerBinding (Defaults)
-	tbDefaults, _ := GenerateDefaultsTriggerBinding(defaultsBindingName, heliosApp.Namespace, &heliosApp)
-	if err := ctrl.SetControllerReference(&heliosApp, tbDefaults, r.Scheme); err != nil {
-		log.Error(err, "Failed to set owner reference for TriggerBinding (Defaults)")
-	} else {
-		foundTbDefaults := &unstructured.Unstructured{}
-		foundTbDefaults.SetGroupVersionKind(tbDefaults.GroupVersionKind())
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: tbDefaults.GetName(), Namespace: tbDefaults.GetNamespace()}, foundTbDefaults); err != nil {
-			if errors.IsNotFound(err) {
-				log.Info("Creating TriggerBinding (Defaults)", "name", tbDefaults.GetName())
-				r.Client.Create(ctx, tbDefaults)
-			}
-		}
-	}
-
-	// 3. Create/Update TriggerTemplate
-	workspaceConfig := map[string]any{} // Placeholder
-	tt, _ := GenerateTriggerTemplate(triggerTemplateName, heliosApp.Namespace, heliosApp.Name+"-run", pipelineName, serviceAccount, workspaceConfig)
-	if err := ctrl.SetControllerReference(&heliosApp, tt, r.Scheme); err != nil {
-		log.Error(err, "Failed to set owner reference for TriggerTemplate")
-	} else {
-		foundTt := &unstructured.Unstructured{}
-		foundTt.SetGroupVersionKind(tt.GroupVersionKind())
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: tt.GetName(), Namespace: tt.GetNamespace()}, foundTt); err != nil {
-			if errors.IsNotFound(err) {
-				log.Info("Creating TriggerTemplate", "name", tt.GetName())
-				r.Client.Create(ctx, tt)
-			}
-		}
-	}
-
-	// 4. Create/Update EventListener
-	el, _ := GenerateEventListener(eventListenerName, heliosApp.Namespace, "github-push", triggerBindingName, defaultsBindingName, triggerTemplateName, webhookSecret)
-	if err := ctrl.SetControllerReference(&heliosApp, el, r.Scheme); err != nil {
-		log.Error(err, "Failed to set owner reference for EventListener")
-	} else {
-		foundEl := &unstructured.Unstructured{}
-		foundEl.SetGroupVersionKind(el.GroupVersionKind())
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: el.GetName(), Namespace: el.GetNamespace()}, foundEl); err != nil {
-			if errors.IsNotFound(err) {
-				log.Info("Creating EventListener", "name", el.GetName())
-				r.Client.Create(ctx, el)
-			}
-		}
-	}
-
-	// ------------------------------------------------------------------
-	// PHASE 0.5: Ensure PVC exists for pipeline workspaces
-	// ------------------------------------------------------------------
-	pvcName := heliosApp.Spec.PVCName
-	if pvcName == "" {
-		pvcName = "shared-workspace-pvc"
-	}
-	pvc := GeneratePVC(pvcName, heliosApp.Namespace)
-	if err := ctrl.SetControllerReference(&heliosApp, pvc, r.Scheme); err != nil {
-		log.Error(err, "Failed to set owner reference for PVC")
-	} else {
-		foundPVC := &unstructured.Unstructured{}
-		foundPVC.SetGroupVersionKind(pvc.GroupVersionKind())
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: pvc.GetName(), Namespace: pvc.GetNamespace()}, foundPVC); err != nil {
-			if errors.IsNotFound(err) {
-				log.Info("Creating PVC for pipeline workspaces", "name", pvc.GetName())
-				if err := r.Client.Create(ctx, pvc); err != nil {
-					log.Error(err, "Failed to create PVC")
-				}
-			}
-		}
+	if err := r.reconcileTektonResourcesCue(ctx, &heliosApp); err != nil {
+		log.Error(err, "Failed to reconcile Tekton resources via CUE")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("CUE Tekton rendering failed: %v", err))
+		return ctrl.Result{}, err
 	}
 
 	// ------------------------------------------------------------------
@@ -298,6 +122,10 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if !heliosApp.Status.InitialBuildTriggered {
 		log.Info("Triggering initial PipelineRun for new HeliosApp")
 
+		pipelineName := heliosApp.Spec.PipelineName
+		if pipelineName == "" {
+			pipelineName = "from-code-to-cluster"
+		}
 		pr, err := GeneratePipelineRunForManifestGeneration(&heliosApp, pipelineName)
 		if err != nil {
 			log.Error(err, "Failed to generate initial PipelineRun")
@@ -459,7 +287,7 @@ func (r *HeliosAppReconciler) mapCRDToModel(app *appv1alpha1.HeliosApp) (heliosC
 
 	for i, c := range app.Spec.Components {
 		// Parse properties from RawExtension
-		var props map[string]interface{}
+		var props map[string]any
 		if c.Properties != nil && c.Properties.Raw != nil {
 			if err := json.Unmarshal(c.Properties.Raw, &props); err != nil {
 				return heliosCue.Application{}, fmt.Errorf("failed to parse component properties: %w", err)
@@ -469,7 +297,7 @@ func (r *HeliosAppReconciler) mapCRDToModel(app *appv1alpha1.HeliosApp) (heliosC
 		// Parse traits
 		traits := make([]heliosCue.Trait, len(c.Traits))
 		for j, t := range c.Traits {
-			var traitProps map[string]interface{}
+			var traitProps map[string]any
 			if t.Properties != nil && t.Properties.Raw != nil {
 				if err := json.Unmarshal(t.Properties.Raw, &traitProps); err != nil {
 					return heliosCue.Application{}, fmt.Errorf("failed to parse trait properties: %w", err)
@@ -500,6 +328,153 @@ func (r *HeliosAppReconciler) mapCRDToModel(app *appv1alpha1.HeliosApp) (heliosC
 	}, nil
 }
 
+// mapCRDToTektonInput converts HeliosApp CRD to TektonInput for CUE rendering.
+// This is the bridge between HeliosApp spec fields and the CUE #TektonInput schema.
+func (r *HeliosAppReconciler) mapCRDToTektonInput(app *appv1alpha1.HeliosApp) heliosCue.TektonInput {
+	input := heliosCue.TektonInput{
+		AppName:         app.Name,
+		Namespace:       app.Namespace,
+		GitRepo:         app.Spec.GitRepo,
+		GitBranch:       app.Spec.GitBranch,
+		ImageRepo:       app.Spec.ImageRepo,
+		GitOpsRepo:      app.Spec.GitOpsRepo,
+		GitOpsPath:      app.Spec.GitOpsPath,
+		GitOpsBranch:    app.Spec.GitOpsBranch,
+		GitOpsSecretRef: app.Spec.GitOpsSecretRef,
+		WebhookDomain:   app.Spec.WebhookDomain,
+		WebhookSecret:   app.Spec.WebhookSecret,
+		PipelineName:    app.Spec.PipelineName,
+		PipelineType:    app.Spec.PipelineName, // pipelineType uses same value as pipelineName
+		TriggerType:     "github-push",         // Default; extend HeliosAppSpec if needed
+		ServiceAccount:  app.Spec.ServiceAccount,
+		PVCName:         app.Spec.PVCName,
+		ContextSubpath:  app.Spec.ContextSubpath,
+		Replicas:        int(app.Spec.Replicas),
+		Port:            int(app.Spec.Port),
+		TestCommand:     app.Spec.TestCommand,
+		DockerSecret:    "docker-credentials",
+		ArgoCDNamespace: app.Spec.ArgoCDNamespace,
+		ArgoCDProject:   app.Spec.ArgoCDProject,
+	}
+
+	// Apply defaults for fields that may be empty
+	input.GitBranch = cmp.Or(input.GitBranch, "main")
+	input.GitOpsBranch = cmp.Or(input.GitOpsBranch, "main")
+	input.GitOpsSecretRef = cmp.Or(input.GitOpsSecretRef, "github-credentials")
+	input.WebhookSecret = cmp.Or(input.WebhookSecret, "github-webhook-secret")
+	if input.PipelineName == "" {
+		input.PipelineName = "from-code-to-cluster"
+		input.PipelineType = "from-code-to-cluster"
+	}
+	input.ServiceAccount = cmp.Or(input.ServiceAccount, "default")
+	if input.Replicas <= 0 {
+		input.Replicas = 1
+	}
+	if input.Port <= 0 {
+		input.Port = 8080
+	}
+
+	return input
+}
+
+// reconcileTektonResourcesCue renders Tekton resources via CUE and applies them.
+// This is the NEW path that replaces all hardcoded Generate* functions.
+func (r *HeliosAppReconciler) reconcileTektonResourcesCue(ctx context.Context, app *appv1alpha1.HeliosApp) error {
+	log := logf.FromContext(ctx)
+
+	// 1. Map CRD → TektonInput
+	tektonInput := r.mapCRDToTektonInput(app)
+
+	// 2. Render via CUE
+	objects, err := r.TektonRenderer.RenderTektonResources(tektonInput)
+	if err != nil {
+		return fmt.Errorf("CUE TektonRenderer failed: %w", err)
+	}
+
+	log.Info("CUE rendered Tekton resources", "count", len(objects))
+
+	// 3. Apply each rendered resource
+	for _, obj := range objects {
+		// Set owner reference (skip cluster-scoped resources)
+		if obj.GetNamespace() != "" {
+			if err := ctrl.SetControllerReference(app, obj, r.Scheme); err != nil {
+				log.Error(err, "Failed to set owner reference", "kind", obj.GetKind(), "name", obj.GetName())
+				continue
+			}
+		}
+
+		// Create or update
+		found := &unstructured.Unstructured{}
+		found.SetGroupVersionKind(obj.GroupVersionKind())
+		err := r.Client.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, found)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating resource", "kind", obj.GetKind(), "name", obj.GetName())
+				if err := r.Client.Create(ctx, obj); err != nil {
+					log.Error(err, "Failed to create resource", "kind", obj.GetKind(), "name", obj.GetName())
+				}
+			} else {
+				log.Error(err, "Failed to get resource", "kind", obj.GetKind(), "name", obj.GetName())
+			}
+		} else {
+			// Update existing resource's spec
+			found.Object["spec"] = obj.Object["spec"]
+			if err := r.Client.Update(ctx, found); err != nil {
+				log.Error(err, "Failed to update resource", "kind", obj.GetKind(), "name", obj.GetName())
+			}
+		}
+	}
+
+	// 4. Also ensure RBAC (SA, RoleBinding, ClusterRoleBinding) — these are not in CUE yet
+	r.ensureTektonRBAC(ctx, app)
+
+	return nil
+}
+
+// ensureTektonRBAC creates ServiceAccount, RoleBinding, ClusterRoleBinding.
+// These are infrastructure resources not managed by CUE (they are cluster lifecycle, not app lifecycle).
+func (r *HeliosAppReconciler) ensureTektonRBAC(ctx context.Context, app *appv1alpha1.HeliosApp) {
+	log := logf.FromContext(ctx)
+
+	sa := GenerateServiceAccount(app.Namespace)
+	if err := ctrl.SetControllerReference(app, sa, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for ServiceAccount")
+	} else {
+		foundSA := &unstructured.Unstructured{}
+		foundSA.SetGroupVersionKind(sa.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: sa.GetName(), Namespace: sa.GetNamespace()}, foundSA); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating ServiceAccount", "name", sa.GetName())
+				r.Client.Create(ctx, sa)
+			}
+		}
+	}
+
+	rb := GenerateRoleBinding(app.Namespace)
+	if err := ctrl.SetControllerReference(app, rb, r.Scheme); err != nil {
+		log.Error(err, "Failed to set owner reference for RoleBinding")
+	} else {
+		foundRB := &unstructured.Unstructured{}
+		foundRB.SetGroupVersionKind(rb.GroupVersionKind())
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: rb.GetName(), Namespace: rb.GetNamespace()}, foundRB); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Creating RoleBinding", "name", rb.GetName())
+				r.Client.Create(ctx, rb)
+			}
+		}
+	}
+
+	crb := GenerateClusterRoleBinding(app.Namespace)
+	foundCrb := &unstructured.Unstructured{}
+	foundCrb.SetGroupVersionKind(crb.GroupVersionKind())
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: crb.GetName()}, foundCrb); err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Creating ClusterRoleBinding", "name", crb.GetName())
+			r.Client.Create(ctx, crb)
+		}
+	}
+}
+
 // updateStatus updates the HeliosApp status
 func (r *HeliosAppReconciler) updateStatus(ctx context.Context, app *appv1alpha1.HeliosApp, phase appv1alpha1.HeliosAppPhase, message string) {
 	app.Status.Phase = phase
@@ -528,4 +503,33 @@ func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Named("heliosapp").
 		Complete(r)
+}
+
+// findObjectsForSecret maps Secret changes to HeliosApp reconcile requests.
+// This ensures the controller re-reconciles when a referenced secret changes.
+func (r *HeliosAppReconciler) findObjectsForSecret(ctx context.Context, obj client.Object) []reconcile.Request {
+	log := logf.FromContext(ctx)
+
+	// List all HeliosApps in the same namespace
+	var heliosAppList appv1alpha1.HeliosAppList
+	if err := r.List(ctx, &heliosAppList, client.InNamespace(obj.GetNamespace())); err != nil {
+		log.Error(err, "Failed to list HeliosApps for secret watch")
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, app := range heliosAppList.Items {
+		// Check if this app references the changed secret
+		if app.Spec.GitOpsSecretRef == obj.GetName() ||
+			app.Spec.WebhookSecret == obj.GetName() {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      app.Name,
+					Namespace: app.Namespace,
+				},
+			})
+		}
+	}
+
+	return requests
 }
