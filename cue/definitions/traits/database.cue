@@ -38,15 +38,21 @@ _#defaultPorts: {
 		// Required — pinned version avoids non-reproducible deployments.
 		version!: string & strings.MinRunes(1)
 
-		storage: string & =~"^[0-9]+(Mi|Gi|Ti)$" | *"1Gi"
-
-		// Credentials — required when no external secret is provided.
-		dbUser:     string | *""
-		dbPassword: string | *""
+		storage: string & =~"^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)$" | *"1Gi"
 
 		// If non-empty, the trait skips Secret generation and references
 		// this existing secret instead.
 		secretName: string | *""
+
+		// Credentials — required when no external secret is provided.
+		dbUser:     string
+		dbPassword: string
+
+		// Enforce non-empty credentials when the trait generates the Secret.
+		if secretName == "" {
+			dbUser:     strings.MinRunes(1)
+			dbPassword: strings.MinRunes(1)
+		}
 	}
 
 	_p: parameter

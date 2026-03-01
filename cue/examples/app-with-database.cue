@@ -34,7 +34,7 @@ appWithDatabase: schema.#HeliosApp & {
 						dbName:     "my_custom_db"
 						version:    "16"
 						dbUser:     "app_user"
-						dbPassword: "s3cur3-p@ss"
+						dbPassword: "<your-db-password>"
 					}
 				},
 			]

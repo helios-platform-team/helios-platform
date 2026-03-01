@@ -301,17 +301,22 @@ func TestEngine_RenderWithDatabaseTrait(t *testing.T) {
 			t.Fatalf("Expected 3 objects (no Secret), got %d", len(objects))
 		}
 
+		foundConfigMap := false
 		for _, obj := range objects {
 			kind, _ := obj["kind"].(string)
 			if kind == "Secret" {
 				t.Error("Secret should NOT be generated when secretName is provided")
 			}
 			if kind == "ConfigMap" {
+				foundConfigMap = true
 				data, _ := obj["data"].(map[string]any)
 				if data["DB_SECRET_NAME"] != "my-existing-secret" {
 					t.Errorf("DB_SECRET_NAME: expected %q, got %q", "my-existing-secret", data["DB_SECRET_NAME"])
 				}
 			}
+		}
+		if !foundConfigMap {
+			t.Error("Expected ConfigMap for database trait with external secret, but none was found")
 		}
 	})
 
