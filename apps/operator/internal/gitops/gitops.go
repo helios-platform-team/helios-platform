@@ -1,6 +1,7 @@
 package gitops
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -33,14 +34,8 @@ type GitOpsClient struct {
 // NewGitOpsClient creates a new client
 // token should be a Personal Access Token (PAT)
 func NewGitOpsClient(repoURL, username, token string) *GitOpsClient {
-	authorName := os.Getenv("GIT_AUTHOR_NAME")
-	if authorName == "" {
-		authorName = "Helios Operator"
-	}
-	authorEmail := os.Getenv("GIT_AUTHOR_EMAIL")
-	if authorEmail == "" {
-		authorEmail = "operator@helios.io"
-	}
+	authorName := cmp.Or(os.Getenv("GIT_AUTHOR_NAME"), "Helios Operator")
+	authorEmail := cmp.Or(os.Getenv("GIT_AUTHOR_EMAIL"), "operator@helios.io")
 
 	return &GitOpsClient{
 		RepoURL: repoURL,

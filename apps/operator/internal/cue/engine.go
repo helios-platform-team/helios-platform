@@ -33,15 +33,15 @@ type AppSpec struct {
 }
 
 type Component struct {
-	Name       string                 `json:"name"`
-	Type       string                 `json:"type"`
-	Properties map[string]interface{} `json:"properties"`
-	Traits     []Trait                `json:"traits,omitempty"`
+	Name       string         `json:"name"`
+	Type       string         `json:"type"`
+	Properties map[string]any `json:"properties"`
+	Traits     []Trait        `json:"traits,omitempty"`
 }
 
 type Trait struct {
-	Type       string                 `json:"type"`
-	Properties map[string]interface{} `json:"properties"`
+	Type       string         `json:"type"`
+	Properties map[string]any `json:"properties"`
 }
 
 // Engine wraps CUE context and provides rendering capability
@@ -53,7 +53,7 @@ type Engine struct {
 // CueEngineInterface defines the methods for CUE rendering
 type CueEngineInterface interface {
 	Render(app Application) ([]byte, error)
-	RenderToObjects(app Application) ([]map[string]interface{}, error)
+	RenderToObjects(app Application) ([]map[string]any, error)
 }
 
 // NewEngine creates a new CUE engine
@@ -117,7 +117,7 @@ func (e *Engine) Render(app Application) ([]byte, error) {
 	}
 
 	// 6. Decode to list of objects
-	var objects []interface{}
+	var objects []any
 	if err := k8sObjects.Decode(&objects); err != nil {
 		return nil, fmt.Errorf("failed to decode objects: %w", err)
 	}
@@ -140,7 +140,7 @@ func (e *Engine) Render(app Application) ([]byte, error) {
 }
 
 // RenderToObjects returns the kubernetes objects as a slice (for direct processing)
-func (e *Engine) RenderToObjects(app Application) ([]map[string]interface{}, error) {
+func (e *Engine) RenderToObjects(app Application) ([]map[string]any, error) {
 	// 1. Load the CUE engine package
 	instances := load.Instances([]string{"./engine"}, &load.Config{
 		Dir: e.cuePath,
@@ -185,7 +185,7 @@ func (e *Engine) RenderToObjects(app Application) ([]map[string]interface{}, err
 	}
 
 	// 6. Decode to slice
-	var objects []map[string]interface{}
+	var objects []map[string]any
 	if err := k8sObjects.Decode(&objects); err != nil {
 		return nil, fmt.Errorf("failed to decode objects: %w", err)
 	}

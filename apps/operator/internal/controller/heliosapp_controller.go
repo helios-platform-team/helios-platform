@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -286,7 +287,7 @@ func (r *HeliosAppReconciler) mapCRDToModel(app *appv1alpha1.HeliosApp) (heliosC
 
 	for i, c := range app.Spec.Components {
 		// Parse properties from RawExtension
-		var props map[string]interface{}
+		var props map[string]any
 		if c.Properties != nil && c.Properties.Raw != nil {
 			if err := json.Unmarshal(c.Properties.Raw, &props); err != nil {
 				return heliosCue.Application{}, fmt.Errorf("failed to parse component properties: %w", err)
@@ -296,7 +297,7 @@ func (r *HeliosAppReconciler) mapCRDToModel(app *appv1alpha1.HeliosApp) (heliosC
 		// Parse traits
 		traits := make([]heliosCue.Trait, len(c.Traits))
 		for j, t := range c.Traits {
-			var traitProps map[string]interface{}
+			var traitProps map[string]any
 			if t.Properties != nil && t.Properties.Raw != nil {
 				if err := json.Unmarshal(t.Properties.Raw, &traitProps); err != nil {
 					return heliosCue.Application{}, fmt.Errorf("failed to parse trait properties: %w", err)
@@ -357,25 +358,15 @@ func (r *HeliosAppReconciler) mapCRDToTektonInput(app *appv1alpha1.HeliosApp) he
 	}
 
 	// Apply defaults for fields that may be empty
-	if input.GitBranch == "" {
-		input.GitBranch = "main"
-	}
-	if input.GitOpsBranch == "" {
-		input.GitOpsBranch = "main"
-	}
-	if input.GitOpsSecretRef == "" {
-		input.GitOpsSecretRef = "github-credentials"
-	}
-	if input.WebhookSecret == "" {
-		input.WebhookSecret = "github-webhook-secret"
-	}
+	input.GitBranch = cmp.Or(input.GitBranch, "main")
+	input.GitOpsBranch = cmp.Or(input.GitOpsBranch, "main")
+	input.GitOpsSecretRef = cmp.Or(input.GitOpsSecretRef, "github-credentials")
+	input.WebhookSecret = cmp.Or(input.WebhookSecret, "github-webhook-secret")
 	if input.PipelineName == "" {
 		input.PipelineName = "from-code-to-cluster"
 		input.PipelineType = "from-code-to-cluster"
 	}
-	if input.ServiceAccount == "" {
-		input.ServiceAccount = "default"
-	}
+	input.ServiceAccount = cmp.Or(input.ServiceAccount, "default")
 	if input.Replicas <= 0 {
 		input.Replicas = 1
 	}

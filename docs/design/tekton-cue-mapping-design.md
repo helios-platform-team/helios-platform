@@ -1236,10 +1236,25 @@ package tekton
 
 ### 9.2 Project Files
 
-- Current Go implementation: `apps/operator/internal/controller/tekton_resources.go`
-- Existing YAML templates: `apps/operator/tekton/*.yaml`
-- Existing CUE engine: `cue/engine/builder.cue`
+#### CUE Engine (new — handles all Tekton resource rendering)
+
+- CUE definitions: `cue/definitions/tekton/`
+- CUE engine/builder: `cue/engine/tekton_builder.cue`
+- Go SDK (TektonRenderer): `apps/operator/internal/cue/tekton.go`
+- Go SDK tests: `apps/operator/internal/cue/tekton_test.go`
+- E2E validation tests: `apps/operator/internal/cue/e2e_validation_test.go`
+
+#### Operator (refactored)
+
+- Controller: `apps/operator/internal/controller/heliosapp_controller.go`
+- Remaining Go generators (RBAC + PipelineRun only): `apps/operator/internal/controller/tekton_resources.go`
+- ArgoCD resources: `apps/operator/internal/controller/argocd_resources.go`
 - HeliosApp CRD: `apps/operator/api/v1alpha1/heliosapp_types.go`
+
+#### Migration Status (T1–T6 complete)
+
+- ✅ Tasks, Pipeline, TriggerBinding, TriggerTemplate, EventListener, Ingress → CUE
+- ✅ Legacy `Generate*` functions for above resources → deleted
 
 ### 9.3 CUE Cheatsheet
 

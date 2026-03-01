@@ -39,8 +39,8 @@ func (f *FakeCueEngine) Render(app heliosCue.Application) ([]byte, error) {
 	return []byte("rendered: true"), nil
 }
 
-func (f *FakeCueEngine) RenderToObjects(app heliosCue.Application) ([]map[string]interface{}, error) {
-	return []map[string]interface{}{}, nil
+func (f *FakeCueEngine) RenderToObjects(app heliosCue.Application) ([]map[string]any, error) {
+	return []map[string]any{}, nil
 }
 
 // FakeTektonRenderer is a mock implementation of TektonRendererInterface.
