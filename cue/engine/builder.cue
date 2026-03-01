@@ -23,8 +23,9 @@ input: schema.#HeliosApp
 
 // Trait Registry - mapping type name → trait definition
 #TraitRegistry: {
-	"service": traits.#ServiceTrait
-	"ingress": traits.#IngressTrait
+	"service":  traits.#ServiceTrait
+	"ingress":  traits.#IngressTrait
+	"database": traits.#DatabaseTrait
 	// Thêm trait mới chỉ cần thêm dòng ở đây
 	// "autoscale": traits.#AutoscaleTrait
 	// "servicemonitor": traits.#ServiceMonitorTrait
