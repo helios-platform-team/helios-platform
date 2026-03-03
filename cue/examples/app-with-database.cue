@@ -1,11 +1,12 @@
 package examples
 
-import "helios.io/cue/definitions/schema"
+import ( "helios.io/cue/definitions/schema"
 
-// Example: Web application with a PostgreSQL database trait.
-// Validates acceptance criteria:
-//   - app.database.type: "postgres"
-//   - app.database.name: "my_custom_db"
+	// Example: Web application with a PostgreSQL database trait.
+	// Validates acceptance criteria:
+	//   - app.database.type: "postgres"
+	//   - app.database.name: "my_custom_db"
+)
 
 appWithDatabase: schema.#HeliosApp & {
 	app: {
@@ -30,11 +31,9 @@ appWithDatabase: schema.#HeliosApp & {
 				{
 					type: "database"
 					properties: {
-						dbType:     "postgres"
-						dbName:     "my_custom_db"
-						version:    "16"
-						dbUser:     "app_user"
-						dbPassword: "<your-db-password>"
+						dbType:  "postgres"
+						dbName:  "my_custom_db"
+						version: "16"
 					}
 				},
 			]
