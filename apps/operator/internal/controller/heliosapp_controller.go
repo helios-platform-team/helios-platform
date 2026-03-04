@@ -59,7 +59,7 @@ type HeliosAppReconciler struct {
 // +kubebuilder:rbac:groups=app.helios.io,resources=heliosapps/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile handles the reconciliation loop for HeliosApp
 // Controller does NOT iterate components/traits - all orchestration is in CUE
@@ -113,6 +113,18 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err := r.reconcileTektonResourcesCue(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile Tekton resources via CUE")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("CUE Tekton rendering failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.5: Database Credential Secrets
+	// Generate and store secure credentials for components with database traits.
+	// Secrets are created BEFORE GitOps sync to ensure credentials exist
+	// when the application is deployed.
+	// ------------------------------------------------------------------
+	if err := r.reconcileDatabaseSecrets(ctx, &heliosApp); err != nil {
+		log.Error(err, "Failed to reconcile database secrets")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database secret creation failed: %v", err))
 		return ctrl.Result{}, err
 	}
 
