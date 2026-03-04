@@ -38,6 +38,7 @@ import { RequirePermission } from '@backstage/plugin-permission-react';
 import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/alpha';
 import { NotificationsPage } from '@backstage/plugin-notifications';
 import { SignalsDisplay } from '@backstage/plugin-signals';
+import { DatabasePickerExtension } from './scaffolder';
 
 const app = createApp({
   apis,
@@ -74,6 +75,8 @@ const app = createApp({
   },
 });
 
+const scaffolderFieldExtensions = [DatabasePickerExtension];
+
 const routes = (
   <FlatRoutes>
     <Route path="/" element={<Navigate to="catalog" />} />
@@ -93,7 +96,11 @@ const routes = (
         <ReportIssue />
       </TechDocsAddons>
     </Route>
-    <Route path="/create" element={<ScaffolderPage />} />
+    <Route path="/create" element={<ScaffolderPage />}>
+      {scaffolderFieldExtensions.map(Extension => (
+        <Extension key={Extension.name} />
+      ))}
+    </Route>
     <Route path="/api-docs" element={<ApiExplorerPage />} />
     <Route
       path="/catalog-import"
