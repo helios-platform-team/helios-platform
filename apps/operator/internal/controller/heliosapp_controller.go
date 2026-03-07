@@ -129,6 +129,18 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// ------------------------------------------------------------------
+	// PHASE 0.7: Database Instance Provisioning
+	// Provision StatefulSets and headless Services for database traits.
+	// Runs AFTER secrets so that the credential Secret already exists
+	// when the database pod starts.
+	// ------------------------------------------------------------------
+	if err := r.reconcileDatabaseInstance(ctx, &heliosApp); err != nil {
+		log.Error(err, "Failed to reconcile database instance")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database instance provisioning failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	// ------------------------------------------------------------------
 	// PHASE 0.6: Trigger Initial PipelineRun (if not already done)
 	// ------------------------------------------------------------------
 	if !heliosApp.Status.InitialBuildTriggered {
@@ -507,6 +519,7 @@ func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appv1alpha1.HeliosApp{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Service{}).
 		Owns(&networkingv1.Ingress{}).
 		Watches(

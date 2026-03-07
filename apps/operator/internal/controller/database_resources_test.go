@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -524,4 +525,377 @@ func TestGenerateBase64Token(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGenerateDatabaseStatefulSet(t *testing.T) {
+	sts := GenerateDatabaseStatefulSet(
+		"test-ns", "api-server-db", "api-server-db-secret",
+		"my_custom_db", "16", "2Gi", 5432,
+	)
+
+	// Verify metadata
+	if sts.Name != "api-server-db" {
+		t.Errorf("Expected name %q, got %q", "api-server-db", sts.Name)
+	}
+	if sts.Namespace != "test-ns" {
+		t.Errorf("Expected namespace %q, got %q", "test-ns", sts.Namespace)
+	}
+
+	// Verify labels
+	if sts.Labels["helios.io/db-type"] != "postgres" {
+		t.Errorf("Expected db-type label %q, got %q", "postgres", sts.Labels["helios.io/db-type"])
+	}
+	if sts.Labels["helios.io/trait"] != "database" {
+		t.Errorf("Expected trait label %q, got %q", "database", sts.Labels["helios.io/trait"])
+	}
+
+	// Verify replicas
+	if *sts.Spec.Replicas != 1 {
+		t.Errorf("Expected 1 replica, got %d", *sts.Spec.Replicas)
+	}
+
+	// Verify serviceName
+	if sts.Spec.ServiceName != "api-server-db" {
+		t.Errorf("Expected serviceName %q, got %q", "api-server-db", sts.Spec.ServiceName)
+	}
+
+	// Verify container
+	containers := sts.Spec.Template.Spec.Containers
+	if len(containers) != 1 {
+		t.Fatalf("Expected 1 container, got %d", len(containers))
+	}
+
+	container := containers[0]
+	if container.Image != "postgres:16" {
+		t.Errorf("Expected image %q, got %q", "postgres:16", container.Image)
+	}
+
+	// Verify POSTGRES_DB env var (the core acceptance criteria)
+	foundPostgresDB := false
+	for _, env := range container.Env {
+		if env.Name == "POSTGRES_DB" {
+			foundPostgresDB = true
+			if env.Value != "my_custom_db" {
+				t.Errorf("Expected POSTGRES_DB value %q, got %q", "my_custom_db", env.Value)
+			}
+		}
+		if env.Name == "POSTGRES_USER" {
+			if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+				t.Error("POSTGRES_USER should reference a secret")
+			} else {
+				if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+					t.Errorf("Expected secret name %q, got %q",
+						"api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+				}
+				if env.ValueFrom.SecretKeyRef.Key != "DB_USER" {
+					t.Errorf("Expected secret key %q, got %q",
+						"DB_USER", env.ValueFrom.SecretKeyRef.Key)
+				}
+			}
+		}
+		if env.Name == "POSTGRES_PASSWORD" {
+			if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+				t.Error("POSTGRES_PASSWORD should reference a secret")
+			} else {
+				if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+					t.Errorf("Expected secret name %q, got %q",
+						"api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+				}
+				if env.ValueFrom.SecretKeyRef.Key != "DB_PASS" {
+					t.Errorf("Expected secret key %q, got %q",
+						"DB_PASS", env.ValueFrom.SecretKeyRef.Key)
+				}
+			}
+		}
+	}
+	if !foundPostgresDB {
+		t.Error("POSTGRES_DB env var not found in container")
+	}
+
+	// Verify PGDATA env var
+	foundPGDATA := false
+	for _, env := range container.Env {
+		if env.Name == "PGDATA" {
+			foundPGDATA = true
+			expectedPGDATA := PostgresDataPath + "/" + PostgresDataSubPath
+			if env.Value != expectedPGDATA {
+				t.Errorf("Expected PGDATA value %q, got %q", expectedPGDATA, env.Value)
+			}
+		}
+	}
+	if !foundPGDATA {
+		t.Error("PGDATA env var not found in container")
+	}
+
+	// Verify POSTGRES_INITDB_ARGS env var
+	foundInitDB := false
+	for _, env := range container.Env {
+		if env.Name == "POSTGRES_INITDB_ARGS" {
+			foundInitDB = true
+		}
+	}
+	if !foundInitDB {
+		t.Error("POSTGRES_INITDB_ARGS env var not found in container")
+	}
+
+	// Verify livenessProbe exists
+	if container.LivenessProbe == nil {
+		t.Error("LivenessProbe should be set on Postgres container")
+	}
+
+	// Verify volume claim template
+	if len(sts.Spec.VolumeClaimTemplates) != 1 {
+		t.Fatalf("Expected 1 VolumeClaimTemplate, got %d", len(sts.Spec.VolumeClaimTemplates))
+	}
+	vct := sts.Spec.VolumeClaimTemplates[0]
+	storageQty := vct.Spec.Resources.Requests[corev1.ResourceStorage]
+	if storageQty.String() != "2Gi" {
+		t.Errorf("Expected storage %q, got %q", "2Gi", storageQty.String())
+	}
+}
+
+func TestGenerateDatabaseService(t *testing.T) {
+	svc := GenerateDatabaseService("test-ns", "api-server-db", 5432)
+
+	// Verify metadata
+	if svc.Name != "api-server-db" {
+		t.Errorf("Expected name %q, got %q", "api-server-db", svc.Name)
+	}
+	if svc.Namespace != "test-ns" {
+		t.Errorf("Expected namespace %q, got %q", "test-ns", svc.Namespace)
+	}
+
+	// Verify headless (clusterIP: None)
+	if svc.Spec.ClusterIP != "None" {
+		t.Errorf("Expected clusterIP %q, got %q", "None", svc.Spec.ClusterIP)
+	}
+
+	// Verify selector
+	if svc.Spec.Selector["app"] != "api-server-db" {
+		t.Errorf("Expected selector app=%q, got %q", "api-server-db", svc.Spec.Selector["app"])
+	}
+
+	// Verify port
+	if len(svc.Spec.Ports) != 1 {
+		t.Fatalf("Expected 1 port, got %d", len(svc.Spec.Ports))
+	}
+	if svc.Spec.Ports[0].Port != 5432 {
+		t.Errorf("Expected port 5432, got %d", svc.Spec.Ports[0].Port)
+	}
+	if svc.Spec.Ports[0].Name != "db" {
+		t.Errorf("Expected port name %q, got %q", "db", svc.Spec.Ports[0].Name)
+	}
+}
+
+func TestReconcileDatabaseInstance(t *testing.T) {
+
+	dbProps := map[string]interface{}{
+		"dbType":  "postgres",
+		"dbName":  "my_custom_db",
+		"version": "16",
+		"storage": "2Gi",
+	}
+	dbPropsJSON, _ := json.Marshal(dbProps)
+
+	app := &appv1alpha1.HeliosApp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-app",
+			Namespace: "default",
+			UID:       "test-uid-789",
+		},
+		Spec: appv1alpha1.HeliosAppSpec{
+			Components: []appv1alpha1.Component{
+				{
+					Name: "api-server",
+					Type: "web-service",
+					Traits: []appv1alpha1.Trait{
+						{
+							Type: "database",
+							Properties: &runtime.RawExtension{
+								Raw: dbPropsJSON,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	t.Run("CreatesStatefulSetAndService", func(t *testing.T) {
+		fullScheme := runtime.NewScheme()
+		_ = corev1.AddToScheme(fullScheme)
+		_ = appv1alpha1.AddToScheme(fullScheme)
+		_ = appsv1.AddToScheme(fullScheme)
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(fullScheme).
+			WithObjects(app).
+			Build()
+
+		r := &HeliosAppReconciler{
+			Client: fakeClient,
+			Scheme: fullScheme,
+		}
+
+		ctx := context.Background()
+		err := r.reconcileDatabaseInstance(ctx, app)
+		if err != nil {
+			t.Fatalf("reconcileDatabaseInstance failed: %v", err)
+		}
+
+		// Verify StatefulSet was created
+		stsList := &appsv1.StatefulSetList{}
+		err = fakeClient.List(ctx, stsList)
+		if err != nil {
+			t.Fatalf("Failed to list StatefulSets: %v", err)
+		}
+		if len(stsList.Items) != 1 {
+			t.Fatalf("Expected 1 StatefulSet, got %d", len(stsList.Items))
+		}
+
+		sts := stsList.Items[0]
+		if sts.Name != "api-server-db" {
+			t.Errorf("Expected StatefulSet name %q, got %q", "api-server-db", sts.Name)
+		}
+
+		// Verify POSTGRES_DB env var
+		containers := sts.Spec.Template.Spec.Containers
+		if len(containers) != 1 {
+			t.Fatalf("Expected 1 container, got %d", len(containers))
+		}
+		foundDB := false
+		for _, env := range containers[0].Env {
+			if env.Name == "POSTGRES_DB" && env.Value == "my_custom_db" {
+				foundDB = true
+			}
+		}
+		if !foundDB {
+			t.Error("POSTGRES_DB env var not found with expected value")
+		}
+
+		// Verify headless Service was created
+		svcList := &corev1.ServiceList{}
+		err = fakeClient.List(ctx, svcList)
+		if err != nil {
+			t.Fatalf("Failed to list Services: %v", err)
+		}
+		if len(svcList.Items) != 1 {
+			t.Fatalf("Expected 1 Service, got %d", len(svcList.Items))
+		}
+		if svcList.Items[0].Spec.ClusterIP != "None" {
+			t.Errorf("Expected headless Service (clusterIP: None), got %q", svcList.Items[0].Spec.ClusterIP)
+		}
+	})
+
+	t.Run("SkipsWhenNoTraits", func(t *testing.T) {
+		appWithoutDB := &appv1alpha1.HeliosApp{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "no-db-app",
+				Namespace: "default",
+				UID:       "test-uid-no-db",
+			},
+			Spec: appv1alpha1.HeliosAppSpec{
+				Components: []appv1alpha1.Component{
+					{
+						Name: "frontend",
+						Type: "web-service",
+					},
+				},
+			},
+		}
+
+		fullScheme := runtime.NewScheme()
+		_ = corev1.AddToScheme(fullScheme)
+		_ = appv1alpha1.AddToScheme(fullScheme)
+		_ = appsv1.AddToScheme(fullScheme)
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(fullScheme).
+			WithObjects(appWithoutDB).
+			Build()
+
+		r := &HeliosAppReconciler{
+			Client: fakeClient,
+			Scheme: fullScheme,
+		}
+
+		ctx := context.Background()
+		err := r.reconcileDatabaseInstance(ctx, appWithoutDB)
+		if err != nil {
+			t.Fatalf("reconcileDatabaseInstance should not fail for app without database traits: %v", err)
+		}
+
+		// Verify no StatefulSet or Service was created
+		stsList := &appsv1.StatefulSetList{}
+		_ = fakeClient.List(ctx, stsList)
+		if len(stsList.Items) != 0 {
+			t.Errorf("Expected no StatefulSets, got %d", len(stsList.Items))
+		}
+
+		svcList := &corev1.ServiceList{}
+		_ = fakeClient.List(ctx, svcList)
+		if len(svcList.Items) != 0 {
+			t.Errorf("Expected no Services, got %d", len(svcList.Items))
+		}
+	})
+
+	t.Run("SkipsNonPostgresType", func(t *testing.T) {
+		redisProps := map[string]interface{}{
+			"dbType":  "redis",
+			"version": "7",
+		}
+		redisPropsJSON, _ := json.Marshal(redisProps)
+
+		appWithRedis := &appv1alpha1.HeliosApp{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "redis-app",
+				Namespace: "default",
+				UID:       "test-uid-redis",
+			},
+			Spec: appv1alpha1.HeliosAppSpec{
+				Components: []appv1alpha1.Component{
+					{
+						Name: "cache",
+						Type: "web-service",
+						Traits: []appv1alpha1.Trait{
+							{
+								Type: "database",
+								Properties: &runtime.RawExtension{
+									Raw: redisPropsJSON,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		fullScheme := runtime.NewScheme()
+		_ = corev1.AddToScheme(fullScheme)
+		_ = appv1alpha1.AddToScheme(fullScheme)
+		_ = appsv1.AddToScheme(fullScheme)
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(fullScheme).
+			WithObjects(appWithRedis).
+			Build()
+
+		r := &HeliosAppReconciler{
+			Client: fakeClient,
+			Scheme: fullScheme,
+		}
+
+		ctx := context.Background()
+		err := r.reconcileDatabaseInstance(ctx, appWithRedis)
+		if err != nil {
+			t.Fatalf("reconcileDatabaseInstance should not fail for redis type: %v", err)
+		}
+
+		// Verify no StatefulSet was created (only postgres is provisioned)
+		stsList := &appsv1.StatefulSetList{}
+		_ = fakeClient.List(ctx, stsList)
+		if len(stsList.Items) != 0 {
+			t.Errorf("Expected no StatefulSets for redis type, got %d", len(stsList.Items))
+		}
+	})
 }
