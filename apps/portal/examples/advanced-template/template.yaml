@@ -43,38 +43,14 @@ spec:
             type: string
             description: The name of the repository (e.g. my-service)
 
+    # --- UPDATED DATABASE CONFIGURATION STEP ---
     - title: Database Configuration
       properties:
-        requireDatabase:
-          title: Add Database
-          type: boolean
-          description: Check to provision a database for this project
-          default: false
-      dependencies:
-        requireDatabase:
-          oneOf:
-            - properties:
-                requireDatabase:
-                  const: false
-            - properties:
-                requireDatabase:
-                  const: true
-                databaseType:
-                  title: Database Type
-                  type: string
-                  enum: [postgres]
-                  default: postgres
-                databaseName:
-                  title: Database Name
-                  type: string
-                  description: The name of the database to create
-                databaseVersion:
-                  title: Database Version
-                  type: string
-                  description: Select the PostgreSQL version
-                  enum: ['13', '14', '15', '16']
-                  default: '15'
-              required: [databaseType, databaseName, databaseVersion]
+        databaseConfig:
+          title: Database Settings
+          type: object
+          ui:field: DatabasePicker
+    # --- END OF NEW STEP ---
 
     - title: Repository & Webhook
       required:
