@@ -1,1 +1,1 @@
-export * from './DatabasePickerExtension/index';
+export { DatabasePickerExtension } from './DatabasePickerExtension/extension';
