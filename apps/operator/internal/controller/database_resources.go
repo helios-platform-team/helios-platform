@@ -347,9 +347,14 @@ func (r *HeliosAppReconciler) reconcileDatabaseInstance(ctx context.Context, app
 		}
 
 		// --- StatefulSet ---
-		sts := GenerateDatabaseStatefulSet(
+		sts, err := GenerateDatabaseStatefulSet(
 			app.Namespace, dbHost, secretName, effectiveDBName, version, storage, int32(port),
 		)
+		if err != nil {
+			log.Error(err, "Failed to generate database StatefulSet",
+				"component", dbTrait.ComponentName, "storage", storage)
+			return fmt.Errorf("failed to generate StatefulSet for %s: %w", dbHost, err)
+		}
 
 		if err := ctrl.SetControllerReference(app, sts, r.Scheme); err != nil {
 			log.Error(err, "Failed to set owner reference for database StatefulSet",
@@ -358,7 +363,7 @@ func (r *HeliosAppReconciler) reconcileDatabaseInstance(ctx context.Context, app
 		}
 
 		existingSts := &appsv1.StatefulSet{}
-		err := r.Get(ctx, types.NamespacedName{Name: dbHost, Namespace: app.Namespace}, existingSts)
+		err = r.Get(ctx, types.NamespacedName{Name: dbHost, Namespace: app.Namespace}, existingSts)
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				return fmt.Errorf("failed to check for StatefulSet %s: %w", dbHost, err)
@@ -378,9 +383,22 @@ func (r *HeliosAppReconciler) reconcileDatabaseInstance(ctx context.Context, app
 				}
 			}
 		} else {
-			log.Info("Database StatefulSet already exists, skipping",
+			// Handle StatefulSet drift: update spec to match the new template
+			log.Info("Database StatefulSet already exists, updating if necessary",
 				"component", dbTrait.ComponentName,
 				"statefulset", dbHost)
+
+			// We only update the mutable fields (Replicas, Template)
+			updatedSts := existingSts.DeepCopy()
+			updatedSts.Spec.Replicas = sts.Spec.Replicas
+			updatedSts.Spec.Template = sts.Spec.Template
+
+			// We need to preserve the existing VolumeClaimTemplates when updating
+			updatedSts.Spec.VolumeClaimTemplates = existingSts.Spec.VolumeClaimTemplates
+
+			if err := r.Update(ctx, updatedSts); err != nil {
+				return fmt.Errorf("failed to update StatefulSet %s: %w", dbHost, err)
+			}
 		}
 
 		// --- Headless Service ---
@@ -412,9 +430,16 @@ func (r *HeliosAppReconciler) reconcileDatabaseInstance(ctx context.Context, app
 				}
 			}
 		} else {
-			log.Info("Database Service already exists, skipping",
+			log.Info("Database Service already exists, updating if necessary",
 				"component", dbTrait.ComponentName,
 				"service", dbHost)
+
+			updatedSvc := existingSvc.DeepCopy()
+			updatedSvc.Spec.Ports = svc.Spec.Ports
+
+			if err := r.Update(ctx, updatedSvc); err != nil {
+				return fmt.Errorf("failed to update Service %s: %w", dbHost, err)
+			}
 		}
 
 		log.Info("Successfully reconciled database instance",
@@ -429,7 +454,12 @@ func (r *HeliosAppReconciler) reconcileDatabaseInstance(ctx context.Context, app
 // GenerateDatabaseStatefulSet creates a StatefulSet for a Postgres database instance.
 // The StatefulSet injects POSTGRES_DB from the CRD's database.name value, and
 // uses the Secret from Issue #33 for POSTGRES_USER and POSTGRES_PASSWORD.
-func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, storage string, port int32) *appsv1.StatefulSet {
+func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, storage string, port int32) (*appsv1.StatefulSet, error) {
+	storageQty, err := resource.ParseQuantity(storage)
+	if err != nil {
+		return nil, fmt.Errorf("invalid storage size format %q: %w", storage, err)
+	}
+
 	replicas := int32(1)
 	labels := map[string]string{
 		"app":                  name,
@@ -503,6 +533,11 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 									Name:  "POSTGRES_INITDB_ARGS",
 									Value: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C",
 								},
+								{
+									// Explicitly set the custom port so that postgres knows to listen on it.
+									Name:  "PGPORT",
+									Value: fmt.Sprintf("%d", port),
+								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -524,7 +559,7 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
-										Command: []string{"pg_isready", "-U", "$(POSTGRES_USER)", "-d", dbName},
+										Command: []string{"pg_isready", "-U", "$(POSTGRES_USER)", "-d", dbName, "-p", "$(PGPORT)"},
 									},
 								},
 								InitialDelaySeconds: 5,
@@ -533,7 +568,7 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
-										Command: []string{"pg_isready", "-U", "$(POSTGRES_USER)", "-d", dbName},
+										Command: []string{"pg_isready", "-U", "$(POSTGRES_USER)", "-d", dbName, "-p", "$(PGPORT)"},
 									},
 								},
 								InitialDelaySeconds: 30,
@@ -554,14 +589,14 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 						},
 						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resourceMustParse(storage),
+								corev1.ResourceStorage: storageQty,
 							},
 						},
 					},
 				},
 			},
 		},
-	}
+	}, nil
 }
 
 // GenerateDatabaseService creates a headless Service for a database StatefulSet.

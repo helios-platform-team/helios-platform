@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -528,14 +529,18 @@ func TestGenerateBase64Token(t *testing.T) {
 }
 
 func TestGenerateDatabaseStatefulSet(t *testing.T) {
-	sts := GenerateDatabaseStatefulSet(
-		"test-ns", "api-server-db", "api-server-db-secret",
+	sts, err := GenerateDatabaseStatefulSet(
+		"test-ns", "my-app-db", "my-app-db-secret",
 		"my_custom_db", "16", "2Gi", 5432,
 	)
 
+	if err != nil {
+		t.Fatalf("GenerateDatabaseStatefulSet failed: %v", err)
+	}
+
 	// Verify metadata
-	if sts.Name != "api-server-db" {
-		t.Errorf("Expected name %q, got %q", "api-server-db", sts.Name)
+	if sts.Name != "my-app-db" {
+		t.Errorf("Expected name %q, got %q", "my-app-db", sts.Name)
 	}
 	if sts.Namespace != "test-ns" {
 		t.Errorf("Expected namespace %q, got %q", "test-ns", sts.Namespace)
@@ -555,8 +560,8 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 	}
 
 	// Verify serviceName
-	if sts.Spec.ServiceName != "api-server-db" {
-		t.Errorf("Expected serviceName %q, got %q", "api-server-db", sts.Spec.ServiceName)
+	if sts.Spec.ServiceName != "my-app-db" {
+		t.Errorf("Expected serviceName %q, got %q", "my-app-db", sts.Spec.ServiceName)
 	}
 
 	// Verify container
@@ -570,6 +575,10 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 		t.Errorf("Expected image %q, got %q", "postgres:16", container.Image)
 	}
 
+	// Verify ports
+	if len(container.Ports) != 1 || container.Ports[0].ContainerPort != 5432 {
+		t.Errorf("Expected container port 5432, got %v", container.Ports)
+	}
 	// Verify POSTGRES_DB env var (the core acceptance criteria)
 	foundPostgresDB := false
 	for _, env := range container.Env {
@@ -583,9 +592,9 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 			if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
 				t.Error("POSTGRES_USER should reference a secret")
 			} else {
-				if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+				if env.ValueFrom.SecretKeyRef.Name != "my-app-db-secret" {
 					t.Errorf("Expected secret name %q, got %q",
-						"api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+						"my-app-db-secret", env.ValueFrom.SecretKeyRef.Name)
 				}
 				if env.ValueFrom.SecretKeyRef.Key != "DB_USER" {
 					t.Errorf("Expected secret key %q, got %q",
@@ -597,9 +606,9 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 			if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
 				t.Error("POSTGRES_PASSWORD should reference a secret")
 			} else {
-				if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+				if env.ValueFrom.SecretKeyRef.Name != "my-app-db-secret" {
 					t.Errorf("Expected secret name %q, got %q",
-						"api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+						"my-app-db-secret", env.ValueFrom.SecretKeyRef.Name)
 				}
 				if env.ValueFrom.SecretKeyRef.Key != "DB_PASS" {
 					t.Errorf("Expected secret key %q, got %q",
@@ -638,9 +647,38 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 		t.Error("POSTGRES_INITDB_ARGS env var not found in container")
 	}
 
-	// Verify livenessProbe exists
+	// Verify PGPORT env var
+	foundPGPORT := false
+	for _, env := range container.Env {
+		if env.Name == "PGPORT" {
+			foundPGPORT = true
+			if env.Value != "5432" {
+				t.Errorf("Expected PGPORT value %q, got %q", "5432", env.Value)
+			}
+		}
+	}
+	if !foundPGPORT {
+		t.Error("PGPORT env var not found in container")
+	}
+
+	// Verify livenessProbe exists and uses custom port
 	if container.LivenessProbe == nil {
 		t.Error("LivenessProbe should be set on Postgres container")
+	} else {
+		cmdStr := strings.Join(container.LivenessProbe.Exec.Command, " ")
+		if !strings.Contains(cmdStr, "-p $(PGPORT)") {
+			t.Errorf("LivenessProbe command missing custom port flag. Got: %s", cmdStr)
+		}
+	}
+
+	// Verify readinessProbe uses custom port
+	if container.ReadinessProbe == nil {
+		t.Error("ReadinessProbe should be set on Postgres container")
+	} else {
+		cmdStr := strings.Join(container.ReadinessProbe.Exec.Command, " ")
+		if !strings.Contains(cmdStr, "-p $(PGPORT)") {
+			t.Errorf("ReadinessProbe command missing custom port flag. Got: %s", cmdStr)
+		}
 	}
 
 	// Verify volume claim template
@@ -651,6 +689,17 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 	storageQty := vct.Spec.Resources.Requests[corev1.ResourceStorage]
 	if storageQty.String() != "2Gi" {
 		t.Errorf("Expected storage %q, got %q", "2Gi", storageQty.String())
+	}
+}
+
+func TestGenerateDatabaseStatefulSet_InvalidStorage(t *testing.T) {
+	_, err := GenerateDatabaseStatefulSet("default", "my-app-db", "my-app-db-secret", "my_custom_db", "16", "invalid-size", 5432)
+
+	if err == nil {
+		t.Fatal("Expected error for invalid storage size, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid storage size format") {
+		t.Errorf("Expected error to mention invalid storage format, got %v", err)
 	}
 }
 
