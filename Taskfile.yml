@@ -35,12 +35,18 @@ tasks:
   check:
     desc: Verify all development prerequisites are installed
     cmds:
-      - bash scripts/check-prereqs.sh
+      - cmd: bash scripts/check-prereqs.sh
+        platforms: [linux, darwin]
+      - cmd: cmd /c scripts\\check-prereqs.bat
+        platforms: [windows]
 
   check:env:
     desc: Verify prerequisites and .env configuration
     cmds:
-      - bash scripts/check-prereqs.sh --env
+      - cmd: bash scripts/check-prereqs.sh --env
+        platforms: [linux, darwin]
+      - cmd: cmd /c scripts\\check-prereqs.bat --env
+        platforms: [windows]
 
   # ===========================================================================
   # Setup Tasks
@@ -68,7 +74,8 @@ tasks:
       - k3d cluster list 2>/dev/null | grep -q '{{.CLUSTER_NAME}}'
     cmds:
       - echo "Creating k3d cluster '{{.CLUSTER_NAME}}'..."
-      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait
+      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 0.0.0.0:6550
+      - kubectl config set-cluster k3d-{{.CLUSTER_NAME}} --server=https://localhost:6550
       - kubectl cluster-info
 
   setup:tekton:
@@ -81,13 +88,13 @@ tasks:
       - echo "Installing Tekton Interceptors..."
       - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
       - echo "Waiting for Tekton Pipelines controller..."
-      - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=120s
+      - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
       - echo "Patching Tekton feature flags..."
       - >-
         kubectl patch configmap feature-flags -n tekton-pipelines
         -p '{"data":{"disable-affinity-assistant":"true","coschedule":"disabled"}}'
       - kubectl rollout restart deployment tekton-pipelines-controller -n tekton-pipelines
-      - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=120s
+      - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
 
   setup:argocd:
     desc: Install ArgoCD
@@ -96,7 +103,7 @@ tasks:
       - echo "Installing ArgoCD..."
       - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
       - echo "Waiting for ArgoCD server..."
-      - kubectl rollout status deployment/argocd-server -n argocd --timeout=180s
+      - kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
 
   setup:crds:
     desc: Install Helios CRDs into the cluster
@@ -154,7 +161,10 @@ tasks:
       GITHUB_TOKEN: $GITHUB_TOKEN
       GITHUB_USER: $GITHUB_USER
     cmds:
-      - make run
+      - cmd: make run
+        platforms: [linux, darwin]
+      - cmd: go run ./cmd/main.go
+        platforms: [windows]
 
   dev:portal:
     desc: Run the Backstage portal with ArgoCD + kubectl proxy
@@ -173,30 +183,46 @@ tasks:
     internal: true
     cmds:
       - echo "Starting ArgoCD port-forward (localhost:{{.ARGOCD_PORT}})..."
-      - kubectl port-forward -n argocd svc/argocd-server {{.ARGOCD_PORT}}:443 &>/dev/null &
-      - sleep 2
+      - cmd: kubectl port-forward -n argocd svc/argocd-server {{.ARGOCD_PORT}}:443 &>/dev/null &
+        platforms: [linux, darwin]
+      - cmd: powershell -Command "Start-Process kubectl -ArgumentList 'port-forward', '-n', 'argocd', 'svc/argocd-server', '{{.ARGOCD_PORT}}:443' -WindowStyle Hidden"
+        platforms: [windows]
+      - cmd: sleep 2
+        platforms: [linux, darwin]
+      - cmd: powershell -Command "Start-Sleep -Seconds 2"
+        platforms: [windows]
       - echo "Starting kubectl proxy (localhost:{{.KUBECTL_PROXY_PORT}})..."
-      - kubectl proxy --port={{.KUBECTL_PROXY_PORT}} &>/dev/null &
-      - sleep 1
+      - cmd: kubectl proxy --port={{.KUBECTL_PROXY_PORT}} &>/dev/null &
+        platforms: [linux, darwin]
+      - cmd: powershell -Command "Start-Process kubectl -ArgumentList 'proxy', '--port={{.KUBECTL_PROXY_PORT}}' -WindowStyle Hidden"
+        platforms: [windows]
+      - cmd: sleep 1
+        platforms: [linux, darwin]
+      - cmd: powershell -Command "Start-Sleep -Seconds 1"
+        platforms: [windows]
 
   dev:portal:start:
     desc: Generate ArgoCD token and start Backstage
     internal: true
     dir: apps/portal
     cmds:
-      - |
-        ARGOCD_PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
-        TOKEN_JSON=$(curl -k -s -X POST \
-          -H "Content-Type: application/json" \
-          -d "{\"username\":\"admin\",\"password\":\"$ARGOCD_PASS\"}" \
-          https://127.0.0.1:{{.ARGOCD_PORT}}/api/v1/session)
-        export ARGOCD_AUTH_TOKEN=$(echo "$TOKEN_JSON" | sed 's/.*"token":"\([^"]*\)".*/\1/')
-        if [ -z "$ARGOCD_AUTH_TOKEN" ] || [ "${#ARGOCD_AUTH_TOKEN}" -lt 20 ]; then
-          echo "WARNING: Could not generate ArgoCD token. ArgoCD features may not work."
-        else
-          echo "ArgoCD token generated."
-        fi
-        yarn start
+      - cmd: |
+          ARGOCD_PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+          TOKEN_JSON=$(curl -k -s -X POST \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"admin\",\"password\":\"$ARGOCD_PASS\"}" \
+            https://127.0.0.1:{{.ARGOCD_PORT}}/api/v1/session)
+          export ARGOCD_AUTH_TOKEN=$(echo "$TOKEN_JSON" | sed 's/.*"token":"\([^"]*\)".*/\1/')
+          if [ -z "$ARGOCD_AUTH_TOKEN" ] || [ "${#ARGOCD_AUTH_TOKEN}" -lt 20 ]; then
+            echo "WARNING: Could not generate ArgoCD token. ArgoCD features may not work."
+          else
+            echo "ArgoCD token generated."
+          fi
+          yarn start
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -Command "$pass=[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}'))); $json=curl.exe -k -s -X POST -H 'Content-Type: application/json' -d \"{\`\"username\`\":\`\"admin\`\",\`\"password\`\":\`\"$pass\`\"}\" https://127.0.0.1:{{.ARGOCD_PORT}}/api/v1/session; if($json -match '\"token\":\"([^\"]+)\"'){ $env:ARGOCD_AUTH_TOKEN=$matches[1]; echo 'ArgoCD token generated.' } else { echo 'WARNING: Could not generate ArgoCD token. ArgoCD features may not work.' }; yarn start"
+        platforms: [windows]
 
   # ===========================================================================
   # Testing Tasks

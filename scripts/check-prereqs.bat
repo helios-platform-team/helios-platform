@@ -32,7 +32,7 @@ echo [Core Tools]
 
 call :check_tool "go" "go version"
 call :check_tool "docker" "docker --version"
-call :check_tool "kubectl" "kubectl version --client --short 2>nul"
+call :check_tool "kubectl" "kubectl version --client"
 call :check_tool "k3d" "k3d version"
 call :check_tool "cue" "cue version"
 
