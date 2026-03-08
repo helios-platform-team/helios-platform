@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 # Helios Platform - Root Taskfile
 # =============================================================================
 # Usage:
@@ -89,6 +89,13 @@ tasks:
       - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
       - echo "Waiting for Tekton Pipelines controller..."
       - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
+      - echo "Waiting for Tekton Pipelines webhook..."
+      - kubectl rollout status deployment/tekton-pipelines-webhook -n tekton-pipelines --timeout=600s
+      - echo "Waiting for webhook endpoints to register..."
+      - cmd: sleep 10
+        platforms: [linux, darwin]
+      - cmd: powershell -Command "Start-Sleep -Seconds 10"
+        platforms: [windows]
       - echo "Patching Tekton feature flags..."
       - >-
         kubectl patch configmap feature-flags -n tekton-pipelines
@@ -103,13 +110,16 @@ tasks:
       - echo "Installing ArgoCD..."
       - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
       - echo "Waiting for ArgoCD server..."
-      - kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
+      - kubectl rollout status deployment/argocd-server -n argocd --timeout=600s
 
   setup:crds:
     desc: Install Helios CRDs into the cluster
     dir: apps/operator
     cmds:
-      - make install
+      - cmd: make install
+        platforms: [linux, darwin]
+      - cmd: kubectl kustomize config/crd | kubectl apply -f -
+        platforms: [windows]
 
   setup:tekton-rbac:
     desc: Grant Tekton Triggers SA the permissions to create PipelineRuns
@@ -220,8 +230,7 @@ tasks:
           fi
           yarn start
         platforms: [linux, darwin]
-      - cmd: |
-          powershell -Command "$pass=[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}'))); $json=curl.exe -k -s -X POST -H 'Content-Type: application/json' -d \"{\`\"username\`\":\`\"admin\`\",\`\"password\`\":\`\"$pass\`\"}\" https://127.0.0.1:{{.ARGOCD_PORT}}/api/v1/session; if($json -match '\"token\":\"([^\"]+)\"'){ $env:ARGOCD_AUTH_TOKEN=$matches[1]; echo 'ArgoCD token generated.' } else { echo 'WARNING: Could not generate ArgoCD token. ArgoCD features may not work.' }; yarn start"
+      - cmd: powershell -ExecutionPolicy Bypass -File ../../scripts/start-portal.ps1 -ArgocdPort {{.ARGOCD_PORT}}
         platforms: [windows]
 
   # ===========================================================================
