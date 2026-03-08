@@ -53,7 +53,6 @@ tasks:
       - task: setup:tekton
       - task: setup:argocd
       - task: setup:crds
-      - task: setup:tekton-resources
       - task: setup:tekton-rbac
       - task: setup:credentials
       - task: setup:portal-deps
@@ -95,7 +94,7 @@ tasks:
     cmds:
       - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
       - echo "Installing ArgoCD..."
-      - kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
       - echo "Waiting for ArgoCD server..."
       - kubectl rollout status deployment/argocd-server -n argocd --timeout=180s
 
@@ -104,14 +103,6 @@ tasks:
     dir: apps/operator
     cmds:
       - make install
-
-  setup:tekton-resources:
-    desc: Export CUE definitions and apply Tekton tasks
-    cmds:
-      - echo "Exporting Tekton tasks from CUE..."
-      - cue export ./cue/definitions/tekton/tasks/*.cue --out yaml > apps/operator/tekton/tasks.yaml
-      - echo "Applying Tekton resources..."
-      - kubectl apply -f apps/operator/tekton/tasks.yaml
 
   setup:tekton-rbac:
     desc: Grant Tekton Triggers SA the permissions to create PipelineRuns
