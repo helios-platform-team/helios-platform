@@ -38,11 +38,11 @@ spec:
             value: $(tt.params.git-revision)
           - name: image-repo
             value: "index.docker.io/${{ values.dockerOrg }}/${{ values.repoName }}" 
-          - name: gitops-repo-url
+          - name: GITOPS_REPO_URL
             value: "$(tt.params.git-repo-url)-gitops"
-          - name: gitops-repo-branch
+          - name: GITOPS_REPO_BRANCH
             value: "main"
-          - name: manifest-path-in-gitops-repo
+          - name: MANIFEST_PATH
             value: "deployment.yaml"
           - name: docker-secret
             value: "docker-credentials"

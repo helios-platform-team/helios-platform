@@ -6,6 +6,7 @@ import { FormControl, InputLabel, Select, MenuItem, TextField } from '@material-
 interface DatabaseConfig {
   dbType: string;
   dbName?: string;
+  dbVersion?: string;
 }
 
 export const DatabasePicker = ({
@@ -17,13 +18,13 @@ export const DatabasePicker = ({
   // Default to 'none' if no data is present
   const dbType = formData?.dbType || 'none';
   const dbName = formData?.dbName || '';
+  const dbVersion = formData?.dbVersion || '16';
 
   const handleTypeChange = (event: React.ChangeEvent<{ value: unknown }>) => {
     const newType = event.target.value as string;
     onChange({
       dbType: newType,
-      // Clear the dbName if they switch back to "No Database"
-      ...(newType === 'postgres' ? { dbName: dbName } : { dbName: '' }),
+      ...(newType === 'postgres' ? { dbName: dbName, dbVersion: dbVersion } : { dbName: '', dbVersion: '' }),
     });
   };
 
@@ -31,6 +32,15 @@ export const DatabasePicker = ({
     onChange({
       dbType,
       dbName: event.target.value,
+      dbVersion,
+    });
+  };
+
+  const handleVersionChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+    onChange({
+      dbType,
+      dbName,
+      dbVersion: event.target.value as string,
     });
   };
 
@@ -45,16 +55,28 @@ export const DatabasePicker = ({
       </FormControl>
 
       {dbType === 'postgres' && (
-        <TextField
-          label="Database Name"
-          value={dbName}
-          onChange={handleNameChange}
-          fullWidth
-          margin="normal"
-          required
-          helperText="The name of the database to create (e.g., my_custom_db)"
-          error={rawErrors?.length > 0 && !dbName}
-        />
+        <>
+          <TextField
+            label="Database Name"
+            value={dbName}
+            onChange={handleNameChange}
+            fullWidth
+            margin="normal"
+            required
+            helperText="The name of the database to create (e.g., my_custom_db)"
+            error={rawErrors?.length > 0 && !dbName}
+          />
+
+          <FormControl fullWidth margin="normal" required>
+            <InputLabel>Database Version</InputLabel>
+            <Select value={dbVersion} onChange={handleVersionChange}>
+              <MenuItem value="13">13</MenuItem>
+              <MenuItem value="14">14</MenuItem>
+              <MenuItem value="15">15</MenuItem>
+              <MenuItem value="16">16</MenuItem>
+            </Select>
+          </FormControl>
+        </>
       )}
     </div>
   );

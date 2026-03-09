@@ -132,6 +132,9 @@ spec:
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           webhookUrl: ${{ parameters.webhookUrl }}
           testCommand: "npm install && npm test"
+          dbType: ${{ parameters.databaseConfig.dbType }}
+          dbName: ${{ parameters.databaseConfig.dbName }}
+          dbVersion: ${{ parameters.databaseConfig.dbVersion }}
 
     - id: publish-gitops
       name: Publish GitOps Manifests

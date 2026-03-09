@@ -34,10 +34,10 @@ func GeneratePipelineRunForManifestGeneration(heliosApp *appv1alpha1.HeliosApp, 
 		map[string]any{"name": "app-repo-url", "value": heliosApp.Spec.GitRepo},
 		map[string]any{"name": "app-repo-revision", "value": heliosApp.Spec.GitBranch},
 		map[string]any{"name": "image-repo", "value": heliosApp.Spec.ImageRepo},
-		map[string]any{"name": "gitops-repo-url", "value": heliosApp.Spec.GitOpsRepo},
-		map[string]any{"name": "manifest-path-in-gitops-repo", "value": heliosApp.Spec.GitOpsPath},
-		map[string]any{"name": "gitops-repo-branch", "value": gitOpsBranch},
-		map[string]any{"name": "context-subpath", "value": contextSubpath},
+		map[string]any{"name": "GITOPS_REPO_URL", "value": heliosApp.Spec.GitOpsRepo},
+		map[string]any{"name": "MANIFEST_PATH", "value": heliosApp.Spec.GitOpsPath},
+		map[string]any{"name": "GITOPS_REPO_BRANCH", "value": gitOpsBranch},
+		map[string]any{"name": "CONTEXT_SUBPATH", "value": contextSubpath},
 		map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", heliosApp.Spec.Replicas)},
 		map[string]any{"name": "port", "value": fmt.Sprintf("%d", heliosApp.Spec.Port)},
 		map[string]any{"name": "test-command", "value": heliosApp.Spec.TestCommand},
@@ -57,7 +57,6 @@ func GeneratePipelineRunForManifestGeneration(heliosApp *appv1alpha1.HeliosApp, 
 	params = append(params, map[string]any{"name": "resources", "value": string(resourcesJSON)})
 
 	// PVC workspace - Pipeline expects two workspaces
-	pvcName := cmp.Or(heliosApp.Spec.PVCName, "shared-workspace-pvc")
 
 	pr := map[string]any{
 		"apiVersion": "tekton.dev/v1beta1",
@@ -81,14 +80,28 @@ func GeneratePipelineRunForManifestGeneration(heliosApp *appv1alpha1.HeliosApp, 
 			"workspaces": []any{
 				map[string]any{
 					"name": "source-workspace",
-					"persistentVolumeClaim": map[string]any{
-						"claimName": pvcName,
+					"volumeClaimTemplate": map[string]any{
+						"spec": map[string]any{
+							"accessModes": []any{"ReadWriteOnce"},
+							"resources": map[string]any{
+								"requests": map[string]any{
+									"storage": "1Gi",
+								},
+							},
+						},
 					},
 				},
 				map[string]any{
 					"name": "gitops-workspace",
-					"persistentVolumeClaim": map[string]any{
-						"claimName": pvcName,
+					"volumeClaimTemplate": map[string]any{
+						"spec": map[string]any{
+							"accessModes": []any{"ReadWriteOnce"},
+							"resources": map[string]any{
+								"requests": map[string]any{
+									"storage": "1Gi",
+								},
+							},
+						},
 					},
 				},
 			},

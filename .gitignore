@@ -1,3 +1,4 @@
 # SQLite
 *.sqlite
 apps/portal/packages/backend/*.sqlite
+.env

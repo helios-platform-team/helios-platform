@@ -37,3 +37,12 @@ spec:
           properties:
             port: ${{ values.port }}
             targetPort: ${{ values.port }}
+        {% if values.dbType and values.dbType != "none" %}
+        - type: database
+          properties:
+            dbType: ${{ values.dbType | dump }}
+            {% if values.dbName %}
+            dbName: ${{ values.dbName | dump }}
+            {% endif %}
+            version: ${{ values.dbVersion | dump }}
+        {% endif %}

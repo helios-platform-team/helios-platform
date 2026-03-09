@@ -50,7 +50,8 @@ import (
                         "helios.io/managed-by":       "helios-operator"
                         "app.kubernetes.io/part-of":  "helios-platform"
                         "app.kubernetes.io/instance": _bp.pipelineName
-                        "app.kubernetes.io/name":     _bp.pipelineName
+                        "app.kubernetes.io/name":     _bp.appName
+                        "janus-idp.io/tekton":        _bp.appName
                     }
                 }
                 spec: {
