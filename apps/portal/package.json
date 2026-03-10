@@ -33,6 +33,7 @@
     "@backstage/e2e-test-utils": "^0.1.1",
     "@jest/environment-jsdom-abstract": "^30.0.0",
     "@playwright/test": "^1.32.3",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/jest": "^30.0.0",
     "jest": "^30.2.0",
     "jsdom": "^27.1.0",
@@ -44,7 +45,6 @@
     "@types/react": "^18",
     "@types/react-dom": "^18"
   },
-  "prettier": "@backstage/cli/config/prettier",
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs,cjs}": [
       "eslint --fix",

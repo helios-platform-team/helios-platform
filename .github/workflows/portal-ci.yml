@@ -1,0 +1,43 @@
+name: Portal CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'features/*'
+  pull_request:
+    branches:
+      - main
+      - 'features/*'
+
+jobs:
+  build-and-test:
+    name: Build and Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/portal
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Run Prettier check
+        run: yarn prettier:check
+
+      - name: Run TypeScript check
+        run: yarn tsc
+
+      - name: Run build
+        run: yarn build:all
