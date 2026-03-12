@@ -68,7 +68,6 @@ _#defaultPorts: {
 			metadata: {
 				name: "\(_p.name)-db-config"
 				labels: {
-					app:                    _p.name
 					"helios.io/managed-by": "operator"
 					"helios.io/trait":      "database"
 				}
