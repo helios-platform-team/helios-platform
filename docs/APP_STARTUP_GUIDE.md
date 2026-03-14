@@ -4,11 +4,100 @@
 
 ---
 
-## Prerequisites
+## Quick Start (Recommended)
 
-### Environment Variables
+The fastest way to get up and running uses [Task](https://taskfile.dev/) to automate all setup steps.
 
-Create a `.env` file in `/apps/portal` with the following content (replace with your values):
+### 1. Install Task
+
+```bash
+# Linux
+sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+
+# macOS (Homebrew)
+brew install go-task
+
+# Windows (Scoop)
+scoop install task
+
+# Windows (Chocolatey)
+choco install go-task
+```
+
+> **Windows users:** Task requires a POSIX shell for its commands. Install [Git for Windows](https://git-scm.com/download/win) (includes Git Bash) or use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install). You can also run `scripts\check-prereqs.bat` directly from `cmd.exe` to verify tools before using Task.
+
+### 2. Configure credentials
+
+```bash
+cp .env.example .env
+# Edit .env and fill in your GitHub PAT, OAuth app, and Docker Hub credentials
+```
+
+### 3. Verify prerequisites
+
+```bash
+task check
+```
+
+### 4. Bootstrap the environment
+
+This creates a k3d cluster (lightweight k3s-in-Docker), installs Tekton, ArgoCD, CRDs, and all dependencies (~5-10 min):
+
+```bash
+task setup
+```
+
+### 5. Start developing
+
+Runs the Go operator and Backstage portal concurrently:
+
+```bash
+task dev
+```
+
+The portal will be available at http://localhost:3000 and the backend API at http://localhost:7007.
+
+### Other useful commands
+
+| Command | Description |
+|---------|-------------|
+| `task check` | Verify all prerequisites are installed |
+| `task setup` | Bootstrap the full local environment |
+| `task dev` | Run operator + portal concurrently |
+| `task dev:operator` | Run only the operator |
+| `task dev:portal` | Run only the portal |
+| `task test` | Run all tests |
+| `task clean` | Delete the k3d cluster |
+
+---
+
+## Manual Setup (Step-by-Step Reference)
+
+The sections below describe each step that `task setup` performs automatically. Use these for troubleshooting or if you prefer manual control.
+
+### Prerequisites
+
+#### Required Tools
+
+Ensure you have the following installed (run `task check` to verify):
+
+- **Go** >= 1.24 ([install](https://go.dev/dl/))
+- **Docker** ([install](https://docs.docker.com/get-docker/))
+- **kubectl** ([install](https://kubernetes.io/docs/tasks/tools/))
+- **k3d** ([install](https://k3d.io/) or `curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash`)
+- **CUE** (`go install cuelang.org/go/cmd/cue@latest`)
+- **Node.js** >= 22 ([install](https://nodejs.org/) or `nvm install 22`)
+- **Yarn** 4 (`corepack enable && corepack prepare yarn@4 --activate`)
+
+#### Environment Variables
+
+Create a `.env` file at the **repository root** with all credentials (see `.env.example`):
+
+```bash
+cp .env.example .env
+```
+
+The Taskfile distributes these to the operator and portal automatically. If running manually, you also need a `.env` in `apps/portal/` with at minimum:
 
 ```env
 AUTH_GITHUB_CLIENT_ID=
@@ -19,10 +108,10 @@ GITHUB_TOKEN=
 
 ---
 
-## Step 1: Create a Fresh Kind Cluster
+## Step 1: Create a Fresh k3d Cluster
 
 ```bash
-kind create cluster --name helios-dev
+k3d cluster create helios-dev --agents 1 --wait
 ```
 
 ---
@@ -56,12 +145,12 @@ kubectl rollout restart deployment tekton-pipelines-controller -n tekton-pipelin
 ### 2.4 Apply Compatibility Patch (Kubernetes < 1.28 Only)
 
 > [!WARNING]
-> **Only apply this patch if your Kind node version is below 1.28.**
+> **Only apply this patch if your k3s node version is below 1.28.**
 > 
-> Check the version in the terminal output after running `kind create cluster`. Newer Tekton versions (v0.50+) officially require Kubernetes v1.28+.
+> k3d typically ships with a recent k3s version (1.28+), so this patch is rarely needed. Check with `kubectl version`.
 
 ```bash
-# PATCH: Fix incompatibility with Kubernetes 1.27+ (Prevent CrashLoopBackOff)
+# PATCH: Fix incompatibility with older Kubernetes (Prevent CrashLoopBackOff)
 kubectl set env deployment/tekton-pipelines-controller -n tekton-pipelines KUBERNETES_MIN_VERSION=1.20.0
 kubectl set env deployment/tekton-pipelines-webhook -n tekton-pipelines KUBERNETES_MIN_VERSION=1.20.0
 ```
@@ -274,9 +363,19 @@ kubectl get pods -n default | grep "advanced-nodejs-app-v14-run"
 
 ## Quick Reference
 
+### Automated (Taskfile)
+
+| Command | Description |
+|---------|-------------|
+| `task setup` | Steps 1-8 in one command |
+| `task dev` | Run operator + portal |
+| `task clean` | Tear down cluster |
+
+### Manual
+
 | Step | Description | Command |
 |------|-------------|---------|
-| 1 | Create cluster | `kind create cluster --name helios-dev` |
+| 1 | Create cluster | `k3d cluster create helios-dev --agents 1 --wait` |
 | 2 | Install Tekton | `kubectl apply -f https://storage.googleapis.com/tekton-releases/...` |
 | 3 | Install ArgoCD | `kubectl apply -n argocd -f https://...argo-cd/.../install.yaml` |
 | 4 | Run operator | `make -C apps/operator run` |
