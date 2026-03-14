@@ -85,19 +85,6 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	// VALIDATION: Ensure image is present (Fix "First Commit Missing Image")
-	for _, comp := range appModel.App.Components {
-		// We can add more specific checks here based on component type
-		// For now, checks if 'image' property exists and is not empty for all components
-		// assuming all workloads need an image.
-		if img, ok := comp.Properties["image"].(string); !ok || img == "" {
-			msg := fmt.Sprintf("Component '%s' is waiting for image (likely building). Status: Pending.", comp.Name)
-			log.Info(msg)
-			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhasePending, msg)
-			return ctrl.Result{}, nil // Wait for next update (CI/CD will update CR with image)
-		}
-	}
-
 	// 3. Render via CUE Engine
 	manifestBytes, err := r.CueEngine.Render(appModel)
 	if err != nil {
@@ -126,6 +113,33 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "Failed to reconcile database secrets")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database secret creation failed: %v", err))
 		return ctrl.Result{}, err
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.7: Database Instance Provisioning
+	// Provision StatefulSets and headless Services for database traits.
+	// Runs AFTER secrets so that the credential Secret already exists
+	// when the database pod starts.
+	// ------------------------------------------------------------------
+	if err := r.reconcileDatabaseInstance(ctx, &heliosApp); err != nil {
+		log.Error(err, "Failed to reconcile database instance")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database instance provisioning failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	// VALIDATION: Ensure image is present (Fix "First Commit Missing Image")
+	// This validation is for application workloads (GitOps pipeline downstream).
+	// We run this AFTER DB provisioning so databases can come up while app is building.
+	for _, comp := range appModel.App.Components {
+		// We can add more specific checks here based on component type
+		// For now, checks if 'image' property exists and is not empty for all components
+		// assuming all workloads need an image.
+		if img, ok := comp.Properties["image"].(string); !ok || img == "" {
+			msg := fmt.Sprintf("Component '%s' is waiting for image (likely building). Status: Pending.", comp.Name)
+			log.Info(msg)
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhasePending, msg)
+			return ctrl.Result{}, nil // Wait for next update (CI/CD will update CR with image)
+		}
 	}
 
 	// ------------------------------------------------------------------
@@ -507,6 +521,7 @@ func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appv1alpha1.HeliosApp{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Service{}).
 		Owns(&networkingv1.Ingress{}).
 		Watches(
