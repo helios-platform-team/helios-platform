@@ -24,6 +24,7 @@ import "helios.io/cue/definitions/tekton"
 	gitopsRepoUrl: tekton.#CommonParams.gitops.repoUrl
 	manifestPath:  tekton.#CommonParams.gitops.manifestPath
 	gitopsBranch:  tekton.#CommonParams.gitops.branch
+	gitopsSecret:  tekton.#CommonParams.gitops.secret
 
 	// Image params
 	contextSubpath: tekton.#CommonParams.image.contextSubpath
@@ -51,6 +52,7 @@ import "helios.io/cue/definitions/tekton"
 	#PipelineParams.gitopsRepoUrl,
 	#PipelineParams.manifestPath,
 	#PipelineParams.gitopsBranch,
+	#PipelineParams.gitopsSecret,
 	#PipelineParams.contextSubpath,
 	#PipelineParams.replicas,
 	#PipelineParams.port,
@@ -186,6 +188,7 @@ import "helios.io/cue/definitions/tekton"
 			{name: tekton.#CommonParams.gitops.manifestPath.name, value: "$(params.\(#PipelineParams.manifestPath.name))"},
 			{name: tekton.#CommonParams.gitops.newImageUrl.name, value:  "$(tasks.\(_imageSourceTask).results.IMAGE_URL)"},
 			{name: tekton.#CommonParams.gitops.branch.name, value:       "$(params.\(#PipelineParams.gitopsBranch.name))"},
+			{name: tekton.#CommonParams.gitops.secret.name, value:       "$(params.\(#PipelineParams.gitopsSecret.name))"},
 			{name: "REPLICAS", value:                             "$(params.\(#PipelineParams.replicas.name))"},
 			{name: "PORT", value:                                 "$(params.\(#PipelineParams.port.name))"},
 		]

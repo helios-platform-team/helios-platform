@@ -41,6 +41,7 @@ func GeneratePipelineRunForManifestGeneration(heliosApp *appv1alpha1.HeliosApp, 
 		map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", heliosApp.Spec.Replicas)},
 		map[string]any{"name": "port", "value": fmt.Sprintf("%d", heliosApp.Spec.Port)},
 		map[string]any{"name": "test-command", "value": heliosApp.Spec.TestCommand},
+		map[string]any{"name": "GITOPS_SECRET", "value": cmp.Or(heliosApp.Spec.GitOpsSecretRef, "github-credentials")},
 	}
 
 	// Serialize Env and Resources to JSON

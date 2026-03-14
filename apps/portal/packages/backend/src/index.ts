@@ -67,8 +67,14 @@ backend.add(import('@backstage/plugin-search-backend-module-techdocs'));
 // kubernetes plugin
 backend.add(import('@backstage/plugin-kubernetes-backend'));
 
+// helios plugin
+backend.add(import('@helios/plugin-database-backend'));
+
 // notifications and signals plugins
 backend.add(import('@backstage/plugin-notifications-backend'));
 backend.add(import('@backstage/plugin-signals-backend'));
+
+// database info extension
+backend.add(import('./extensions/database-router-simple'));
 
 backend.start();

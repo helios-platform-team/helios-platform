@@ -104,6 +104,11 @@ package tekton
 			description: "New image URL to update in manifest"
 			type:        "string"
 		}
+		secret: {
+			name:    "GITOPS_SECRET"
+			type:    "string"
+			default: "github-credentials"
+		}
 	}
 
 	// App params

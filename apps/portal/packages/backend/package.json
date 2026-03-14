@@ -47,6 +47,7 @@
     "@backstage/plugin-search-backend-node": "^1.4.0",
     "@backstage/plugin-signals-backend": "^0.3.11",
     "@backstage/plugin-techdocs-backend": "^2.1.3",
+    "@helios/plugin-database-backend": "link:../../plugins/helios-backend",
     "app": "link:../app",
     "better-sqlite3": "^12.0.0",
     "dotenv": "^17.2.3",

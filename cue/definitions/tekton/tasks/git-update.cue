@@ -16,7 +16,8 @@ import "helios.io/cue/definitions/tekton"
 			tekton.#CommonParams.gitops.repoUrl,
 			tekton.#CommonParams.gitops.manifestPath,
 			tekton.#CommonParams.gitops.newImageUrl,
-			tekton.#CommonParams.gitops.branch, {
+			tekton.#CommonParams.gitops.branch,
+			tekton.#CommonParams.gitops.secret, {
 			name:    "REPLICAS"
 			default: "2"
 			type:    "string"
@@ -51,6 +52,9 @@ import "helios.io/cue/definitions/tekton"
 			// Step 2: Update Manifests using YQ image
 			name:  "update-manifests"
 			image: _config.images.yq
+			securityContext: {
+				runAsUser: 0
+			}
 			entrypoint: ["/bin/sh"] // Override default yq entrypoint
 			script: """
 				#!/bin/sh
@@ -107,7 +111,7 @@ import "helios.io/cue/definitions/tekton"
 			image: _config.images.gitClone
 			envFrom: [{
 				secretRef: {
-					name:     "github-credentials"
+					name:     "$(params.GITOPS_SECRET)"
 					optional: true
 				}
 			}]

@@ -78,6 +78,14 @@ package tekton
 	envFrom?: [...#EnvFromSource]
 	volumeMounts?: [...#VolumeMount]
 	workingDir?: string
+	securityContext?: {
+		runAsUser?:    int
+		runAsGroup?:   int
+		fsGroup?:      int
+		runAsNonRoot?: bool
+		privileged?:   bool
+		...
+	}
 }
 
 #EnvFromSource: {

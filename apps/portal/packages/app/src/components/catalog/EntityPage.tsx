@@ -67,6 +67,7 @@ import {
   EntityKubernetesContent,
   isKubernetesAvailable,
 } from '@backstage/plugin-kubernetes';
+import { DatabaseTab } from '../database';
 
 const techdocsContent = (
   <EntityTechdocsContent>
@@ -203,6 +204,10 @@ const serviceEntityPage = (
           <EntityDependsOnResourcesCard variant="gridItem" />
         </Grid>
       </Grid>
+    </EntityLayout.Route>
+
+    <EntityLayout.Route path="/database" title="Database">
+      <DatabaseTab />
     </EntityLayout.Route>
 
     <EntityLayout.Route path="/docs" title="Docs">

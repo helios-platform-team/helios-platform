@@ -559,7 +559,7 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
-										Command: []string{"pg_isready", "-U", "$(POSTGRES_USER)", "-d", dbName, "-p", "$(PGPORT)"},
+										Command: []string{"sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -p $PGPORT"},
 									},
 								},
 								InitialDelaySeconds: 5,
@@ -568,7 +568,7 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
-										Command: []string{"pg_isready", "-U", "$(POSTGRES_USER)", "-d", dbName, "-p", "$(PGPORT)"},
+										Command: []string{"sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -p $PGPORT"},
 									},
 								},
 								InitialDelaySeconds: 30,
