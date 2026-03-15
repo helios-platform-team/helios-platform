@@ -54,5 +54,8 @@
       "prettier --write"
     ]
   },
-  "packageManager": "yarn@4.4.1"
+  "packageManager": "yarn@4.4.1",
+  "dependencies": {
+    "lucide-react": "^0.577.0"
+  }
 }

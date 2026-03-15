@@ -1,0 +1,498 @@
+/* Import Fonts (Alternative to index.html) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  /* HELIOS PRIMITIVES (DARK) */
+  --helios-void: #000000;
+  --helios-panel: #09090b;
+  --helios-glass: rgba(10, 10, 10, 0.6);
+  --helios-border: rgba(255, 255, 255, 0.08);
+  --helios-text-main: #ffffff;
+  --helios-text-muted: #a1a1aa;
+
+  /* HELIOS PRIMITIVES (LIGHT) */
+  --helios-light-app: #fafafa;
+  --helios-light-panel: #ffffff;
+  --helios-light-glass: rgba(255, 255, 255, 0.7);
+  --helios-light-border: rgba(0, 0, 0, 0.08);
+  --helios-light-text-main: #09090b;
+  --helios-light-text-muted: #52525b;
+
+  /* BRAND (Shared) */
+  --helios-solar: #f59e0b;
+  --helios-solar-hover: #fbbf24;
+  --helios-solar-glass: rgba(245, 158, 11, 0.2);
+  --helios-solar-subtle: rgba(245, 158, 11, 0.5); /* Accent border/corner (theme-aware in dark/light) */
+
+/* STATUS Semantic (Shifted to 600-level for legibility on white) */
+--emerald: #059669;
+--rose: #e11d48;
+    --rose-bg: rgba(255, 29, 72, 0.3);
+--amber: #d97706;
+--cyan: #0891b2;
+
+  /* UTILS */
+  --glass-blur: 12px;
+  
+  /* Font Families */
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Theme-Aware Defaults (Fallback to Dark Mode) */
+  --theme-glass: var(--helios-glass);
+  --theme-border: var(--helios-border);
+  --theme-primary-glow: rgba(245, 158, 11, 0.4);
+  --theme-text-glow: rgba(245, 158, 11, 0.3);
+}
+
+/* BUI default fallback (match dark theme until data-theme-mode is set) */
+:root {
+  --bui-bg-app: var(--helios-void);
+  --bui-bg-surface-0: var(--helios-void);
+  --bui-bg-surface-1: var(--helios-glass);
+  --bui-bg-surface-2: var(--helios-panel);
+  --bui-fg-primary: var(--helios-text-main);
+  --bui-fg-secondary: var(--helios-text-muted);
+  --bui-border: var(--helios-border);
+  --bui-bg-solid: var(--helios-solar);
+  --bui-bg-solid-hover: var(--helios-solar-hover);
+  --bui-fg-solid: #000000;
+  --bui-font-regular: var(--font-sans);
+  --bui-font-mono: var(--font-mono);
+  --bui-font-monospace: var(--font-mono);
+  --bui-radius-1: 2px;
+  --bui-radius-2: 4px;
+  --bui-radius-3: 4px;
+}
+
+/* --- ANIMATIONS --- */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shine {
+  100% { left: 125%; }
+}
+
+/* --- UTILITY CLASSES --- */
+.animate-enter {
+  animation: fade-slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+
+/* Homepage: metric card hover */
+.helios-metric-card:hover {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.helios-metric-card:hover .helios-metric-value {
+  text-shadow: 0 0 20px var(--theme-text-glow);
+}
+.helios-metric-card:hover .helios-metric-sub {
+  border-left-color: var(--helios-solar);
+}
+
+/* Homepage: quick action card hover (theme-aware) */
+[data-theme-mode='dark'] .helios-quick-action-card:hover {
+  border-color: rgba(245, 158, 11, 0.5);
+  background-color: rgba(24, 24, 27, 0.8);
+}
+[data-theme-mode='light'] .helios-quick-action-card:hover {
+  border-color: rgba(245, 158, 11, 0.5);
+  background-color: rgba(255, 255, 255, 0.95);
+}
+.helios-quick-action-card:hover .helios-quick-action-cta {
+  color: var(--helios-solar);
+}
+
+/* Status badges (reusable; use project BUI status tokens) */
+.helios-hp-status-badge {
+  border-width: 1px;
+  border-style: solid;
+  font-family: var(--font-mono);
+}
+.helios-hp-status-healthy { color: var(--bui-fg-success-on-bg); border-color: var(--bui-border-success); background-color: var(--bui-bg-success); }
+.helios-hp-status-healthy .helios-hp-status-dot { background-color: var(--bui-fg-success-on-bg); }
+.helios-hp-status-warning { color: var(--bui-fg-warning-on-bg); border-color: var(--bui-border-warning); background-color: var(--bui-bg-warning); }
+.helios-hp-status-warning .helios-hp-status-dot { background-color: var(--bui-fg-warning-on-bg); }
+.helios-hp-status-critical { color: var(--bui-fg-danger-on-bg); border-color: var(--bui-border-danger); background-color: var(--bui-bg-danger); }
+.helios-hp-status-critical .helios-hp-status-dot { background-color: var(--bui-fg-danger-on-bg); }
+.helios-hp-status-pending { color: var(--bui-fg-info-on-bg); border-color: var(--bui-border-info); background-color: var(--bui-bg-info); }
+.helios-hp-status-pending .helios-hp-status-dot { background-color: var(--bui-fg-info-on-bg); }
+.helios-hp-status-neutral { color: var(--bui-fg-secondary); border-color: var(--bui-border-2); background-color: var(--bui-bg-neutral-2); }
+.helios-hp-status-neutral .helios-hp-status-dot { background-color: var(--bui-fg-secondary); }
+
+/* List/table row hover (reusable) */
+.helios-hp-service-row:hover {
+  background-color: var(--bui-bg-neutral-1-hover);
+}
+
+/* BUI ButtonLink styled to match MuiButton containedPrimary (heliosThemes.ts) */
+.helios-mui-primary-btn {
+  position: relative;
+  border-radius: 2px;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  overflow: hidden;
+  transition: all 0.15s ease;
+  border: none;
+  text-decoration: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.helios-mui-primary-btn:active {
+  transform: scale(0.97);
+}
+.helios-mui-primary-btn:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+/* Default (dark) and dark theme: MuiButton containedPrimary */
+.helios-mui-primary-btn,
+[data-theme-mode='dark'] .helios-mui-primary-btn {
+  background-color: #f59e0b;
+  color: #000000;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+}
+[data-theme-mode='dark'] .helios-mui-primary-btn:hover {
+  background-color: #fbbf24;
+  box-shadow: 0 0 30px rgba(245, 158, 11, 0.6);
+}
+[data-theme-mode='dark'] .helios-mui-primary-btn:active {
+  background-color: #d97706;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+/* Light theme: MuiButton containedPrimary */
+[data-theme-mode='light'] .helios-mui-primary-btn {
+  background-color: #f59e0b;
+  color: #09090b;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+}
+[data-theme-mode='light'] .helios-mui-primary-btn:hover {
+  background-color: #fbbf24;
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+[data-theme-mode='light'] .helios-mui-primary-btn:active {
+  background-color: #d97706;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+}
+
+/* Hover shine effect (MuiButton ::after) */
+.helios-mui-primary-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  transform: skewX(-12deg);
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.2));
+  transition: left 0.7s ease-out;
+  z-index: 0;
+  pointer-events: none;
+}
+[data-theme-mode='light'] .helios-mui-primary-btn::after {
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.4));
+}
+.helios-mui-primary-btn:hover::after {
+  left: 200%;
+}
+
+/* Content and icon above shine (z-index); icon scale on hover/active */
+.helios-mui-primary-btn > * {
+  z-index: 1;
+  position: relative;
+}
+.helios-mui-primary-btn svg,
+.helios-mui-primary-btn [class*='Icon'] {
+  transition: transform 0.2s ease;
+}
+.helios-mui-primary-btn:hover svg,
+.helios-mui-primary-btn:hover [class*='Icon'] {
+  transform: scale(1.1);
+}
+.helios-mui-primary-btn:active svg,
+.helios-mui-primary-btn:active [class*='Icon'] {
+  transform: scale(0.95);
+}
+
+.text-glow {
+  text-shadow: 0 0 20px var(--theme-text-glow);
+}
+
+/* The "Slant" clip-path for buttons */
+.clip-path-slant {
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+
+/* --- THEME DEFINITIONS --- */
+
+[data-theme-mode='dark'] {
+  /* Theme-Aware Context Variables */
+  --theme-glass: var(--helios-glass);
+  --theme-border: var(--helios-border);
+  --theme-primary-glow: rgba(245, 158, 11, 0.4);
+  --theme-text-glow: rgba(245, 158, 11, 0.3);
+  --sidebar-background: var(--helios-glass);
+
+  /* === BUI overrides (match heliosThemes.ts MUI) === */
+  /* Base (same in both themes) */
+  --bui-black: #000000;
+  --bui-white: #ffffff;
+
+  /* Neutral backgrounds (MUI: background.default, paper, glass) */
+  --bui-bg-app: var(--helios-void);
+  --bui-bg-surface-0: var(--helios-void);
+  --bui-bg-neutral-1: var(--helios-glass);
+  --bui-bg-neutral-1-hover: rgba(255, 255, 255, 0.08);
+  --bui-bg-neutral-1-pressed: rgba(255, 255, 255, 0.12);
+  --bui-bg-neutral-1-disabled: rgba(255, 255, 255, 0.02);
+  --bui-bg-surface-1: var(--helios-glass);
+  --bui-bg-neutral-2: var(--helios-panel);
+  --bui-bg-neutral-2-hover: rgba(255, 255, 255, 0.04);
+  --bui-bg-neutral-2-pressed: rgba(255, 255, 255, 0.06);
+  --bui-bg-neutral-2-disabled: rgba(255, 255, 255, 0.02);
+  --bui-bg-surface-2: var(--helios-panel);
+  --bui-bg-neutral-3: rgba(24, 24, 27, 0.8);
+  --bui-bg-neutral-3-hover: rgba(39, 39, 42, 0.9);
+  --bui-bg-neutral-3-pressed: rgba(63, 63, 70, 0.9);
+  --bui-bg-neutral-3-disabled: rgba(24, 24, 27, 0.5);
+  --bui-bg-neutral-4: rgba(39, 39, 42, 0.9);
+  --bui-bg-neutral-4-hover: rgba(63, 63, 70, 0.95);
+  --bui-bg-neutral-4-pressed: rgba(82, 82, 91, 0.95);
+  --bui-bg-neutral-4-disabled: rgba(39, 39, 42, 0.6);
+
+  /* Solid (primary button = MuiButton containedPrimary) */
+  --bui-bg-solid: #f59e0b;
+  --bui-bg-solid-hover: #fbbf24;
+  --bui-bg-solid-pressed: #b45309;
+  --bui-bg-solid-disabled: rgba(245, 158, 11, 0.3);
+  --bui-fg-solid: #000000;
+
+  /* Status (MuiChip / status in heliosThemes) */
+  --bui-bg-danger: rgba(244, 63, 94, 0.1);
+  --bui-bg-warning: rgba(245, 158, 11, 0.1);
+  --bui-bg-success: rgba(16, 185, 129, 0.1);
+  --bui-bg-info: rgba(6, 182, 212, 0.1);
+
+  /* Foreground (MUI text.primary, text.secondary) */
+  --bui-fg-primary: var(--helios-text-main);
+  --bui-fg-secondary: var(--helios-text-muted);
+  --bui-fg-disabled: #52525b;
+  --bui-fg-danger: #fb7185;
+  --bui-fg-warning: #fbbf24;
+  --bui-fg-success: #34d399;
+  --bui-fg-info: #22d3ee;
+  --bui-fg-danger-on-bg: #f43f5e;
+  --bui-fg-warning-on-bg: #f59e0b;
+  --bui-fg-success-on-bg: #10b981;
+  --bui-fg-info-on-bg: #06b6d4;
+
+  /* Borders (MUI borderSubtle, table borders) */
+  --bui-border: var(--helios-border);
+  --bui-border-1: rgba(255, 255, 255, 0.08);
+  --bui-border-2: rgba(255, 255, 255, 0.12);
+  --bui-border-danger: rgba(244, 63, 94, 0.3);
+  --bui-border-warning: rgba(245, 158, 11, 0.3);
+  --bui-border-success: rgba(16, 185, 129, 0.3);
+  --bui-border-info: rgba(6, 182, 212, 0.3);
+
+  /* Focus ring (MuiButton focusVisible, MuiOutlinedInput focused) */
+  --bui-ring: rgba(245, 158, 11, 0.5);
+  /* Scrollbar (MuiCssBaseline scrollbarColor) */
+  --bui-scrollbar: #000000;
+  --bui-scrollbar-thumb: #333333;
+
+  /* Typography (heliosThemes FONTS) */
+  --bui-font-regular: var(--font-sans);
+  --bui-font-mono: var(--font-mono);
+  --bui-font-monospace: var(--font-mono);
+  --bui-font-weight-regular: 400;
+  --bui-font-weight-bold: 700;
+
+  /* Radius (MUI borderRadius 2px buttons, 4px cards/paper) */
+  --bui-radius-1: 2px;
+  --bui-radius-2: 4px;
+  --bui-radius-3: 4px;
+  --bui-radius-4: 6px;
+  --bui-radius-5: 8px;
+  --bui-radius-6: 12px;
+  --bui-radius-full: 9999px;
+}
+
+[data-theme-mode='light'] {
+  /* Theme-Aware Context Variables */
+  --theme-glass: var(--helios-light-glass);
+  --theme-border: var(--helios-light-border);
+  --theme-primary-glow: rgba(245, 158, 11, 0.3); /* Slightly softer glow for light mode */
+  --theme-text-glow: rgba(245, 158, 11, 0.5); /* Stronger text glow for visibility on light bg */
+    --sidebar-background: var(--helios-solar-glass);
+
+  /* === BUI overrides (match heliosThemes.ts MUI) === */
+  /* Base */
+  --bui-black: #000000;
+  --bui-white: #ffffff;
+
+  /* Neutral backgrounds (MUI: background.default, paper, glass) */
+  --bui-bg-app: var(--helios-light-app);
+  --bui-bg-surface-0: var(--helios-light-app);
+  --bui-bg-neutral-1: var(--helios-light-glass);
+  --bui-bg-neutral-1-hover: rgba(0, 0, 0, 0.04);
+  --bui-bg-neutral-1-pressed: rgba(0, 0, 0, 0.06);
+  --bui-bg-neutral-1-disabled: rgba(0, 0, 0, 0.02);
+  --bui-bg-surface-1: var(--helios-light-glass);
+  --bui-bg-neutral-2: var(--helios-light-panel);
+  --bui-bg-neutral-2-hover: rgba(0, 0, 0, 0.02);
+  --bui-bg-neutral-2-pressed: rgba(0, 0, 0, 0.04);
+  --bui-bg-neutral-2-disabled: rgba(0, 0, 0, 0.01);
+  --bui-bg-surface-2: var(--helios-light-panel);
+  --bui-bg-neutral-3: rgba(255, 255, 255, 0.95);
+  --bui-bg-neutral-3-hover: rgba(244, 244, 245, 0.98);
+  --bui-bg-neutral-3-pressed: rgba(228, 228, 231, 0.98);
+  --bui-bg-neutral-3-disabled: rgba(255, 255, 255, 0.8);
+  --bui-bg-neutral-4: rgba(244, 244, 245, 0.98);
+  --bui-bg-neutral-4-hover: rgba(228, 228, 231, 0.98);
+  --bui-bg-neutral-4-pressed: rgba(212, 212, 216, 0.98);
+  --bui-bg-neutral-4-disabled: rgba(244, 244, 245, 0.8);
+
+  /* Solid (primary button = MuiButton containedPrimary) */
+  --bui-bg-solid: #f59e0b;
+  --bui-bg-solid-hover: #fbbf24;
+  --bui-bg-solid-pressed: #d97706;
+  --bui-bg-solid-disabled: rgba(245, 158, 11, 0.4);
+  --bui-fg-solid: #09090b;
+
+  /* Status (MuiChip filledSuccess / filledWarning / filledError) */
+  --bui-bg-danger: #fff1f2;
+  --bui-bg-warning: #fffbeb;
+  --bui-bg-success: #ecfdf5;
+  --bui-bg-info: #ecfeff;
+
+  /* Foreground (MUI text.primary, text.secondary) */
+  --bui-fg-primary: var(--helios-light-text-main);
+  --bui-fg-secondary: var(--helios-light-text-muted);
+  --bui-fg-disabled: #a1a1aa;
+  --bui-fg-danger: #be123c;
+  --bui-fg-warning: #b45309;
+  --bui-fg-success: #047857;
+  --bui-fg-info: #0e7490;
+  --bui-fg-danger-on-bg: #e11d48;
+  --bui-fg-warning-on-bg: #d97706;
+  --bui-fg-success-on-bg: #059669;
+  --bui-fg-info-on-bg: #0891b2;
+
+  /* Borders (MUI borderSubtle, MuiCard border) */
+  --bui-border: var(--helios-light-border);
+  --bui-border-1: rgba(0, 0, 0, 0.08);
+  --bui-border-2: #e4e4e7;
+  --bui-border-danger: #fda4af;
+  --bui-border-warning: #fcd34d;
+  --bui-border-success: #6ee7b7;
+  --bui-border-info: #67e8f9;
+
+  /* Focus ring (MuiButton / MuiOutlinedInput focus) */
+  --bui-ring: rgba(245, 158, 11, 0.4);
+  /* Scrollbar (MuiCssBaseline scrollbarColor) */
+  --bui-scrollbar: #f4f4f5;
+  --bui-scrollbar-thumb: #d4d4d8;
+
+  /* Typography (heliosThemes FONTS) */
+  --bui-font-regular: var(--font-sans);
+  --bui-font-mono: var(--font-mono);
+  --bui-font-monospace: var(--font-mono);
+  --bui-font-weight-regular: 400;
+  --bui-font-weight-bold: 700;
+
+  /* Radius (MUI borderRadius 2px buttons, 4px cards/paper) */
+  --bui-radius-1: 2px;
+  --bui-radius-2: 4px;
+  --bui-radius-3: 4px;
+  --bui-radius-4: 6px;
+  --bui-radius-5: 8px;
+  --bui-radius-6: 12px;
+  --bui-radius-full: 9999px;
+}
+
+/* --- OVERRIDES (Now Theme-Aware) --- */
+
+/* Specific Sidebar Overrides */
+div[class*="Sidebar-drawer"] {
+    background-color: var(--theme-glass) !important;
+    backdrop-filter: blur(var(--glass-blur));
+    border-right: 1px solid var(--theme-border);
+}
+
+a[class*="BackstageSidebarItem"] {
+    color: var(--bui-fg-primary);
+    font-family: var(--font-sans), serif !important;
+}
+
+a[class*="BackstageSidebarItem-highlightable"]:hover {
+    background-color: var(--helios-solar-glass);
+    color: var(--helios-solar) !important;
+}
+
+a[class*="BackstageSidebarItem-selected"] {
+    color: var(--helios-solar) !important;
+}
+
+/* Glassmorphism Utility Class */
+.helios-glass {
+    background-color: var(--theme-glass);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--theme-border);
+}
+
+/* Apply the slant to standard MUI buttons automatically */
+button.MuiButton-containedPrimary {
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  background-color: var(--helios-solar);
+  color: #09090b; /* Zinc 950 works well on Amber for both modes */
+  font-family: var(--font-mono);
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+button.MuiButton-containedPrimary:hover {
+  background-color: var(--helios-solar-hover);
+  box-shadow: 0 0 20px var(--theme-primary-glow);
+}
+
+div[class*="BackstageWarningPanel-panel"] {
+    /*background-color: var(--rose);*/
+    color: var(--rose) !important;
+}
+
+div[class*="BackstageWarningPanel-summary"] {
+    /*background-color: var(--rose);*/
+    color: var(--rose);
+    fill: var(--rose);
+}
+
+article[class*="BackstageContent-root"] {
+    /*background-color: var(--rose);*/
+    padding-left: 48px;
+    padding-right: 48px;
+}
