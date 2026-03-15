@@ -1,0 +1,190 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: nestjs-prisma-template
+  title: NestJS + Prisma Template (Database-backed)
+  description: >-
+    Scaffolds a NestJS service with Prisma ORM and a PostgreSQL database.
+    The Helios Operator automatically provisions the database and injects
+    credentials (DB_HOST, DB_USER, DB_PASS) into the backend pod.
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Component Information
+      required:
+        - name
+        - owner
+        - port
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Unique name of the component
+          ui:autofocus: true
+        owner:
+          title: Owner
+          type: string
+          description: Owner of the component
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [Group, User]
+        port:
+          title: Port
+          type: number
+          description: The port the NestJS app listens on
+          default: 3000
+        dockerOrg:
+          title: Docker Registry Org/User
+          type: string
+          description: Your Docker Hub username or Organization
+        repoName:
+          title: Docker Repository Name
+          type: string
+          description: The name of the Docker repository (e.g. my-service)
+
+    - title: Database Configuration
+      properties:
+        databaseConfig:
+          title: Database Settings
+          type: object
+          ui:field: DatabasePicker
+
+    - title: Repository & Webhook
+      required:
+        - repoUrl
+        - webhookUrl
+        - webhookSecret
+      properties:
+        repoUrl:
+          title: Source Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+        webhookUrl:
+          title: Webhook URL
+          type: string
+          description: The URL to send the webhook payload to
+        webhookSecret:
+          title: Webhook Secret
+          type: string
+          description: The secret to use for the webhook
+          ui:field: Secret
+
+  steps:
+    # 1. Source Code
+    - id: fetch-source
+      name: Fetch Source Code
+      action: fetch:template
+      input:
+        url: ./content/source
+        targetPath: ./source
+        values:
+          name: ${{ parameters.name }}
+          owner: ${{ parameters.owner }}
+          port: ${{ parameters.port }}
+          description: "NestJS service: ${{ parameters.name }}"
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+
+    - id: publish-source
+      name: Publish Source Code
+      action: publish:github
+      input:
+        description: Source Code for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}
+        sourcePath: ./source
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repoVisibility: public
+        protectDefaultBranch: false
+
+    - id: create-webhook
+      name: Create Webhook
+      action: github:webhook
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        webhookUrl: ${{ parameters.webhookUrl }}
+        webhookSecret: ${{ parameters.webhookSecret }}
+        events:
+          - push
+        active: true
+        contentType: json
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    # 2. GitOps
+    - id: fetch-gitops
+      name: Fetch GitOps Manifests
+      action: fetch:template
+      input:
+        url: ./content/gitops
+        targetPath: ./gitops
+        values:
+          name: ${{ parameters.name }}
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          dockerOrg: ${{ parameters.dockerOrg }}
+          repoName: ${{ parameters.repoName }}
+          port: ${{ parameters.port }}
+          owner: ${{ parameters.owner }}
+          sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
+          gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
+          webhookUrl: ${{ parameters.webhookUrl }}
+          testCommand: "npm ci && npm test"
+
+    - id: publish-gitops
+      name: Publish GitOps Manifests
+      action: publish:github
+      input:
+        description: GitOps Manifests for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}-gitops
+        sourcePath: ./gitops
+        token: ${{ secrets.GITHUB_TOKEN }}
+        repoVisibility: public
+        protectDefaultBranch: false
+
+    # 3. Secret + Deploy
+    - id: create-secret
+      name: Create GitHub Credentials Secret
+      action: kubernetes:create-github-secret
+      input:
+        name: ${{ parameters.name }}
+        namespace: default
+        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+        webhookSecret: ${{ parameters.webhookSecret }}
+
+    - id: apply-helios
+      name: Deploy to Kubernetes
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/helios-app.yaml
+        namespaced: true
+
+    # 4. Registration
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+    - id: notify
+      name: Notify User
+      action: notification:send
+      input:
+        recipients: entity
+        entityRefs:
+          - user:default/guest
+        title: 'NestJS + Prisma Template Executed'
+        info: 'Your NestJS + Prisma service has been scaffolded with a PostgreSQL database!'
+
+  output:
+    links:
+      - title: Source Repository
+        url: ${{ steps['publish-source'].output.remoteUrl }}
+      - title: GitOps Repository
+        url: ${{ steps['publish-gitops'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}

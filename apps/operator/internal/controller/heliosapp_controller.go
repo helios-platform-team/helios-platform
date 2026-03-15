@@ -127,6 +127,18 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
+	// ------------------------------------------------------------------
+	// PHASE 0.9: Inject Database Credentials into Backend Deployment
+	// Patches the live Deployment (deployed by ArgoCD) to add DB_HOST,
+	// DB_USER, DB_PASS env vars referencing the operator-managed Secret.
+	// Runs AFTER secrets and instances so the Secret already exists.
+	// ------------------------------------------------------------------
+	if err := r.reconcileDatabaseSecretInjection(ctx, &heliosApp); err != nil {
+		log.Error(err, "Failed to inject database secrets into Deployment")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database secret injection failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
 	// VALIDATION: Ensure image is present (Fix "First Commit Missing Image")
 	// This validation is for application workloads (GitOps pipeline downstream).
 	// We run this AFTER DB provisioning so databases can come up while app is building.

@@ -451,6 +451,105 @@ func (r *HeliosAppReconciler) reconcileDatabaseInstance(ctx context.Context, app
 	return nil
 }
 
+// databaseEnvVarNames lists the env var names injected by the operator
+// for database credential secret injection.
+var databaseEnvVarNames = []string{"DB_HOST", "DB_USER", "DB_PASS"}
+
+// InjectDatabaseEnvVars patches a Deployment's first container to include
+// DB_HOST, DB_USER, DB_PASS env vars referencing the given K8s Secret.
+// The function is idempotent — if the env vars already exist with the correct
+// secretKeyRef, no changes are made and it returns false.
+func InjectDatabaseEnvVars(deploy *appsv1.Deployment, secretName string) bool {
+	if len(deploy.Spec.Template.Spec.Containers) == 0 {
+		return false
+	}
+
+	container := &deploy.Spec.Template.Spec.Containers[0]
+
+	// Build a set of existing env var names for fast lookup.
+	existingEnvs := make(map[string]bool, len(container.Env))
+	for _, ev := range container.Env {
+		existingEnvs[ev.Name] = true
+	}
+
+	changed := false
+	for _, envName := range databaseEnvVarNames {
+		if existingEnvs[envName] {
+			continue
+		}
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name: envName,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: envName,
+				},
+			},
+		})
+		changed = true
+	}
+
+	return changed
+}
+
+// reconcileDatabaseSecretInjection patches live Deployments (deployed by ArgoCD)
+// to inject DB_HOST, DB_USER, DB_PASS env vars from the operator-managed Secret.
+// This runs AFTER database secrets and instances are provisioned so that the
+// Secret already exists when the Deployment references it.
+func (r *HeliosAppReconciler) reconcileDatabaseSecretInjection(ctx context.Context, app *appv1alpha1.HeliosApp) error {
+	log := logf.FromContext(ctx)
+
+	dbTraits := ExtractDatabaseTraits(app)
+	if len(dbTraits) == 0 {
+		log.V(1).Info("No database traits found, skipping secret injection")
+		return nil
+	}
+
+	for _, dbTrait := range dbTraits {
+		secretName := GetDatabaseSecretName(dbTrait.ComponentName)
+		deployName := dbTrait.ComponentName
+
+		// Fetch the live Deployment (created by ArgoCD via GitOps).
+		deploy := &appsv1.Deployment{}
+		err := r.Get(ctx, types.NamespacedName{
+			Name:      deployName,
+			Namespace: app.Namespace,
+		}, deploy)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				// Deployment may not exist yet (ArgoCD hasn't synced).
+				// This is expected — we'll inject on the next reconcile.
+				log.Info("Deployment not found yet, will inject on next reconcile",
+					"component", dbTrait.ComponentName,
+					"deployment", deployName)
+				continue
+			}
+			return fmt.Errorf("failed to get Deployment %s: %w", deployName, err)
+		}
+
+		// Inject env vars if not already present.
+		if !InjectDatabaseEnvVars(deploy, secretName) {
+			log.V(1).Info("Database env vars already injected, skipping",
+				"component", dbTrait.ComponentName,
+				"deployment", deployName)
+			continue
+		}
+
+		if err := r.Update(ctx, deploy); err != nil {
+			return fmt.Errorf("failed to update Deployment %s with database env vars: %w", deployName, err)
+		}
+
+		log.Info("Successfully injected database env vars into Deployment",
+			"component", dbTrait.ComponentName,
+			"deployment", deployName,
+			"secret", secretName)
+	}
+
+	return nil
+}
+
 // GenerateDatabaseStatefulSet creates a StatefulSet for a Postgres database instance.
 // The StatefulSet injects POSTGRES_DB from the CRD's database.name value, and
 // uses the Secret from Issue #33 for POSTGRES_USER and POSTGRES_PASSWORD.

@@ -1,0 +1,35 @@
+apiVersion: app.helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.name }}
+  namespace: default
+spec:
+  owner: ${{ values.owner }}
+  description: "NestJS service: ${{ values.name }}"
+  gitRepo: ${{ values.sourceRepo }}
+  gitBranch: main
+  imageRepo: ${{ values.image }}
+  gitopsRepo: ${{ values.gitopsRepo }}
+  gitopsPath: ${{ values.name }}
+  pipelineName: from-code-to-cluster
+  webhookDomain: ${{ values.webhookUrl }}
+  webhookSecret: github-webhook-secret
+  port: ${{ values.port }}
+  testCommand: "npm ci && npm test"
+  components:
+    - name: ${{ values.name }}
+      type: web-service
+      properties:
+        image: ${{ values.image }}:latest
+        port: ${{ values.port }}
+        replicas: 1
+      traits:
+        - type: service
+          properties:
+            port: ${{ values.port }}
+        - type: database
+          properties:
+            dbType: postgres
+            dbName: ${{ values.name | replace('-', '_') }}_db
+            version: "16"
+            storage: "1Gi"
