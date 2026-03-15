@@ -124,21 +124,55 @@ const heliosPaletteLight = {
 };
 
 const heliosTypography = {
+  htmlFontSize: 16,
   fontFamily: FONTS.sans, // Base font for body
 
   // Display XL
-  h1: { fontFamily: FONTS.sans, fontWeight: 700, letterSpacing: '-0.02em' },
+  h1: {
+    fontFamily: FONTS.sans,
+    fontSize: 34,
+    fontWeight: 700,
+    marginBottom: 16,
+    letterSpacing: '-0.02em',
+  },
 
   // Heading L
-  h2: { fontFamily: FONTS.mono, fontWeight: 700, letterSpacing: '-0.03em' },
+  h2: {
+    fontFamily: FONTS.mono,
+    fontSize: 28,
+    fontWeight: 700,
+    marginBottom: 12,
+    letterSpacing: '-0.03em',
+  },
 
-  // Heading M (Can be Sans or Mono, defaulting to Sans here for readability)
-  h3: { fontFamily: FONTS.sans, fontWeight: 700, letterSpacing: '-0.01em' },
+  // Heading M
+  h3: {
+    fontFamily: FONTS.sans,
+    fontSize: 22,
+    fontWeight: 700,
+    marginBottom: 10,
+    letterSpacing: '-0.01em',
+  },
 
-  // Lower level headings (extrapolated as Sans for standard UI text)
-  h4: { fontFamily: FONTS.sans, fontWeight: 700 },
-  h5: { fontFamily: FONTS.sans, fontWeight: 700 },
-  h6: { fontFamily: FONTS.sans, fontWeight: 700 },
+  // Lower level headings
+  h4: {
+    fontFamily: FONTS.sans,
+    fontSize: 18,
+    fontWeight: 700,
+    marginBottom: 8,
+  },
+  h5: {
+    fontFamily: FONTS.sans,
+    fontSize: 16,
+    fontWeight: 700,
+    marginBottom: 6,
+  },
+  h6: {
+    fontFamily: FONTS.sans,
+    fontSize: 14,
+    fontWeight: 700,
+    marginBottom: 4,
+  },
 
   // System / Technical elements
   button: { fontFamily: FONTS.mono, fontWeight: 700 },
@@ -382,25 +416,22 @@ export const darkTheme = createUnifiedTheme({
         },
       },
     },
-    // CHIPS/BADGES (Status Glows)
+    // CHIPS/BADGES (Status Glows) — use MUI Chip class keys (colorSuccess, colorWarning, colorError)
     MuiChip: {
       styleOverrides: {
-        // "Healthy" status mapping (usually "success" or "primary" in standard MUI)
-        filledSuccess: {
+        colorSuccess: {
           backgroundColor: 'rgba(16, 185, 129, 0.1)', // bg-emerald-500/10
           color: '#34d399', // text-emerald-400
           border: '1px solid rgba(16, 185, 129, 0.3)',
           boxShadow: '0 0 10px rgba(16,185,129,0.2)',
         },
-        // "Warning" status mapping
-        filledWarning: {
+        colorWarning: {
           backgroundColor: 'rgba(245, 158, 11, 0.1)', // bg-amber-500/10
           color: '#fbbf24', // text-amber-400
           border: '1px solid rgba(245, 158, 11, 0.3)',
           boxShadow: '0 0 10px rgba(245,158,11,0.2)',
         },
-        // "Error" status mapping
-        filledError: {
+        colorError: {
           backgroundColor: 'rgba(244, 63, 94, 0.1)', // bg-rose-500/10
           color: '#fb7185', // text-rose-400
           border: '1px solid rgba(244, 63, 94, 0.3)',
@@ -727,22 +758,22 @@ export const lightTheme = createUnifiedTheme({
         },
       },
     },
-    // CHIPS/BADGES (Status Glows updated for light bg)
+    // CHIPS/BADGES (Status Glows updated for light bg) — use MUI Chip class keys
     MuiChip: {
       styleOverrides: {
-        filledSuccess: {
+        colorSuccess: {
           backgroundColor: '#ecfdf5', // emerald-50
           color: '#047857', // emerald-700
           border: '1px solid #6ee7b7', // emerald-300
           boxShadow: 'none', // Removed heavy glow for cleaner look on light, relying on border
         },
-        filledWarning: {
+        colorWarning: {
           backgroundColor: '#fffbeb', // amber-50
           color: '#b45309', // amber-700
           border: '1px solid #fcd34d', // amber-300
           boxShadow: 'none',
         },
-        filledError: {
+        colorError: {
           backgroundColor: '#fff1f2', // rose-50
           color: '#be123c', // rose-700
           border: '1px solid #fda4af', // rose-300

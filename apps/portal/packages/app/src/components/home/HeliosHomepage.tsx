@@ -15,7 +15,6 @@ import {
   GitBranch,
   LayoutGrid,
   Plus,
-  Search,
   Server,
   Terminal,
   Zap,
@@ -340,9 +339,6 @@ const QUICK_ACTIONS = [
 ];
 
 export const HeliosHomepage = () => {
-  const { up } = useBreakpoint();
-  const showSearchHint = up('md');
-
   return (
     <Box
       style={{
