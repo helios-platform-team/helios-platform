@@ -38,10 +38,10 @@ const LogoFull = () => {
       >
         <Sun
           size={28}
-          stroke={ 'currentColor' }
+          stroke={'currentColor'}
           style={{
             color: 'var(--mui-palette-primary-main)',
-            fill: alpha('#EDB506', 0.2)
+            fill: alpha('#EDB506', 0.2),
           }}
         />
 
@@ -55,7 +55,10 @@ const LogoFull = () => {
             color: 'text.primary',
           }}
         >
-          HELIOS<Box component="span" sx={{ color: 'primary.main' }}>.IDP</Box>
+          HELIOS
+          <Box component="span" sx={{ color: 'primary.main' }}>
+            .IDP
+          </Box>
         </Box>
       </Box>
     </Wrapper>

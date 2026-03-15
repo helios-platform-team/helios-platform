@@ -144,10 +144,20 @@ const heliosTypography = {
   button: { fontFamily: FONTS.mono, fontWeight: 700 },
 
   // Label S
-  caption: { fontFamily: FONTS.mono, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' },
+  caption: {
+    fontFamily: FONTS.mono,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
 
   // Micro
-  overline: { fontFamily: FONTS.mono, fontWeight: 400, textTransform: 'uppercase', letterSpacing: '0.05em' },
+  overline: {
+    fontFamily: FONTS.mono,
+    fontWeight: 400,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
 };
 
 export const darkTheme = createUnifiedTheme({
@@ -806,7 +816,7 @@ export const lightTheme = createUnifiedTheme({
           color: COLORS_LIGHT.textSecondary,
           fontSize: '14px',
           fontFamily: FONTS.sans,
-        }
+        },
       },
     },
     BackstageHeaderTabs: {

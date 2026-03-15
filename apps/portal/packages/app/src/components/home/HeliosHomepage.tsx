@@ -43,7 +43,10 @@ const StatusBadge: React.FC<{ status: StatusType; label?: string }> = ({
       width: 'fit-content',
     }}
   >
-    <Box className="helios-hp-status-dot" style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0 }} />
+    <Box
+      className="helios-hp-status-dot"
+      style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0 }}
+    />
     {label || status}
   </Flex>
 );
@@ -69,10 +72,54 @@ const MetricCard: React.FC<{
     }}
   >
     {/* Corner markers (solar accent) */}
-    <Box position="absolute" style={{ top: 0, left: 0, width: 8, height: 8, borderLeft: '1px solid var(--helios-solar-subtle)', borderTop: '1px solid var(--helios-solar-subtle)', opacity: 0.5 }} />
-    <Box position="absolute" style={{ top: 0, right: 0, width: 8, height: 8, borderRight: '1px solid var(--helios-solar-subtle)', borderTop: '1px solid var(--helios-solar-subtle)', opacity: 0.5 }} />
-    <Box position="absolute" style={{ bottom: 0, left: 0, width: 8, height: 8, borderLeft: '1px solid var(--helios-solar-subtle)', borderBottom: '1px solid var(--helios-solar-subtle)', opacity: 0.5 }} />
-    <Box position="absolute" style={{ bottom: 0, right: 0, width: 8, height: 8, borderRight: '1px solid var(--helios-solar-subtle)', borderBottom: '1px solid var(--helios-solar-subtle)', opacity: 0.5 }} />
+    <Box
+      position="absolute"
+      style={{
+        top: 0,
+        left: 0,
+        width: 8,
+        height: 8,
+        borderLeft: '1px solid var(--helios-solar-subtle)',
+        borderTop: '1px solid var(--helios-solar-subtle)',
+        opacity: 0.5,
+      }}
+    />
+    <Box
+      position="absolute"
+      style={{
+        top: 0,
+        right: 0,
+        width: 8,
+        height: 8,
+        borderRight: '1px solid var(--helios-solar-subtle)',
+        borderTop: '1px solid var(--helios-solar-subtle)',
+        opacity: 0.5,
+      }}
+    />
+    <Box
+      position="absolute"
+      style={{
+        bottom: 0,
+        left: 0,
+        width: 8,
+        height: 8,
+        borderLeft: '1px solid var(--helios-solar-subtle)',
+        borderBottom: '1px solid var(--helios-solar-subtle)',
+        opacity: 0.5,
+      }}
+    />
+    <Box
+      position="absolute"
+      style={{
+        bottom: 0,
+        right: 0,
+        width: 8,
+        height: 8,
+        borderRight: '1px solid var(--helios-solar-subtle)',
+        borderBottom: '1px solid var(--helios-solar-subtle)',
+        opacity: 0.5,
+      }}
+    />
     <Flex justify="between" align="start" mb="1">
       <Text
         variant="body-x-small"
@@ -89,7 +136,12 @@ const MetricCard: React.FC<{
       {trend && (
         <Activity
           size={14}
-          style={{ color: trend === 'up' ? 'var(--bui-fg-success-on-bg)' : 'var(--bui-fg-danger-on-bg)' }}
+          style={{
+            color:
+              trend === 'up'
+                ? 'var(--bui-fg-success-on-bg)'
+                : 'var(--bui-fg-danger-on-bg)',
+          }}
         />
       )}
     </Flex>
@@ -337,11 +389,7 @@ export const HeliosHomepage = () => {
       </Flex>
 
       {/* Metrics Grid */}
-      <Grid.Root
-        columns={{ initial: '1', sm: '2', lg: '4' }}
-        gap="4"
-        mb="12"
-      >
+      <Grid.Root columns={{ initial: '1', sm: '2', lg: '4' }} gap="4" mb="12">
         <Grid.Item>
           <MetricCard
             title="Total Requests"
@@ -401,7 +449,8 @@ export const HeliosHomepage = () => {
                     borderRadius: 'var(--bui-radius-2)',
                     border: '1px solid var(--bui-border-1)',
                     backgroundColor: 'var(--bui-bg-neutral-1)',
-                    transition: 'border-color 0.3s ease, background-color 0.3s ease',
+                    transition:
+                      'border-color 0.3s ease, background-color 0.3s ease',
                     cursor: 'pointer',
                   }}
                 >
@@ -464,7 +513,10 @@ export const HeliosHomepage = () => {
 
       {/* Service Monitor */}
       <Box className="animate-enter delay-300">
-        <Card className="helios-glass" style={{ borderRadius: 'var(--bui-radius-2)', overflow: 'hidden' }}>
+        <Card
+          className="helios-glass"
+          style={{ borderRadius: 'var(--bui-radius-2)', overflow: 'hidden' }}
+        >
           <Box
             p="4"
             style={{
@@ -474,7 +526,10 @@ export const HeliosHomepage = () => {
           >
             <Flex justify="between" align="center">
               <Flex align="center" gap="2">
-                <Terminal size={16} style={{ color: 'var(--bui-fg-secondary)' }} />
+                <Terminal
+                  size={16}
+                  style={{ color: 'var(--bui-fg-secondary)' }}
+                />
                 <Text
                   variant="body-medium"
                   weight="bold"

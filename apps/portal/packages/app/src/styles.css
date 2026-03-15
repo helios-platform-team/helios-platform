@@ -22,18 +22,23 @@
   --helios-solar: #f59e0b;
   --helios-solar-hover: #fbbf24;
   --helios-solar-glass: rgba(245, 158, 11, 0.2);
-  --helios-solar-subtle: rgba(245, 158, 11, 0.5); /* Accent border/corner (theme-aware in dark/light) */
+  --helios-solar-subtle: rgba(
+    245,
+    158,
+    11,
+    0.5
+  ); /* Accent border/corner (theme-aware in dark/light) */
 
-/* STATUS Semantic (Shifted to 600-level for legibility on white) */
---emerald: #059669;
---rose: #e11d48;
-    --rose-bg: rgba(255, 29, 72, 0.3);
---amber: #d97706;
---cyan: #0891b2;
+  /* STATUS Semantic (Shifted to 600-level for legibility on white) */
+  --emerald: #059669;
+  --rose: #e11d48;
+  --rose-bg: rgba(255, 29, 72, 0.3);
+  --amber: #d97706;
+  --cyan: #0891b2;
 
   /* UTILS */
   --glass-blur: 12px;
-  
+
   /* Font Families */
   --font-sans: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -67,22 +72,41 @@
 
 /* --- ANIMATIONS --- */
 @keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
 }
 
 @keyframes glow-pulse {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.1); }
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
 }
 
 @keyframes fade-slide-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes shine {
-  100% { left: 125%; }
+  100% {
+    left: 125%;
+  }
 }
 
 /* --- UTILITY CLASSES --- */
@@ -91,10 +115,18 @@
   opacity: 0;
 }
 
-.delay-100 { animation-delay: 100ms; }
-.delay-200 { animation-delay: 200ms; }
-.delay-300 { animation-delay: 300ms; }
-.delay-400 { animation-delay: 400ms; }
+.delay-100 {
+  animation-delay: 100ms;
+}
+.delay-200 {
+  animation-delay: 200ms;
+}
+.delay-300 {
+  animation-delay: 300ms;
+}
+.delay-400 {
+  animation-delay: 400ms;
+}
 
 /* Homepage: metric card hover */
 .helios-metric-card:hover {
@@ -126,16 +158,46 @@
   border-style: solid;
   font-family: var(--font-mono);
 }
-.helios-hp-status-healthy { color: var(--bui-fg-success-on-bg); border-color: var(--bui-border-success); background-color: var(--bui-bg-success); }
-.helios-hp-status-healthy .helios-hp-status-dot { background-color: var(--bui-fg-success-on-bg); }
-.helios-hp-status-warning { color: var(--bui-fg-warning-on-bg); border-color: var(--bui-border-warning); background-color: var(--bui-bg-warning); }
-.helios-hp-status-warning .helios-hp-status-dot { background-color: var(--bui-fg-warning-on-bg); }
-.helios-hp-status-critical { color: var(--bui-fg-danger-on-bg); border-color: var(--bui-border-danger); background-color: var(--bui-bg-danger); }
-.helios-hp-status-critical .helios-hp-status-dot { background-color: var(--bui-fg-danger-on-bg); }
-.helios-hp-status-pending { color: var(--bui-fg-info-on-bg); border-color: var(--bui-border-info); background-color: var(--bui-bg-info); }
-.helios-hp-status-pending .helios-hp-status-dot { background-color: var(--bui-fg-info-on-bg); }
-.helios-hp-status-neutral { color: var(--bui-fg-secondary); border-color: var(--bui-border-2); background-color: var(--bui-bg-neutral-2); }
-.helios-hp-status-neutral .helios-hp-status-dot { background-color: var(--bui-fg-secondary); }
+.helios-hp-status-healthy {
+  color: var(--bui-fg-success-on-bg);
+  border-color: var(--bui-border-success);
+  background-color: var(--bui-bg-success);
+}
+.helios-hp-status-healthy .helios-hp-status-dot {
+  background-color: var(--bui-fg-success-on-bg);
+}
+.helios-hp-status-warning {
+  color: var(--bui-fg-warning-on-bg);
+  border-color: var(--bui-border-warning);
+  background-color: var(--bui-bg-warning);
+}
+.helios-hp-status-warning .helios-hp-status-dot {
+  background-color: var(--bui-fg-warning-on-bg);
+}
+.helios-hp-status-critical {
+  color: var(--bui-fg-danger-on-bg);
+  border-color: var(--bui-border-danger);
+  background-color: var(--bui-bg-danger);
+}
+.helios-hp-status-critical .helios-hp-status-dot {
+  background-color: var(--bui-fg-danger-on-bg);
+}
+.helios-hp-status-pending {
+  color: var(--bui-fg-info-on-bg);
+  border-color: var(--bui-border-info);
+  background-color: var(--bui-bg-info);
+}
+.helios-hp-status-pending .helios-hp-status-dot {
+  background-color: var(--bui-fg-info-on-bg);
+}
+.helios-hp-status-neutral {
+  color: var(--bui-fg-secondary);
+  border-color: var(--bui-border-2);
+  background-color: var(--bui-bg-neutral-2);
+}
+.helios-hp-status-neutral .helios-hp-status-dot {
+  background-color: var(--bui-fg-secondary);
+}
 
 /* List/table row hover (reusable) */
 .helios-hp-service-row:hover {
@@ -244,7 +306,14 @@
 
 /* The "Slant" clip-path for buttons */
 .clip-path-slant {
-  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  clip-path: polygon(
+    12px 0,
+    100% 0,
+    100% calc(100% - 12px),
+    calc(100% - 12px) 100%,
+    0 100%,
+    0 12px
+  );
 }
 
 /* --- THEME DEFINITIONS --- */
@@ -346,9 +415,19 @@
   /* Theme-Aware Context Variables */
   --theme-glass: var(--helios-light-glass);
   --theme-border: var(--helios-light-border);
-  --theme-primary-glow: rgba(245, 158, 11, 0.3); /* Slightly softer glow for light mode */
-  --theme-text-glow: rgba(245, 158, 11, 0.5); /* Stronger text glow for visibility on light bg */
-    --sidebar-background: var(--helios-solar-glass);
+  --theme-primary-glow: rgba(
+    245,
+    158,
+    11,
+    0.3
+  ); /* Slightly softer glow for light mode */
+  --theme-text-glow: rgba(
+    245,
+    158,
+    11,
+    0.5
+  ); /* Stronger text glow for visibility on light bg */
+  --sidebar-background: var(--helios-solar-glass);
 
   /* === BUI overrides (match heliosThemes.ts MUI) === */
   /* Base */
@@ -438,36 +517,43 @@
 /* --- OVERRIDES (Now Theme-Aware) --- */
 
 /* Specific Sidebar Overrides */
-div[class*="Sidebar-drawer"] {
-    background-color: var(--theme-glass) !important;
-    backdrop-filter: blur(var(--glass-blur));
-    border-right: 1px solid var(--theme-border);
+div[class*='Sidebar-drawer'] {
+  background-color: var(--theme-glass) !important;
+  backdrop-filter: blur(var(--glass-blur));
+  border-right: 1px solid var(--theme-border);
 }
 
-a[class*="BackstageSidebarItem"] {
-    color: var(--bui-fg-primary);
-    font-family: var(--font-sans), serif !important;
+a[class*='BackstageSidebarItem'] {
+  color: var(--bui-fg-primary);
+  font-family: var(--font-sans), serif !important;
 }
 
-a[class*="BackstageSidebarItem-highlightable"]:hover {
-    background-color: var(--helios-solar-glass);
-    color: var(--helios-solar) !important;
+a[class*='BackstageSidebarItem-highlightable']:hover {
+  background-color: var(--helios-solar-glass);
+  color: var(--helios-solar) !important;
 }
 
-a[class*="BackstageSidebarItem-selected"] {
-    color: var(--helios-solar) !important;
+a[class*='BackstageSidebarItem-selected'] {
+  color: var(--helios-solar) !important;
 }
 
 /* Glassmorphism Utility Class */
 .helios-glass {
-    background-color: var(--theme-glass);
-    backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid var(--theme-border);
+  background-color: var(--theme-glass);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--theme-border);
 }
 
 /* Apply the slant to standard MUI buttons automatically */
 button.MuiButton-containedPrimary {
-  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  clip-path: polygon(
+    12px 0,
+    100% 0,
+    100% calc(100% - 12px),
+    calc(100% - 12px) 100%,
+    0 100%,
+    0 12px
+  );
   background-color: var(--helios-solar);
   color: #09090b; /* Zinc 950 works well on Amber for both modes */
   font-family: var(--font-mono);
@@ -480,19 +566,19 @@ button.MuiButton-containedPrimary:hover {
   box-shadow: 0 0 20px var(--theme-primary-glow);
 }
 
-div[class*="BackstageWarningPanel-panel"] {
-    /*background-color: var(--rose);*/
-    color: var(--rose) !important;
+div[class*='BackstageWarningPanel-panel'] {
+  /*background-color: var(--rose);*/
+  color: var(--rose) !important;
 }
 
-div[class*="BackstageWarningPanel-summary"] {
-    /*background-color: var(--rose);*/
-    color: var(--rose);
-    fill: var(--rose);
+div[class*='BackstageWarningPanel-summary'] {
+  /*background-color: var(--rose);*/
+  color: var(--rose);
+  fill: var(--rose);
 }
 
-article[class*="BackstageContent-root"] {
-    /*background-color: var(--rose);*/
-    padding-left: 48px;
-    padding-right: 48px;
+article[class*='BackstageContent-root'] {
+  /*background-color: var(--rose);*/
+  padding-left: 48px;
+  padding-right: 48px;
 }

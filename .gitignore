@@ -2,3 +2,4 @@
 *.sqlite
 apps/portal/packages/backend/*.sqlite
 .env
+.idea

@@ -22,7 +22,9 @@ const useStyles = makeStyles(theme => {
       width: '50%',
       height: '50%',
       borderRadius: '50%',
-      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.2)', // Solar glow
+      backgroundColor: isDark
+        ? 'rgba(245, 158, 11, 0.1)'
+        : 'rgba(245, 158, 11, 0.2)', // Solar glow
       filter: 'blur(120px)',
       transform: 'translate3d(0, 0, 0)',
     },
@@ -33,7 +35,9 @@ const useStyles = makeStyles(theme => {
       width: '40%',
       height: '40%',
       borderRadius: '50%',
-      backgroundColor: isDark ? 'rgba(79, 70, 229, 0.1)' : 'rgba(79, 70, 229, 0.2)',
+      backgroundColor: isDark
+        ? 'rgba(79, 70, 229, 0.1)'
+        : 'rgba(79, 70, 229, 0.2)',
       filter: 'blur(100px)',
       transform: 'translate3d(0, 0, 0)',
     },
