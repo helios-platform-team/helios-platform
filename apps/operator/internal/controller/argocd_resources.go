@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"cmp"
+
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -8,18 +10,9 @@ import (
 // GenerateArgoApplication creates an ArgoCD Application manifest
 func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Unstructured, error) {
 	appName := heliosApp.Name + "-argocd"
-	targetNamespace := heliosApp.Spec.ArgoCDNamespace
-	if targetNamespace == "" {
-		targetNamespace = "argocd"
-	}
-	project := heliosApp.Spec.ArgoCDProject
-	if project == "" {
-		project = "default"
-	}
-	gitOpsBranch := heliosApp.Spec.GitOpsBranch
-	if gitOpsBranch == "" {
-		gitOpsBranch = "main"
-	}
+	targetNamespace := cmp.Or(heliosApp.Spec.ArgoCDNamespace, "argocd")
+	project := cmp.Or(heliosApp.Spec.ArgoCDProject, "default")
+	gitOpsBranch := cmp.Or(heliosApp.Spec.GitOpsBranch, "main")
 
 	app := map[string]any{
 		"apiVersion": "argoproj.io/v1alpha1",
