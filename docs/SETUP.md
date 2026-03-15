@@ -6,7 +6,7 @@ This guide explains how to install necessary development tools for the Helios Pl
 
 Ensure you have the following installed:
 
-- **Go**: v1.24.0+
+- **Go**: v1.26.0+
 - **Docker**: 17.03+
 - **kubectl**: v1.11.3+
 

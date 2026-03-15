@@ -86,7 +86,7 @@ func GenerateSecurePassword(length int) (string, error) {
 	password := make([]byte, length)
 	charsetLen := big.NewInt(int64(len(PasswordCharset)))
 
-	for i := 0; i < length; i++ {
+	for i := range length {
 		idx, err := rand.Int(rand.Reader, charsetLen)
 		if err != nil {
 			return "", fmt.Errorf("failed to generate random index: %w", err)
@@ -459,6 +459,8 @@ var databaseEnvVarNames = []string{"DB_HOST", "DB_USER", "DB_PASS"}
 // DB_HOST, DB_USER, DB_PASS env vars referencing the given K8s Secret.
 // The function is idempotent — if the env vars already exist with the correct
 // secretKeyRef, no changes are made and it returns false.
+// If an env var exists but points to a different source (wrong secret, plain
+// value, etc.), it is updated to the expected secretKeyRef.
 func InjectDatabaseEnvVars(deploy *appsv1.Deployment, secretName string) bool {
 	if len(deploy.Spec.Template.Spec.Containers) == 0 {
 		return false
@@ -466,29 +468,46 @@ func InjectDatabaseEnvVars(deploy *appsv1.Deployment, secretName string) bool {
 
 	container := &deploy.Spec.Template.Spec.Containers[0]
 
-	// Build a set of existing env var names for fast lookup.
-	existingEnvs := make(map[string]bool, len(container.Env))
-	for _, ev := range container.Env {
-		existingEnvs[ev.Name] = true
-	}
-
 	changed := false
 	for _, envName := range databaseEnvVarNames {
-		if existingEnvs[envName] {
-			continue
-		}
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name: envName,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: envName,
+		expectedRef := &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: secretName,
 				},
+				Key: envName,
 			},
-		})
-		changed = true
+		}
+
+		// Look for an existing env var with this name.
+		found := false
+		for i := range container.Env {
+			if container.Env[i].Name != envName {
+				continue
+			}
+			found = true
+			// If it already references the correct Secret/key, leave it as-is.
+			if container.Env[i].ValueFrom != nil &&
+				container.Env[i].ValueFrom.SecretKeyRef != nil &&
+				container.Env[i].ValueFrom.SecretKeyRef.Name == secretName &&
+				container.Env[i].ValueFrom.SecretKeyRef.Key == envName {
+				break
+			}
+			// Otherwise, update it to use the expected secretKeyRef.
+			container.Env[i].Value = ""
+			container.Env[i].ValueFrom = expectedRef
+			changed = true
+			break
+		}
+
+		// If no env var with this name exists, append a new one.
+		if !found {
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:      envName,
+				ValueFrom: expectedRef,
+			})
+			changed = true
+		}
 	}
 
 	return changed
@@ -498,14 +517,20 @@ func InjectDatabaseEnvVars(deploy *appsv1.Deployment, secretName string) bool {
 // to inject DB_HOST, DB_USER, DB_PASS env vars from the operator-managed Secret.
 // This runs AFTER database secrets and instances are provisioned so that the
 // Secret already exists when the Deployment references it.
-func (r *HeliosAppReconciler) reconcileDatabaseSecretInjection(ctx context.Context, app *appv1alpha1.HeliosApp) error {
+//
+// Returns (pendingInjection, error). pendingInjection is true when one or more
+// target Deployments do not exist yet (e.g. ArgoCD hasn't synced), signalling
+// the caller to requeue so injection is retried.
+func (r *HeliosAppReconciler) reconcileDatabaseSecretInjection(ctx context.Context, app *appv1alpha1.HeliosApp) (bool, error) {
 	log := logf.FromContext(ctx)
 
 	dbTraits := ExtractDatabaseTraits(app)
 	if len(dbTraits) == 0 {
 		log.V(1).Info("No database traits found, skipping secret injection")
-		return nil
+		return false, nil
 	}
+
+	pendingInjection := false
 
 	for _, dbTrait := range dbTraits {
 		secretName := GetDatabaseSecretName(dbTrait.ComponentName)
@@ -520,13 +545,14 @@ func (r *HeliosAppReconciler) reconcileDatabaseSecretInjection(ctx context.Conte
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// Deployment may not exist yet (ArgoCD hasn't synced).
-				// This is expected — we'll inject on the next reconcile.
-				log.Info("Deployment not found yet, will inject on next reconcile",
+				// Signal the caller to requeue so we retry injection later.
+				log.Info("Deployment not found yet, will requeue for injection",
 					"component", dbTrait.ComponentName,
 					"deployment", deployName)
+				pendingInjection = true
 				continue
 			}
-			return fmt.Errorf("failed to get Deployment %s: %w", deployName, err)
+			return false, fmt.Errorf("failed to get Deployment %s: %w", deployName, err)
 		}
 
 		// Inject env vars if not already present.
@@ -538,7 +564,7 @@ func (r *HeliosAppReconciler) reconcileDatabaseSecretInjection(ctx context.Conte
 		}
 
 		if err := r.Update(ctx, deploy); err != nil {
-			return fmt.Errorf("failed to update Deployment %s with database env vars: %w", deployName, err)
+			return false, fmt.Errorf("failed to update Deployment %s with database env vars: %w", deployName, err)
 		}
 
 		log.Info("Successfully injected database env vars into Deployment",
@@ -547,7 +573,7 @@ func (r *HeliosAppReconciler) reconcileDatabaseSecretInjection(ctx context.Conte
 			"secret", secretName)
 	}
 
-	return nil
+	return pendingInjection, nil
 }
 
 // GenerateDatabaseStatefulSet creates a StatefulSet for a Postgres database instance.

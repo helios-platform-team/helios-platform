@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -138,7 +137,7 @@ func TestGenerateCredentialsUniqueness(t *testing.T) {
 	credentials := make(map[string]bool)
 	iterations := 100
 
-	for i := 0; i < iterations; i++ {
+	for i := range iterations {
 		creds, err := GenerateCredentials()
 		if err != nil {
 			t.Fatalf("GenerateCredentials failed on iteration %d: %v", i, err)
@@ -363,7 +362,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 			Scheme: scheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseSecrets(ctx, app)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseSecrets failed: %v", err)
@@ -414,7 +413,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 			Scheme: scheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseSecrets(ctx, app)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseSecrets failed: %v", err)
@@ -471,7 +470,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 			Scheme: scheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseSecrets(ctx, appWithoutDB)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseSecrets should not fail for app without database traits: %v", err)
@@ -786,7 +785,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			Scheme: fullScheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseInstance(ctx, app)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseInstance failed: %v", err)
@@ -868,7 +867,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			Scheme: fullScheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseInstance(ctx, appWithoutDB)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseInstance should not fail for app without database traits: %v", err)
@@ -934,7 +933,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			Scheme: fullScheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseInstance(ctx, appWithRedis)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseInstance should not fail for redis type: %v", err)
@@ -1038,6 +1037,67 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		}
 	})
 
+	t.Run("UpdatesExistingWrongSource", func(t *testing.T) {
+		deploy := &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "api-server",
+								Image: "myregistry/api:v1",
+								Env: []corev1.EnvVar{
+									{Name: "PORT", Value: "3000"},
+									{Name: "DB_HOST", Value: "hardcoded-host"},
+									{Name: "DB_USER", ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{Name: "wrong-secret"},
+											Key:                  "DB_USER",
+										},
+									}},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret")
+		if !changed {
+			t.Fatal("Expected InjectDatabaseEnvVars to return true when existing env vars have wrong source")
+		}
+
+		container := deploy.Spec.Template.Spec.Containers[0]
+		// Should have PORT + DB_HOST + DB_USER + DB_PASS = 4
+		if len(container.Env) != 4 {
+			t.Fatalf("Expected 4 env vars, got %d", len(container.Env))
+		}
+
+		// DB_HOST should now reference the secret, not a plain value
+		for _, env := range container.Env {
+			if env.Name == "DB_HOST" {
+				if env.Value != "" {
+					t.Error("DB_HOST should have Value cleared")
+				}
+				if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+					t.Fatal("DB_HOST should reference a secret")
+				}
+				if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+					t.Errorf("DB_HOST: expected secret name %q, got %q", "api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+				}
+			}
+			if env.Name == "DB_USER" {
+				if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+					t.Fatal("DB_USER should reference a secret")
+				}
+				if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+					t.Errorf("DB_USER: expected secret name %q, got %q", "api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+				}
+			}
+		}
+	})
+
 	t.Run("NoContainers", func(t *testing.T) {
 		deploy := &appsv1.Deployment{
 			Spec: appsv1.DeploymentSpec{
@@ -1132,10 +1192,13 @@ func TestReconcileDatabaseSecretInjection(t *testing.T) {
 			Scheme: fullScheme,
 		}
 
-		ctx := context.Background()
-		err := r.reconcileDatabaseSecretInjection(ctx, app)
+		ctx := t.Context()
+		pending, err := r.reconcileDatabaseSecretInjection(ctx, app)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseSecretInjection failed: %v", err)
+		}
+		if pending {
+			t.Error("Expected no pending injection when Deployment exists")
 		}
 
 		// Verify the Deployment was updated with DB env vars
@@ -1204,10 +1267,13 @@ func TestReconcileDatabaseSecretInjection(t *testing.T) {
 			Scheme: fullScheme,
 		}
 
-		ctx := context.Background()
-		err := r.reconcileDatabaseSecretInjection(ctx, appWithoutDB)
+		ctx := t.Context()
+		pending, err := r.reconcileDatabaseSecretInjection(ctx, appWithoutDB)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseSecretInjection should not fail for app without database traits: %v", err)
+		}
+		if pending {
+			t.Error("Expected no pending injection for app without database traits")
 		}
 	})
 
@@ -1229,10 +1295,13 @@ func TestReconcileDatabaseSecretInjection(t *testing.T) {
 			Scheme: fullScheme,
 		}
 
-		ctx := context.Background()
-		err := r.reconcileDatabaseSecretInjection(ctx, app)
+		ctx := t.Context()
+		pending, err := r.reconcileDatabaseSecretInjection(ctx, app)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseSecretInjection should not fail when Deployment is missing: %v", err)
+		}
+		if !pending {
+			t.Error("Expected pending=true when Deployment is missing")
 		}
 	})
 }
