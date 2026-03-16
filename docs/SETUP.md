@@ -8,8 +8,8 @@ This guide explains how to install necessary development tools for the Helios Pl
 
 Ensure you have the following installed:
 
+- **Go**: v1.26.0+
 - **Task**: [taskfile.dev](https://taskfile.dev/) (the project task runner)
-- **Go**: v1.24.0+
 - **Docker**: 17.03+
 - **kubectl**: v1.11.3+
 - **Node.js**: v22+ (for Backstage portal)

@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -124,6 +125,19 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err := r.reconcileDatabaseInstance(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile database instance")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database instance provisioning failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.9: Inject Database Credentials into Backend Deployment
+	// Patches the live Deployment (deployed by ArgoCD) to add DB_HOST,
+	// DB_USER, DB_PASS env vars referencing the operator-managed Secret.
+	// Runs AFTER secrets and instances so the Secret already exists.
+	// ------------------------------------------------------------------
+	dbInjectionPending, err := r.reconcileDatabaseSecretInjection(ctx, &heliosApp)
+	if err != nil {
+		log.Error(err, "Failed to inject database secrets into Deployment")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database secret injection failed: %v", err))
 		return ctrl.Result{}, err
 	}
 
@@ -303,6 +317,13 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// NOTE: Ingress removed - use port-forwarding for EventListener:
 	// kubectl port-forward svc/el-<app>-listener 8080:8080
+
+	// If database secret injection is pending (Deployment not yet created by
+	// ArgoCD), requeue so the operator retries once the Deployment appears.
+	if dbInjectionPending {
+		log.Info("Database secret injection pending, requeuing")
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
 
 	return ctrl.Result{}, nil
 }
