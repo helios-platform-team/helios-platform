@@ -9,6 +9,7 @@ import LibraryBooks from '@material-ui/icons/LibraryBooks';
 import CreateComponentIcon from '@material-ui/icons/AddCircleOutline';
 import LogoFull from './LogoFull';
 import LogoIcon from './LogoIcon';
+import CategoryIcon from '@material-ui/icons/Category';
 import {
   Settings as SidebarSettings,
   UserSettingsSignInAvatar,
@@ -60,8 +61,6 @@ const SidebarLogo = () => {
   );
 };
 
-
-
 export const Root = ({ children }: PropsWithChildren<{}>) => {
   const identity = useApi(identityApiRef);
   const { value: profile } = useAsync(async () => {
@@ -78,7 +77,8 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
         <SidebarDivider />
         <SidebarGroup label="Menu" icon={<MenuIcon />}>
           {/* Global nav, not org-specific */}
-          <SidebarItem icon={HomeIcon} to="catalog" text="Home" />
+          <SidebarItem icon={HomeIcon} to="/" text="Home" />
+          <SidebarItem icon={CategoryIcon} to="catalog" text="Catalog" />
           <MyGroupsSidebarItem
             singularTitle="My Group"
             pluralTitle="My Groups"
@@ -86,7 +86,11 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
           />
           <SidebarItem icon={ExtensionIcon} to="api-docs" text="APIs" />
           <SidebarItem icon={LibraryBooks} to="docs" text="Docs" />
-          <SidebarItem icon={CreateComponentIcon} to="create" text="Create..." />
+          <SidebarItem
+            icon={CreateComponentIcon}
+            to="create"
+            text="Create..."
+          />
           {/* End global nav */}
           <SidebarDivider />
           <SidebarScrollWrapper>
@@ -97,27 +101,31 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
         <SidebarDivider />
         <NotificationsSidebarItem />
         <SidebarDivider />
-        <SidebarGroup label="Settings" icon={<UserSettingsSignInAvatar />} to="/settings">
+        <SidebarGroup
+          label="Settings"
+          icon={<UserSettingsSignInAvatar />}
+          to="/settings"
+        >
           <SidebarSettings />
         </SidebarGroup>
         <SidebarItem
           icon={
             profile?.picture
               ? () => (
-                <Avatar
-                  picture={profile?.picture}
-                  customStyles={{ width: 24, height: 24, margin: 0 }}
-                />
-              )
+                  <Avatar
+                    picture={profile?.picture}
+                    customStyles={{ width: 24, height: 24, margin: 0 }}
+                  />
+                )
               : // Fallback icon if no picture, though Avatar handles this internally too
-              () => (
-                <Avatar
-                  displayName={
-                    profile?.displayName || profile?.email || 'User'
-                  }
-                  customStyles={{ width: 24, height: 24, margin: 0 }}
-                />
-              )
+                () => (
+                  <Avatar
+                    displayName={
+                      profile?.displayName || profile?.email || 'User'
+                    }
+                    customStyles={{ width: 24, height: 24, margin: 0 }}
+                  />
+                )
           }
           text={profile?.displayName || profile?.email || 'User'}
           to="/settings"
