@@ -20,20 +20,32 @@ kubectl port-forward -n argocd svc/argocd-server 8080:443 > /dev/null 2>&1 &
 PF_PID=$!
 sleep 2 # Wait for it to be ready
 
-# Get Token via Curl
-TOKEN_JSON=$(curl -k -s -X POST -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"$ARGOCD_PASS\"}" https://127.0.0.1:8080/api/v1/session)
+# Get Token via Curl with timeout
+echo -e "${YELLOW}⏳  Waiting for ArgoCD API to be ready (up to 30s)...${NC}"
+MAX_RETRIES=15
+RETRY_COUNT=0
+ARGOCD_AUTH_TOKEN=""
 
-# Extract token (simple string extraction since jq might be missing)
-ARGOCD_AUTH_TOKEN=$(echo $TOKEN_JSON | sed 's/.*"token":"\([^"]*\)".*/\1/')
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  TOKEN_JSON=$(curl -k -s --connect-timeout 2 -X POST -H "Content-Type: application/json" -d "{\"username\":\"admin\",\"password\":\"$ARGOCD_PASS\"}" https://127.0.0.1:8080/api/v1/session || true)
+  ARGOCD_AUTH_TOKEN=$(echo $TOKEN_JSON | sed 's/.*"token":"\([^"]*\)".*/\1/' || true)
+  
+  if [ ! -z "$ARGOCD_AUTH_TOKEN" ] && [ "${#ARGOCD_AUTH_TOKEN}" -gt 20 ]; then
+    echo -e "${GREEN}✅  ArgoCD Token Generated!${NC}"
+    break
+  fi
+  
+  RETRY_COUNT=$((RETRY_COUNT+1))
+  sleep 2
+done
 
 if [ -z "$ARGOCD_AUTH_TOKEN" ] || [ "${#ARGOCD_AUTH_TOKEN}" -lt 20 ]; then
-  echo -e "${RED}❌  Failed to generate ArgoCD Token! Check if ArgoCD is running.${NC}"
-  kill $PF_PID
-  exit 1
+  echo -e "${RED}⚠️   Warning: Could not generate ArgoCD token. ArgoCD features may not work.${NC}"
+  echo -e "${YELLOW}💡  Hint: Check if ArgoCD pods are running. Your system might have disk-pressure (92% used).${NC}"
+  # Don't exit 1 here, let Backstage start anyway
+else
+  export ARGOCD_AUTH_TOKEN
 fi
-
-echo -e "${GREEN}✅  ArgoCD Token Generated!${NC}"
-export ARGOCD_AUTH_TOKEN
 
 # 2. Kubectl Proxy
 echo -e "${YELLOW}🚀  Starting Kubectl Proxy (localhost:8001)...${NC}"

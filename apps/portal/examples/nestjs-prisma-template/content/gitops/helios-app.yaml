@@ -17,7 +17,7 @@ spec:
   port: ${{ values.port }}
   testCommand: "npm ci && npm test"
   components:
-    - name: ${{ values.name }}
+    - name: ${{ values.name }}-backend
       type: web-service
       properties:
         image: ${{ values.image }}:latest
