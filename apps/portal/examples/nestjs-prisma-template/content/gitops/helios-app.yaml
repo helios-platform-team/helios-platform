@@ -10,10 +10,11 @@ spec:
   gitBranch: main
   imageRepo: ${{ values.image }}
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: ${{ values.name }}
+  gitopsPath: .
   pipelineName: from-code-to-cluster
-  webhookDomain: ${{ values.webhookUrl }}
-  webhookSecret: github-webhook-secret
+  webhookDomain: ${{ values.webhookUrl | replace("https://", "") | replace("http://", "") | replace("/hooks/" + values.name + "/", "") | replace("/hooks/" + values.name, "") | replace("/", "") }}
+  webhookSecret: "github-credentials-${{ values.name }}"
+  gitopsSecretRef: "github-credentials-${{ values.name }}"
   port: ${{ values.port }}
   testCommand: "npm ci && npm test"
   components:
