@@ -97,7 +97,7 @@ catalog:
     entityFilename: catalog-info.yaml
     pullRequestBranchName: backstage-integration
   rules:
-    - allow: [Component, System, API, Resource, Location]
+    - allow: [Component, System, API, Resource, Location, Template, User, Group]
   locations:
     # Local example data, file locations are relative to the backend process, typically `packages/backend`
     - type: file
@@ -118,6 +118,12 @@ catalog:
     # Advanced Node.js Template
     - type: file
       target: ../../examples/advanced-template/template.yaml
+      rules:
+        - allow: [Template]
+
+    # NestJS + Prisma Template
+    - type: file
+      target: ../../examples/nestjs-prisma-template/template.yaml
       rules:
         - allow: [Template]
 

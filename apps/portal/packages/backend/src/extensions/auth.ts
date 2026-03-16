@@ -19,14 +19,14 @@ export const customAuth = createBackendModule({
             authenticator: githubAuthenticator,
             async signInResolver(info, ctx) {
               console.log('GitHub Auth Info:', JSON.stringify(info, null, 2));
-              // GitHub returned profile might map username to loging in fullProfile
-              const username = info.result.fullProfile.username;
+              // GitHub returned profile might map username to login in fullProfile
+              // login is the standard GitHub username field
+              const username = (info.result.fullProfile as any).username || (info.result.fullProfile as any).login;
 
               if (!username) {
+                console.error('GitHub Auth Error: No username or login found', info.result.fullProfile);
                 throw new Error(
-                  `GitHub user profile contained no username. Full Profile: ${JSON.stringify(
-                    info.result.fullProfile,
-                  )}`,
+                  `GitHub user profile contained no username or login.`,
                 );
               }
 

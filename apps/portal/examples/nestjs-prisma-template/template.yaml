@@ -86,6 +86,7 @@ spec:
         values:
           name: ${{ parameters.name }}
           owner: ${{ parameters.owner }}
+          repoUrl: ${{ parameters.repoUrl }}
           port: ${{ parameters.port }}
           description: "NestJS service: ${{ parameters.name }}"
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}

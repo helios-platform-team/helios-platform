@@ -11,9 +11,9 @@ export default createBackendModule({
   register(reg) {
     reg.registerInit({
       deps: {
-        middleware: coreServices.middleware,
+        httpRouter: coreServices.httpRouter,
       },
-      async init({ middleware }) {
+      async init({ httpRouter }) {
         const router = Router();
 
         router.get('/api/helios/database/info/:componentName', async (req, res) => {
@@ -76,7 +76,7 @@ export default createBackendModule({
           }
         });
 
-        middleware.use(router);
+        httpRouter.use(router);
       },
     });
   },
