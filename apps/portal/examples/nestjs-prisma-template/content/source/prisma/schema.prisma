@@ -1,0 +1,23 @@
+// Prisma Schema for ${{ values.name }}
+// DATABASE_URL is constructed at runtime from injected env vars:
+//   DB_HOST, DB_USER, DB_PASS (from K8s Secret via Helios Operator)
+//   DB_NAME, DB_PORT (from K8s ConfigMap via CUE engine)
+
+generator client {
+  provider = "prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Example model — replace with your domain models
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}

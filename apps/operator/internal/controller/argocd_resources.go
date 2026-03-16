@@ -45,6 +45,17 @@ func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Un
 					"CreateNamespace=true",
 				},
 			},
+			// Ignore env var diffs on Deployments so that ArgoCD self-heal
+			// does not revert the DB_* env vars injected by the operator.
+			"ignoreDifferences": []any{
+				map[string]any{
+					"group": "apps",
+					"kind":  "Deployment",
+					"jsonPointers": []any{
+						"/spec/template/spec/containers/0/env",
+					},
+				},
+			},
 		},
 	}
 

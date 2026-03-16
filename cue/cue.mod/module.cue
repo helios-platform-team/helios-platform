@@ -1,2 +1,2 @@
 module: "helios.io/cue"
-language: version: "v0.15.4"
+language: version: "v0.16.0"

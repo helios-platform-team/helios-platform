@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -138,7 +137,7 @@ func TestGenerateCredentialsUniqueness(t *testing.T) {
 	credentials := make(map[string]bool)
 	iterations := 100
 
-	for i := 0; i < iterations; i++ {
+	for i := range iterations {
 		creds, err := GenerateCredentials()
 		if err != nil {
 			t.Fatalf("GenerateCredentials failed on iteration %d: %v", i, err)
@@ -247,7 +246,7 @@ func TestGetDatabaseHost(t *testing.T) {
 
 func TestExtractDatabaseTraits(t *testing.T) {
 	// Create a HeliosApp with database traits
-	dbProps := map[string]interface{}{
+	dbProps := map[string]any{
 		"dbType":  "postgres",
 		"dbName":  "mydb",
 		"version": "16",
@@ -321,7 +320,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 	_ = corev1.AddToScheme(scheme)
 	_ = appv1alpha1.AddToScheme(scheme)
 
-	dbProps := map[string]interface{}{
+	dbProps := map[string]any{
 		"dbType":  "postgres",
 		"dbName":  "mydb",
 		"version": "16",
@@ -363,7 +362,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 			Scheme: scheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseSecrets(ctx, app)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseSecrets failed: %v", err)
@@ -414,7 +413,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 			Scheme: scheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseSecrets(ctx, app)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseSecrets failed: %v", err)
@@ -471,7 +470,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 			Scheme: scheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseSecrets(ctx, appWithoutDB)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseSecrets should not fail for app without database traits: %v", err)
@@ -738,7 +737,7 @@ func TestGenerateDatabaseService(t *testing.T) {
 
 func TestReconcileDatabaseInstance(t *testing.T) {
 
-	dbProps := map[string]interface{}{
+	dbProps := map[string]any{
 		"dbType":  "postgres",
 		"dbName":  "my_custom_db",
 		"version": "16",
@@ -786,7 +785,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			Scheme: fullScheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseInstance(ctx, app)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseInstance failed: %v", err)
@@ -868,7 +867,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			Scheme: fullScheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseInstance(ctx, appWithoutDB)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseInstance should not fail for app without database traits: %v", err)
@@ -889,7 +888,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 	})
 
 	t.Run("SkipsNonPostgresType", func(t *testing.T) {
-		redisProps := map[string]interface{}{
+		redisProps := map[string]any{
 			"dbType":  "redis",
 			"version": "7",
 		}
@@ -934,7 +933,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			Scheme: fullScheme,
 		}
 
-		ctx := context.Background()
+		ctx := t.Context()
 		err := r.reconcileDatabaseInstance(ctx, appWithRedis)
 		if err != nil {
 			t.Fatalf("reconcileDatabaseInstance should not fail for redis type: %v", err)
@@ -945,6 +944,364 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 		_ = fakeClient.List(ctx, stsList)
 		if len(stsList.Items) != 0 {
 			t.Errorf("Expected no StatefulSets for redis type, got %d", len(stsList.Items))
+		}
+	})
+}
+
+func TestInjectDatabaseEnvVars(t *testing.T) {
+	t.Run("InjectsAllEnvVars", func(t *testing.T) {
+		deploy := &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "api-server",
+								Image: "myregistry/api:v1",
+								Env: []corev1.EnvVar{
+									{Name: "PORT", Value: "3000"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret")
+		if !changed {
+			t.Fatal("Expected InjectDatabaseEnvVars to return true (changed)")
+		}
+
+		container := deploy.Spec.Template.Spec.Containers[0]
+		// Should have PORT + DB_HOST + DB_USER + DB_PASS = 4
+		if len(container.Env) != 4 {
+			t.Fatalf("Expected 4 env vars, got %d", len(container.Env))
+		}
+
+		expectedEnvs := map[string]string{
+			"DB_HOST": "DB_HOST",
+			"DB_USER": "DB_USER",
+			"DB_PASS": "DB_PASS",
+		}
+		for _, env := range container.Env {
+			if expectedKey, ok := expectedEnvs[env.Name]; ok {
+				if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+					t.Errorf("Env %s should reference a secret", env.Name)
+					continue
+				}
+				if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+					t.Errorf("Env %s: expected secret name %q, got %q",
+						env.Name, "api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+				}
+				if env.ValueFrom.SecretKeyRef.Key != expectedKey {
+					t.Errorf("Env %s: expected secret key %q, got %q",
+						env.Name, expectedKey, env.ValueFrom.SecretKeyRef.Key)
+				}
+				delete(expectedEnvs, env.Name)
+			}
+		}
+		if len(expectedEnvs) > 0 {
+			t.Errorf("Missing expected env vars: %v", expectedEnvs)
+		}
+	})
+
+	t.Run("Idempotent", func(t *testing.T) {
+		deploy := &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "api-server", Image: "myregistry/api:v1"},
+						},
+					},
+				},
+			},
+		}
+
+		// First injection
+		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret")
+		if !changed {
+			t.Fatal("Expected first injection to report changes")
+		}
+		firstCount := len(deploy.Spec.Template.Spec.Containers[0].Env)
+
+		// Second injection — should be idempotent
+		changed = InjectDatabaseEnvVars(deploy, "api-server-db-secret")
+		if changed {
+			t.Error("Expected second injection to report no changes (idempotent)")
+		}
+		secondCount := len(deploy.Spec.Template.Spec.Containers[0].Env)
+		if firstCount != secondCount {
+			t.Errorf("Env var count changed after idempotent call: %d → %d", firstCount, secondCount)
+		}
+	})
+
+	t.Run("UpdatesExistingWrongSource", func(t *testing.T) {
+		deploy := &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "api-server",
+								Image: "myregistry/api:v1",
+								Env: []corev1.EnvVar{
+									{Name: "PORT", Value: "3000"},
+									{Name: "DB_HOST", Value: "hardcoded-host"},
+									{Name: "DB_USER", ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{Name: "wrong-secret"},
+											Key:                  "DB_USER",
+										},
+									}},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret")
+		if !changed {
+			t.Fatal("Expected InjectDatabaseEnvVars to return true when existing env vars have wrong source")
+		}
+
+		container := deploy.Spec.Template.Spec.Containers[0]
+		// Should have PORT + DB_HOST + DB_USER + DB_PASS = 4
+		if len(container.Env) != 4 {
+			t.Fatalf("Expected 4 env vars, got %d", len(container.Env))
+		}
+
+		// DB_HOST should now reference the secret, not a plain value
+		for _, env := range container.Env {
+			if env.Name == "DB_HOST" {
+				if env.Value != "" {
+					t.Error("DB_HOST should have Value cleared")
+				}
+				if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+					t.Fatal("DB_HOST should reference a secret")
+				}
+				if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+					t.Errorf("DB_HOST: expected secret name %q, got %q", "api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+				}
+			}
+			if env.Name == "DB_USER" {
+				if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+					t.Fatal("DB_USER should reference a secret")
+				}
+				if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+					t.Errorf("DB_USER: expected secret name %q, got %q", "api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+				}
+			}
+		}
+	})
+
+	t.Run("NoContainers", func(t *testing.T) {
+		deploy := &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{},
+					},
+				},
+			},
+		}
+
+		changed := InjectDatabaseEnvVars(deploy, "test-secret")
+		if changed {
+			t.Error("Expected no changes for Deployment with no containers")
+		}
+	})
+}
+
+func TestReconcileDatabaseSecretInjection(t *testing.T) {
+	dbProps := map[string]any{
+		"dbType":  "postgres",
+		"dbName":  "mydb",
+		"version": "16",
+	}
+	dbPropsJSON, _ := json.Marshal(dbProps)
+
+	app := &appv1alpha1.HeliosApp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-app",
+			Namespace: "default",
+			UID:       "test-uid-inject",
+		},
+		Spec: appv1alpha1.HeliosAppSpec{
+			Components: []appv1alpha1.Component{
+				{
+					Name: "api-server",
+					Type: "web-service",
+					Traits: []appv1alpha1.Trait{
+						{
+							Type: "database",
+							Properties: &runtime.RawExtension{
+								Raw: dbPropsJSON,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	t.Run("InjectsIntoExistingDeployment", func(t *testing.T) {
+		fullScheme := runtime.NewScheme()
+		_ = corev1.AddToScheme(fullScheme)
+		_ = appv1alpha1.AddToScheme(fullScheme)
+		_ = appsv1.AddToScheme(fullScheme)
+
+		existingDeploy := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "api-server",
+				Namespace: "default",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "api-server"},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"app": "api-server"},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "api-server",
+								Image: "myregistry/api:v1",
+								Env: []corev1.EnvVar{
+									{Name: "PORT", Value: "3000"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(fullScheme).
+			WithObjects(app, existingDeploy).
+			Build()
+
+		r := &HeliosAppReconciler{
+			Client: fakeClient,
+			Scheme: fullScheme,
+		}
+
+		ctx := t.Context()
+		pending, err := r.reconcileDatabaseSecretInjection(ctx, app)
+		if err != nil {
+			t.Fatalf("reconcileDatabaseSecretInjection failed: %v", err)
+		}
+		if pending {
+			t.Error("Expected no pending injection when Deployment exists")
+		}
+
+		// Verify the Deployment was updated with DB env vars
+		updatedDeploy := &appsv1.Deployment{}
+		err = fakeClient.Get(ctx, types.NamespacedName{
+			Name:      "api-server",
+			Namespace: "default",
+		}, updatedDeploy)
+		if err != nil {
+			t.Fatalf("Failed to get updated Deployment: %v", err)
+		}
+
+		container := updatedDeploy.Spec.Template.Spec.Containers[0]
+		expectedEnvNames := map[string]bool{
+			"DB_HOST": false,
+			"DB_USER": false,
+			"DB_PASS": false,
+		}
+		for _, env := range container.Env {
+			if _, ok := expectedEnvNames[env.Name]; ok {
+				expectedEnvNames[env.Name] = true
+				if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+					t.Errorf("Env %s should reference a secret", env.Name)
+				} else if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+					t.Errorf("Env %s: expected secret name %q, got %q",
+						env.Name, "api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+				}
+			}
+		}
+		for name, found := range expectedEnvNames {
+			if !found {
+				t.Errorf("Expected env var %s not found in Deployment", name)
+			}
+		}
+	})
+
+	t.Run("SkipsWhenNoTraits", func(t *testing.T) {
+		appWithoutDB := &appv1alpha1.HeliosApp{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "no-db-app",
+				Namespace: "default",
+				UID:       "test-uid-no-inject",
+			},
+			Spec: appv1alpha1.HeliosAppSpec{
+				Components: []appv1alpha1.Component{
+					{
+						Name: "frontend",
+						Type: "web-service",
+					},
+				},
+			},
+		}
+
+		fullScheme := runtime.NewScheme()
+		_ = corev1.AddToScheme(fullScheme)
+		_ = appv1alpha1.AddToScheme(fullScheme)
+		_ = appsv1.AddToScheme(fullScheme)
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(fullScheme).
+			WithObjects(appWithoutDB).
+			Build()
+
+		r := &HeliosAppReconciler{
+			Client: fakeClient,
+			Scheme: fullScheme,
+		}
+
+		ctx := t.Context()
+		pending, err := r.reconcileDatabaseSecretInjection(ctx, appWithoutDB)
+		if err != nil {
+			t.Fatalf("reconcileDatabaseSecretInjection should not fail for app without database traits: %v", err)
+		}
+		if pending {
+			t.Error("Expected no pending injection for app without database traits")
+		}
+	})
+
+	t.Run("DeploymentNotFound_GracefulSkip", func(t *testing.T) {
+		// When Deployment doesn't exist yet (ArgoCD hasn't synced),
+		// the reconciler should skip without error.
+		fullScheme := runtime.NewScheme()
+		_ = corev1.AddToScheme(fullScheme)
+		_ = appv1alpha1.AddToScheme(fullScheme)
+		_ = appsv1.AddToScheme(fullScheme)
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(fullScheme).
+			WithObjects(app).
+			Build()
+
+		r := &HeliosAppReconciler{
+			Client: fakeClient,
+			Scheme: fullScheme,
+		}
+
+		ctx := t.Context()
+		pending, err := r.reconcileDatabaseSecretInjection(ctx, app)
+		if err != nil {
+			t.Fatalf("reconcileDatabaseSecretInjection should not fail when Deployment is missing: %v", err)
+		}
+		if !pending {
+			t.Error("Expected pending=true when Deployment is missing")
 		}
 	})
 }

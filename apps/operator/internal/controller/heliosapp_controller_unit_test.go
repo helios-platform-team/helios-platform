@@ -119,7 +119,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	res, err := r.Reconcile(ctx, req)
 
 	// 7. Assertions
@@ -180,7 +180,7 @@ func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 		TektonRenderer: &FakeTektonRenderer{},
 	}
 
-	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Name: "pending-app", Namespace: "default"}})
+	res, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Name: "pending-app", Namespace: "default"}})
 
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, wantErr %v", err, nil)
@@ -190,7 +190,7 @@ func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 	}
 
 	updatedApp := &appv1alpha1.HeliosApp{}
-	_ = client.Get(context.Background(), types.NamespacedName{Name: "pending-app", Namespace: "default"}, updatedApp)
+	_ = client.Get(t.Context(), types.NamespacedName{Name: "pending-app", Namespace: "default"}, updatedApp)
 	if updatedApp.Status.Phase != appv1alpha1.PhasePending {
 		t.Errorf("Expected Phase to be %s, got %s", appv1alpha1.PhasePending, updatedApp.Status.Phase)
 	}
