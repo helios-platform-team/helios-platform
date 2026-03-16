@@ -5,3 +5,6 @@ apps/portal/packages/backend/*.sqlite
 # Environment secrets
 .env
 !.env.example
+
+# Claude
+.claude/
