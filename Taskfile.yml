@@ -82,11 +82,11 @@ tasks:
     desc: Install Tekton Pipeline, Triggers, and Interceptors
     cmds:
       - echo "Installing Tekton Pipeline..."
-      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
+      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml --request-timeout=120s
       - echo "Installing Tekton Triggers..."
-      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
+      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml --request-timeout=120s
       - echo "Installing Tekton Interceptors..."
-      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
+      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml --request-timeout=120s
       - echo "Waiting for Tekton Pipelines controller..."
       - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
       - echo "Waiting for Tekton Pipelines webhook..."
@@ -132,25 +132,37 @@ tasks:
 
   setup:credentials:
     desc: Create Docker registry secret and link to pipeline SA
-    preconditions:
-      - sh: '[ -n "$DOCKER_USERNAME" ]'
-        msg: "DOCKER_USERNAME is not set in .env"
-      - sh: '[ -n "$DOCKER_PASSWORD" ]'
-        msg: "DOCKER_PASSWORD is not set in .env"
     cmds:
-      - >-
-        kubectl create secret docker-registry docker-credentials
-        --docker-server=${DOCKER_SERVER:-https://index.docker.io/v1/}
-        --docker-username=$DOCKER_USERNAME
-        --docker-password=$DOCKER_PASSWORD
-        --docker-email=${DOCKER_EMAIL:-dev@helios.io}
-        --dry-run=client -o yaml | kubectl apply -f -
-      - >-
-        if kubectl get sa pipeline >/dev/null 2>&1; then
-          kubectl patch sa pipeline -p '{"secrets": [{"name": "docker-credentials"}]}'
-        else
-          echo "pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)"
-        fi
+      - cmd: |
+          if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_PASSWORD" ]; then
+            echo "DOCKER_USERNAME and DOCKER_PASSWORD must be set in .env" >&2
+            exit 1
+          fi
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -Command "if ([string]::IsNullOrEmpty($env:DOCKER_USERNAME) -or [string]::IsNullOrEmpty($env:DOCKER_PASSWORD)) { Write-Error 'DOCKER_USERNAME and DOCKER_PASSWORD must be set in .env'; exit 1 }"
+        platforms: [windows]
+      - cmd: |
+          kubectl create secret docker-registry docker-credentials \
+            --docker-server=${DOCKER_SERVER:-https://index.docker.io/v1/} \
+            --docker-username=$DOCKER_USERNAME \
+            --docker-password=$DOCKER_PASSWORD \
+            --docker-email=${DOCKER_EMAIL:-dev@helios.io} \
+            --dry-run=client -o yaml | kubectl apply -f -
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -Command "$server = if ([string]::IsNullOrEmpty($env:DOCKER_SERVER)) { 'https://index.docker.io/v1/' } else { $env:DOCKER_SERVER }; $email = if ([string]::IsNullOrEmpty($env:DOCKER_EMAIL)) { 'dev@helios.io' } else { $env:DOCKER_EMAIL }; kubectl create secret docker-registry docker-credentials --docker-server=$server --docker-username=$env:DOCKER_USERNAME --docker-password=$env:DOCKER_PASSWORD --docker-email=$email --dry-run=client -o yaml | kubectl apply -f -"
+        platforms: [windows]
+      - cmd: |
+          if kubectl get sa pipeline >/dev/null 2>&1; then
+            kubectl patch sa pipeline -p '{"secrets": [{"name": "docker-credentials"}]}'
+          else
+            echo "pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)"
+          fi
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -Command "kubectl get sa pipeline *> $null; if ($LASTEXITCODE -eq 0) { kubectl patch sa pipeline -p '{\"secrets\": [{\"name\": \"docker-credentials\"}]}' } else { Write-Host 'pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)' }"
+        platforms: [windows]
 
   setup:portal-deps:
     desc: Install Backstage portal dependencies

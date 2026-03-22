@@ -185,6 +185,8 @@ func ExtractDatabaseTraits(app *appv1alpha1.HeliosApp) []struct {
 	ComponentName string
 	Properties    DatabaseTraitProperties
 } {
+	log := logf.Log.WithName("database-traits")
+
 	var dbTraits []struct {
 		ComponentName string
 		Properties    DatabaseTraitProperties
@@ -197,6 +199,10 @@ func ExtractDatabaseTraits(app *appv1alpha1.HeliosApp) []struct {
 				if trait.Properties != nil && trait.Properties.Raw != nil {
 					if err := json.Unmarshal(trait.Properties.Raw, &props); err != nil {
 						// Log error but continue - don't fail the entire reconciliation
+						log.Error(err, "Failed to parse database trait properties, skipping trait",
+							"component", component.Name,
+							"traitType", trait.Type,
+							"rawPreview", truncateForLog(trait.Properties.Raw, 200))
 						continue
 					}
 				}
@@ -212,6 +218,14 @@ func ExtractDatabaseTraits(app *appv1alpha1.HeliosApp) []struct {
 	}
 
 	return dbTraits
+}
+
+func truncateForLog(raw []byte, maxLen int) string {
+	if maxLen <= 0 || len(raw) <= maxLen {
+		return string(raw)
+	}
+
+	return string(raw[:maxLen]) + "..."
 }
 
 // reconcileDatabaseSecrets ensures database credential secrets exist for all
