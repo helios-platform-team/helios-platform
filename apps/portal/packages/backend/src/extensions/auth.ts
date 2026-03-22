@@ -23,7 +23,11 @@ export const customAuth = createBackendModule({
               const username = info.result.fullProfile.username;
 
               if (!username) {
-                throw new Error(`GitHub user profile contained no username. Full Profile: ${JSON.stringify(info.result.fullProfile)}`);
+                throw new Error(
+                  `GitHub user profile contained no username. Full Profile: ${JSON.stringify(
+                    info.result.fullProfile,
+                  )}`,
+                );
               }
 
               // Map the GitHub username to a Backstage User entity
@@ -38,9 +42,15 @@ export const customAuth = createBackendModule({
                   entityRef: userEntity,
                 });
               } catch (error) {
-                console.log(`User ${username} not found in catalog, falling back to guest user.`);
+                console.log(
+                  `User ${username} not found in catalog, falling back to guest user.`,
+                );
                 return ctx.signInWithCatalogUser({
-                  entityRef: { name: 'guest', kind: 'User', namespace: 'default' },
+                  entityRef: {
+                    name: 'guest',
+                    kind: 'User',
+                    namespace: 'default',
+                  },
                 });
               }
             },

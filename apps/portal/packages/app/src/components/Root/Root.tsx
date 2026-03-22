@@ -60,8 +60,6 @@ const SidebarLogo = () => {
   );
 };
 
-
-
 export const Root = ({ children }: PropsWithChildren<{}>) => {
   const identity = useApi(identityApiRef);
   const { value: profile } = useAsync(async () => {
@@ -86,7 +84,11 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
           />
           <SidebarItem icon={ExtensionIcon} to="api-docs" text="APIs" />
           <SidebarItem icon={LibraryBooks} to="docs" text="Docs" />
-          <SidebarItem icon={CreateComponentIcon} to="create" text="Create..." />
+          <SidebarItem
+            icon={CreateComponentIcon}
+            to="create"
+            text="Create..."
+          />
           {/* End global nav */}
           <SidebarDivider />
           <SidebarScrollWrapper>
@@ -97,27 +99,31 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
         <SidebarDivider />
         <NotificationsSidebarItem />
         <SidebarDivider />
-        <SidebarGroup label="Settings" icon={<UserSettingsSignInAvatar />} to="/settings">
+        <SidebarGroup
+          label="Settings"
+          icon={<UserSettingsSignInAvatar />}
+          to="/settings"
+        >
           <SidebarSettings />
         </SidebarGroup>
         <SidebarItem
           icon={
             profile?.picture
               ? () => (
-                <Avatar
-                  picture={profile?.picture}
-                  customStyles={{ width: 24, height: 24, margin: 0 }}
-                />
-              )
+                  <Avatar
+                    picture={profile?.picture}
+                    customStyles={{ width: 24, height: 24, margin: 0 }}
+                  />
+                )
               : // Fallback icon if no picture, though Avatar handles this internally too
-              () => (
-                <Avatar
-                  displayName={
-                    profile?.displayName || profile?.email || 'User'
-                  }
-                  customStyles={{ width: 24, height: 24, margin: 0 }}
-                />
-              )
+                () => (
+                  <Avatar
+                    displayName={
+                      profile?.displayName || profile?.email || 'User'
+                    }
+                    customStyles={{ width: 24, height: 24, margin: 0 }}
+                  />
+                )
           }
           text={profile?.displayName || profile?.email || 'User'}
           to="/settings"

@@ -25,7 +25,8 @@ import { scaffolderModuleCustomActions } from './extensions/scaffolder';
 backend.add(scaffolderModuleCustomActions);
 import { customAuth } from './extensions/auth';
 
-backend.add(import('@backstage/plugin-scaffolder-backend-module-notifications'),
+backend.add(
+  import('@backstage/plugin-scaffolder-backend-module-notifications'),
 );
 
 // auth plugin
