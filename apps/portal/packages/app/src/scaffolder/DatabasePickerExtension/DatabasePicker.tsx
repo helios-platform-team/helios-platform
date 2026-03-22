@@ -24,7 +24,9 @@ export const DatabasePicker = ({
   const dbType = formData?.dbType || 'none';
   const dbName = formData?.dbName || '';
 
-  const handleTypeChange = (event: ChangeEvent<{ value: unknown }>) => {
+  const handleTypeChange = (
+    event: ChangeEvent<{ name?: string; value: unknown }>,
+  ) => {
     const newType = event.target.value as string;
     onChange({
       dbType: newType,

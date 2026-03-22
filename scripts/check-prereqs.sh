@@ -10,6 +10,10 @@
 # =============================================================================
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=./lib/env_helpers.sh
+source "$SCRIPT_DIR/lib/env_helpers.sh"
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -28,49 +32,6 @@ fail()  { echo -e "  ${RED}[FAIL]${NC} $1"; ERRORS=$((ERRORS + 1)); }
 # ---------------------------------------------------------------------------
 version_gte() {
   printf '%s\n%s' "$2" "$1" | sort -t. -k1,1n -k2,2n -k3,3n -C
-}
-
-trim_ws() {
-  local s="$1"
-  s="${s#"${s%%[![:space:]]*}"}"
-  s="${s%"${s##*[![:space:]]}"}"
-  printf '%s' "$s"
-}
-
-read_env_value() {
-  local env_file="$1"
-  local wanted_key="$2"
-  local line key value
-
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    line="$(trim_ws "$line")"
-    [[ -z "$line" || "${line:0:1}" == "#" ]] && continue
-
-    if [[ "$line" == export\ * ]]; then
-      line="${line#export }"
-      line="$(trim_ws "$line")"
-    fi
-
-    [[ "$line" != *=* ]] && continue
-
-    key="$(trim_ws "${line%%=*}")"
-    value="$(trim_ws "${line#*=}")"
-
-    if [[ "$key" != "$wanted_key" ]]; then
-      continue
-    fi
-
-    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
-      value="${value:1:${#value}-2}"
-    elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
-      value="${value:1:${#value}-2}"
-    fi
-
-    printf '%s' "$value"
-    return 0
-  done < "$env_file"
-
-  return 1
 }
 
 # ---------------------------------------------------------------------------

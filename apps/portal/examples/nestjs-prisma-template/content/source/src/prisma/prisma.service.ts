@@ -31,6 +31,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       port: parseInt(process.env.DB_PORT || '5432', 10),
     });
 
+    // TODO(helios-platform#328): Remove this cast when @prisma/adapter-pg exposes
+    // a Pool-compatible type accepted by PrismaPg in all supported versions.
     const adapter = new PrismaPg(pool as any);
 
     super({ adapter });

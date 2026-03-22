@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -404,6 +405,20 @@ func (r *HeliosAppReconciler) reconcileDatabaseInstance(ctx context.Context, app
 				"component", dbTrait.ComponentName,
 				"statefulset", dbHost)
 
+			currentStorage, storageErr := getCurrentStorageRequest(existingSts)
+			if storageErr != nil {
+				return fmt.Errorf("failed to read StatefulSet %s storage: %w", dbHost, storageErr)
+			}
+
+			desiredStorageQty, parseErr := resource.ParseQuantity(storage)
+			if parseErr != nil {
+				return fmt.Errorf("invalid desired storage for StatefulSet %s: %w", dbHost, parseErr)
+			}
+
+			if currentStorage.Cmp(desiredStorageQty) != 0 {
+				return fmt.Errorf("database storage drift detected for %s: current=%s desired=%s; StatefulSet volume expansion is not handled automatically", dbHost, currentStorage.String(), desiredStorageQty.String())
+			}
+
 			// We only update the mutable fields (Replicas, Template)
 			updatedSts := existingSts.DeepCopy()
 			updatedSts.Spec.Replicas = sts.Spec.Replicas
@@ -467,9 +482,8 @@ func (r *HeliosAppReconciler) reconcileDatabaseInstance(ctx context.Context, app
 	return nil
 }
 
-// databaseEnvVarNames lists the env var names injected by the operator
-// for database credential secret injection.
-var databaseEnvVarNames = []string{"DB_HOST", "DB_USER", "DB_PASS"}
+// databaseSecretEnvVarNames lists env vars resolved from Secret keys.
+var databaseSecretEnvVarNames = []string{"DB_HOST", "DB_USER", "DB_PASS"}
 
 // InjectDatabaseEnvVars patches a Deployment's first container to include
 // DB_HOST, DB_USER, DB_PASS env vars referencing the given K8s Secret.
@@ -478,15 +492,16 @@ var databaseEnvVarNames = []string{"DB_HOST", "DB_USER", "DB_PASS"}
 // If an env var exists but points to a different source (wrong secret, plain
 // value, etc.), it is updated to the expected secretKeyRef.
 func InjectDatabaseEnvVars(deploy *appsv1.Deployment, secretName string) bool {
-	changed, _ := InjectDatabaseEnvVarsForContainer(deploy, secretName, "")
+	changed, _ := InjectDatabaseEnvVarsForContainer(deploy, secretName, "", DefaultPostgresPort)
 	return changed
 }
 
 // InjectDatabaseEnvVarsForContainer patches a Deployment container to include
-// DB_HOST, DB_USER, DB_PASS env vars referencing the given K8s Secret.
+// DB_HOST, DB_USER, DB_PASS env vars referencing the given K8s Secret, plus a
+// literal DB_PORT value.
 // If preferredContainerName is not found, it falls back to the first container.
 // Returns (changed, exactMatch).
-func InjectDatabaseEnvVarsForContainer(deploy *appsv1.Deployment, secretName, preferredContainerName string) (bool, bool) {
+func InjectDatabaseEnvVarsForContainer(deploy *appsv1.Deployment, secretName, preferredContainerName string, dbPort int32) (bool, bool) {
 	if len(deploy.Spec.Template.Spec.Containers) == 0 {
 		return false, false
 	}
@@ -499,7 +514,7 @@ func InjectDatabaseEnvVarsForContainer(deploy *appsv1.Deployment, secretName, pr
 	container := &deploy.Spec.Template.Spec.Containers[containerIndex]
 
 	changed := false
-	for _, envName := range databaseEnvVarNames {
+	for _, envName := range databaseSecretEnvVarNames {
 		expectedRef := &corev1.EnvVarSource{
 			SecretKeyRef: &corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{
@@ -538,6 +553,30 @@ func InjectDatabaseEnvVarsForContainer(deploy *appsv1.Deployment, secretName, pr
 			})
 			changed = true
 		}
+	}
+
+	portValue := strconv.FormatInt(int64(dbPort), 10)
+	foundDBPort := false
+	for i := range container.Env {
+		if container.Env[i].Name != "DB_PORT" {
+			continue
+		}
+		foundDBPort = true
+		if container.Env[i].Value == portValue && container.Env[i].ValueFrom == nil {
+			break
+		}
+		container.Env[i].Value = portValue
+		container.Env[i].ValueFrom = nil
+		changed = true
+		break
+	}
+
+	if !foundDBPort {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "DB_PORT",
+			Value: portValue,
+		})
+		changed = true
 	}
 
 	return changed, exactMatch
@@ -610,8 +649,13 @@ func (r *HeliosAppReconciler) reconcileDatabaseSecretInjection(ctx context.Conte
 			return false, fmt.Errorf("failed to get Deployment %s: %w", deployName, err)
 		}
 
+		port := dbTrait.Properties.Port
+		if port <= 0 {
+			port = DefaultPostgresPort
+		}
+
 		// Inject env vars if not already present.
-		changed, exactContainerMatch := InjectDatabaseEnvVarsForContainer(deploy, secretName, dbTrait.ComponentName)
+		changed, exactContainerMatch := InjectDatabaseEnvVarsForContainer(deploy, secretName, dbTrait.ComponentName, int32(port))
 		if !exactContainerMatch {
 			log.Info("Preferred application container not found, using first container for DB env injection",
 				"component", dbTrait.ComponentName,
@@ -788,6 +832,23 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 			},
 		},
 	}, nil
+}
+
+func getCurrentStorageRequest(sts *appsv1.StatefulSet) (resource.Quantity, error) {
+	if sts == nil {
+		return resource.Quantity{}, fmt.Errorf("statefulset is nil")
+	}
+
+	if len(sts.Spec.VolumeClaimTemplates) == 0 {
+		return resource.Quantity{}, fmt.Errorf("no volumeClaimTemplates found")
+	}
+
+	qty, ok := sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage]
+	if !ok {
+		return resource.Quantity{}, fmt.Errorf("storage request is missing")
+	}
+
+	return qty, nil
 }
 
 // ValidateDatabaseSecret ensures an existing database credential Secret has all

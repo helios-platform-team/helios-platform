@@ -17,6 +17,8 @@ spec:
         - name
         - owner
         - port
+        - dockerOrg
+        - repoName
       properties:
         name:
           title: Name
@@ -50,6 +52,9 @@ spec:
         databaseConfig:
           title: Database Settings
           type: object
+          default:
+            dbType: none
+            dbName: ""
           ui:field: DatabasePicker
 
     - title: Repository & Webhook

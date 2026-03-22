@@ -1,4 +1,4 @@
-﻿# =============================================================================
+# =============================================================================
 # Helios Platform - Root Taskfile
 # =============================================================================
 # Usage:
@@ -146,9 +146,11 @@ tasks:
         --docker-email=${DOCKER_EMAIL:-dev@helios.io}
         --dry-run=client -o yaml | kubectl apply -f -
       - >-
-        kubectl patch sa pipeline
-        -p '{"secrets": [{"name": "docker-credentials"}]}'
-        2>/dev/null || true
+        if kubectl get sa pipeline >/dev/null 2>&1; then
+          kubectl patch sa pipeline -p '{"secrets": [{"name": "docker-credentials"}]}'
+        else
+          echo "pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)"
+        fi
 
   setup:portal-deps:
     desc: Install Backstage portal dependencies
@@ -243,7 +245,11 @@ tasks:
             -H "Content-Type: application/json" \
             -d "{\"username\":\"admin\",\"password\":\"$ARGOCD_PASS\"}" \
             https://127.0.0.1:{{.ARGOCD_PORT}}/api/v1/session)
-          export ARGOCD_AUTH_TOKEN=$(echo "$TOKEN_JSON" | sed 's/.*"token":"\([^"]*\)".*/\1/')
+          if command -v jq >/dev/null 2>&1; then
+            export ARGOCD_AUTH_TOKEN=$(echo "$TOKEN_JSON" | jq -r '.token // empty')
+          else
+            export ARGOCD_AUTH_TOKEN=$(echo "$TOKEN_JSON" | sed 's/.*"token":"\([^"]*\)".*/\1/')
+          fi
           if [ -z "$ARGOCD_AUTH_TOKEN" ] || [ "${#ARGOCD_AUTH_TOKEN}" -lt 20 ]; then
             echo "WARNING: Could not generate ArgoCD token. ArgoCD features may not work."
           else

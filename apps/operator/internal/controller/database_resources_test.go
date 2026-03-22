@@ -7,6 +7,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -952,6 +953,117 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			t.Errorf("Expected no StatefulSets for redis type, got %d", len(stsList.Items))
 		}
 	})
+
+	t.Run("UpdatesExistingStatefulSetAndService", func(t *testing.T) {
+		fullScheme := runtime.NewScheme()
+		_ = corev1.AddToScheme(fullScheme)
+		_ = appv1alpha1.AddToScheme(fullScheme)
+		_ = appsv1.AddToScheme(fullScheme)
+
+		existingSts := &appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "api-server-db", Namespace: app.Namespace},
+			Spec: appsv1.StatefulSetSpec{
+				Replicas: func() *int32 { r := int32(1); return &r }(),
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{
+							Name:  "postgres",
+							Image: "postgres:15",
+						}},
+					},
+				},
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
+					Spec: corev1.PersistentVolumeClaimSpec{
+						Resources: corev1.VolumeResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("2Gi"),
+							},
+						},
+					},
+				}},
+			},
+		}
+
+		existingSvc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "api-server-db", Namespace: app.Namespace},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{Name: "db", Port: 15432}},
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(fullScheme).
+			WithObjects(app, existingSts, existingSvc).
+			Build()
+
+		r := &HeliosAppReconciler{Client: fakeClient, Scheme: fullScheme}
+
+		ctx := t.Context()
+		err := r.reconcileDatabaseInstance(ctx, app)
+		if err != nil {
+			t.Fatalf("reconcileDatabaseInstance failed: %v", err)
+		}
+
+		updatedSts := &appsv1.StatefulSet{}
+		err = fakeClient.Get(ctx, types.NamespacedName{Name: "api-server-db", Namespace: app.Namespace}, updatedSts)
+		if err != nil {
+			t.Fatalf("failed to get updated StatefulSet: %v", err)
+		}
+		if got := updatedSts.Spec.Template.Spec.Containers[0].Image; got != "postgres:16" {
+			t.Fatalf("expected image postgres:16, got %s", got)
+		}
+
+		updatedSvc := &corev1.Service{}
+		err = fakeClient.Get(ctx, types.NamespacedName{Name: "api-server-db", Namespace: app.Namespace}, updatedSvc)
+		if err != nil {
+			t.Fatalf("failed to get updated Service: %v", err)
+		}
+		if got := updatedSvc.Spec.Ports[0].Port; got != 5432 {
+			t.Fatalf("expected service port 5432, got %d", got)
+		}
+	})
+
+	t.Run("FailsOnStatefulSetStorageDrift", func(t *testing.T) {
+		fullScheme := runtime.NewScheme()
+		_ = corev1.AddToScheme(fullScheme)
+		_ = appv1alpha1.AddToScheme(fullScheme)
+		_ = appsv1.AddToScheme(fullScheme)
+
+		existingSts := &appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "api-server-db", Namespace: app.Namespace},
+			Spec: appsv1.StatefulSetSpec{
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
+					Spec: corev1.PersistentVolumeClaimSpec{
+						Resources: corev1.VolumeResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				}},
+			},
+		}
+
+		existingSvc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "api-server-db", Namespace: app.Namespace},
+			Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Name: "db", Port: 5432}}},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(fullScheme).
+			WithObjects(app, existingSts, existingSvc).
+			Build()
+
+		r := &HeliosAppReconciler{Client: fakeClient, Scheme: fullScheme}
+
+		err := r.reconcileDatabaseInstance(t.Context(), app)
+		if err == nil {
+			t.Fatal("expected storage drift error, got nil")
+		}
+		if !strings.Contains(err.Error(), "storage drift detected") {
+			t.Fatalf("expected storage drift error, got %v", err)
+		}
+	})
 }
 
 func TestInjectDatabaseEnvVars(t *testing.T) {
@@ -980,9 +1092,9 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		}
 
 		container := deploy.Spec.Template.Spec.Containers[0]
-		// Should have PORT + DB_HOST + DB_USER + DB_PASS = 4
-		if len(container.Env) != 4 {
-			t.Fatalf("Expected 4 env vars, got %d", len(container.Env))
+		// Should have PORT + DB_HOST + DB_USER + DB_PASS + DB_PORT = 5
+		if len(container.Env) != 5 {
+			t.Fatalf("Expected 5 env vars, got %d", len(container.Env))
 		}
 
 		expectedEnvs := map[string]string{
@@ -990,6 +1102,7 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			"DB_USER": "DB_USER",
 			"DB_PASS": "DB_PASS",
 		}
+		foundDBPort := false
 		for _, env := range container.Env {
 			if expectedKey, ok := expectedEnvs[env.Name]; ok {
 				if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
@@ -1006,9 +1119,21 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 				}
 				delete(expectedEnvs, env.Name)
 			}
+			if env.Name == "DB_PORT" {
+				if env.Value != "5432" {
+					t.Errorf("Expected DB_PORT=5432, got %q", env.Value)
+				}
+				if env.ValueFrom != nil {
+					t.Error("DB_PORT should not use ValueFrom")
+				}
+				foundDBPort = true
+			}
 		}
 		if len(expectedEnvs) > 0 {
 			t.Errorf("Missing expected env vars: %v", expectedEnvs)
+		}
+		if !foundDBPort {
+			t.Error("Missing DB_PORT env var")
 		}
 	})
 
@@ -1075,9 +1200,9 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		}
 
 		container := deploy.Spec.Template.Spec.Containers[0]
-		// Should have PORT + DB_HOST + DB_USER + DB_PASS = 4
-		if len(container.Env) != 4 {
-			t.Fatalf("Expected 4 env vars, got %d", len(container.Env))
+		// Should have PORT + DB_HOST + DB_USER + DB_PASS + DB_PORT = 5
+		if len(container.Env) != 5 {
+			t.Fatalf("Expected 5 env vars, got %d", len(container.Env))
 		}
 
 		// DB_HOST should now reference the secret, not a plain value
@@ -1135,7 +1260,7 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			},
 		}
 
-		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "api-server-db-secret", "api-server")
+		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "api-server-db-secret", "api-server", 5433)
 		if !changed {
 			t.Fatal("Expected env injection changes")
 		}
@@ -1149,10 +1274,13 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		}
 
 		appContainer := deploy.Spec.Template.Spec.Containers[1]
-		expected := map[string]bool{"DB_HOST": false, "DB_USER": false, "DB_PASS": false}
+		expected := map[string]bool{"DB_HOST": false, "DB_USER": false, "DB_PASS": false, "DB_PORT": false}
 		for _, env := range appContainer.Env {
 			if _, ok := expected[env.Name]; ok {
 				expected[env.Name] = true
+				if env.Name == "DB_PORT" && env.Value != "5433" {
+					t.Errorf("Expected DB_PORT=5433, got %q", env.Value)
+				}
 			}
 		}
 		for name, found := range expected {
@@ -1175,15 +1303,15 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			},
 		}
 
-		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "app-db-secret", "missing-app")
+		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "app-db-secret", "missing-app", 5432)
 		if !changed {
 			t.Fatal("Expected env injection changes")
 		}
 		if exactMatch {
 			t.Fatal("Expected fallback because preferred container does not exist")
 		}
-		if len(deploy.Spec.Template.Spec.Containers[0].Env) != 3 {
-			t.Fatalf("Expected 3 injected DB env vars, got %d", len(deploy.Spec.Template.Spec.Containers[0].Env))
+		if len(deploy.Spec.Template.Spec.Containers[0].Env) != 4 {
+			t.Fatalf("Expected 4 injected DB env vars, got %d", len(deploy.Spec.Template.Spec.Containers[0].Env))
 		}
 	})
 }
