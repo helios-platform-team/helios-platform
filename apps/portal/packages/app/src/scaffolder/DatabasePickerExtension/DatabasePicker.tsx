@@ -23,13 +23,15 @@ export const DatabasePicker = ({
   formData,
 }: FieldExtensionComponentProps<DatabaseConfig | undefined>) => {
   // Default to 'none' if no data is present
-  const dbType: DatabaseType = formData?.dbType === 'postgres' ? 'postgres' : 'none';
+  const dbType: DatabaseType =
+    formData?.dbType === 'postgres' ? 'postgres' : 'none';
   const dbName = formData?.dbName || '';
 
   const handleTypeChange = (
     event: ChangeEvent<{ name?: string; value: unknown }>,
   ) => {
-    const newType: DatabaseType = event.target.value === 'postgres' ? 'postgres' : 'none';
+    const newType: DatabaseType =
+      event.target.value === 'postgres' ? 'postgres' : 'none';
     onChange({
       dbType: newType,
       // Clear the dbName if they switch back to "No Database"

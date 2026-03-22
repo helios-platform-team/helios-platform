@@ -671,11 +671,15 @@ func (r *HeliosAppReconciler) reconcileDatabaseSecretInjection(ctx context.Conte
 		// Inject env vars if not already present.
 		changed, exactContainerMatch := InjectDatabaseEnvVarsForContainer(deploy, secretName, dbTrait.ComponentName, int32(port))
 		if !exactContainerMatch {
+			fallbackContainer := "<no-containers>"
+			if len(deploy.Spec.Template.Spec.Containers) > 0 {
+				fallbackContainer = deploy.Spec.Template.Spec.Containers[0].Name
+			}
 			log.Info("Preferred application container not found, using first container for DB env injection",
 				"component", dbTrait.ComponentName,
 				"deployment", deployName,
 				"preferredContainer", dbTrait.ComponentName,
-				"fallbackContainer", deploy.Spec.Template.Spec.Containers[0].Name)
+				"fallbackContainer", fallbackContainer)
 		}
 
 		if !changed {
@@ -715,7 +719,7 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 		"helios.io/db-type":    "postgres",
 	}
 
-	probeCommand := fmt.Sprintf("pg_isready -U \"$POSTGRES_USER\" -d %q -p \"$PGPORT\"", dbName)
+	probeCommand := `pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -p "$PGPORT"`
 
 	return &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -773,9 +777,9 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 								},
 								{
 									// PGDATA tells Postgres where to store cluster data.
-									// Must match volumeMount + subPath to avoid lost+found conflicts.
+									// Use mount path directly; subPath already selects the PVC folder.
 									Name:  "PGDATA",
-									Value: PostgresDataPath + "/" + PostgresDataSubPath,
+									Value: PostgresDataPath,
 								},
 								{
 									// Ensure consistent UTF-8 encoding for all databases.

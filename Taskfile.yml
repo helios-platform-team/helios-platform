@@ -71,7 +71,7 @@ tasks:
   setup:cluster:
     desc: Create a k3d cluster (idempotent)
     status:
-      - k3d cluster list 2>/dev/null | grep -q '{{.CLUSTER_NAME}}'
+      - k3d kubeconfig get {{.CLUSTER_NAME}}
     cmds:
       - echo "Creating k3d cluster '{{.CLUSTER_NAME}}'..."
       - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 127.0.0.1:6550
@@ -125,8 +125,15 @@ tasks:
     desc: Grant Tekton Triggers SA the permissions to create PipelineRuns
     cmds:
       - >-
-        kubectl create clusterrolebinding tekton-triggers-sa-admin
-        --clusterrole=cluster-admin
+        kubectl create role tekton-triggers-pipelinerun-runner
+        --namespace default
+        --verb=get,list,watch,create,update,patch
+        --resource=pipelineruns.tekton.dev,taskruns.tekton.dev
+        --dry-run=client -o yaml | kubectl apply -f -
+      - >-
+        kubectl create rolebinding tekton-triggers-pipelinerun-runner
+        --namespace default
+        --role=tekton-triggers-pipelinerun-runner
         --serviceaccount=default:tekton-triggers-sa
         --dry-run=client -o yaml | kubectl apply -f -
 

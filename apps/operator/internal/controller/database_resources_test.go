@@ -645,7 +645,7 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 	for _, env := range container.Env {
 		if env.Name == "PGDATA" {
 			foundPGDATA = true
-			expectedPGDATA := PostgresDataPath + "/" + PostgresDataSubPath
+			expectedPGDATA := PostgresDataPath
 			if env.Value != expectedPGDATA {
 				t.Errorf("Expected PGDATA value %q, got %q", expectedPGDATA, env.Value)
 			}
@@ -691,6 +691,9 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 		if !strings.Contains(cmdStr, `-p "$PGPORT"`) {
 			t.Errorf("LivenessProbe command missing custom port flag. Got: %s", cmdStr)
 		}
+		if !strings.Contains(cmdStr, `-d "$POSTGRES_DB"`) {
+			t.Errorf("LivenessProbe command should reference POSTGRES_DB env var. Got: %s", cmdStr)
+		}
 	}
 
 	// Verify readinessProbe uses custom port
@@ -703,6 +706,9 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 		}
 		if !strings.Contains(cmdStr, `-p "$PGPORT"`) {
 			t.Errorf("ReadinessProbe command missing custom port flag. Got: %s", cmdStr)
+		}
+		if !strings.Contains(cmdStr, `-d "$POSTGRES_DB"`) {
+			t.Errorf("ReadinessProbe command should reference POSTGRES_DB env var. Got: %s", cmdStr)
 		}
 	}
 

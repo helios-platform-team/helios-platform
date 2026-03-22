@@ -10,7 +10,10 @@ export const DatabasePickerExtension = scaffolderPlugin.provide(
   createScaffolderFieldExtension({
     name: 'DatabasePicker',
     component: DatabasePicker,
-    validation: (value: DatabaseConfig | undefined, validation: ValidationContext) => {
+    validation: (
+      value: DatabaseConfig | undefined,
+      validation: ValidationContext,
+    ) => {
       // Custom validation: If postgres is selected, dbName MUST be provided
       if (value?.dbType === 'postgres') {
         const dbName =
