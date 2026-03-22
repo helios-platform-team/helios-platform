@@ -217,7 +217,28 @@ tasks:
     dir: apps/portal
     cmds:
       - cmd: |
-          ARGOCD_PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+          decode_base64() {
+            if printf 'Zg==' | base64 --decode >/dev/null 2>&1; then
+              base64 --decode
+              return
+            fi
+            if printf 'Zg==' | base64 -d >/dev/null 2>&1; then
+              base64 -d
+              return
+            fi
+            if printf 'Zg==' | base64 -D >/dev/null 2>&1; then
+              base64 -D
+              return
+            fi
+            if command -v openssl >/dev/null 2>&1; then
+              openssl base64 -d -A
+              return
+            fi
+            echo "No compatible base64 decoder found" >&2
+            return 1
+          }
+
+          ARGOCD_PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | decode_base64)
           TOKEN_JSON=$(curl -k -s -X POST \
             -H "Content-Type: application/json" \
             -d "{\"username\":\"admin\",\"password\":\"$ARGOCD_PASS\"}" \

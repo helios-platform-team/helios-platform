@@ -76,8 +76,6 @@ const app = createApp({
   },
 });
 
-const scaffolderFieldExtensions = [DatabasePickerExtension];
-
 const routes = (
   <FlatRoutes>
     <Route path="/" element={<Navigate to="catalog" />} />
@@ -97,13 +95,16 @@ const routes = (
         <ReportIssue />
       </TechDocsAddons>
     </Route>
-    <Route path="/create" element={
-      <ScaffolderPage>
-        <ScaffolderFieldExtensions>
-          <DatabasePickerExtension />
-        </ScaffolderFieldExtensions>
-      </ScaffolderPage>
-    } />
+    <Route
+      path="/create"
+      element={
+        <ScaffolderPage>
+          <ScaffolderFieldExtensions>
+            <DatabasePickerExtension />
+          </ScaffolderFieldExtensions>
+        </ScaffolderPage>
+      }
+    />
     <Route path="/api-docs" element={<ApiExplorerPage />} />
     <Route
       path="/catalog-import"

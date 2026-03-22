@@ -127,6 +127,8 @@ spec:
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
           port: ${{ parameters.port }}
+          databaseType: ${{ parameters.databaseConfig.dbType }}
+          databaseName: ${{ parameters.databaseConfig.dbName }}
           owner: ${{ parameters.owner }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops

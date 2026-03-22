@@ -137,7 +137,7 @@ func TestGenerateCredentialsUniqueness(t *testing.T) {
 	credentials := make(map[string]bool)
 	iterations := 100
 
-	for i := range iterations {
+	for i := 0; i < iterations; i++ {
 		creds, err := GenerateCredentials()
 		if err != nil {
 			t.Fatalf("GenerateCredentials failed on iteration %d: %v", i, err)
@@ -399,7 +399,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 			Data: map[string][]byte{
 				"DB_USER": []byte("existing-user"),
 				"DB_PASS": []byte("existing-pass"),
-				"DB_HOST": []byte("existing-host"),
+				"DB_HOST": []byte("api-server-db"),
 			},
 		}
 
@@ -665,7 +665,10 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 		t.Error("LivenessProbe should be set on Postgres container")
 	} else {
 		cmdStr := strings.Join(container.LivenessProbe.Exec.Command, " ")
-		if !strings.Contains(cmdStr, "-p $(PGPORT)") {
+		if len(container.LivenessProbe.Exec.Command) != 3 || container.LivenessProbe.Exec.Command[0] != "sh" || container.LivenessProbe.Exec.Command[1] != "-c" {
+			t.Errorf("LivenessProbe command should use shell expansion, got: %v", container.LivenessProbe.Exec.Command)
+		}
+		if !strings.Contains(cmdStr, `-p "$PGPORT"`) {
 			t.Errorf("LivenessProbe command missing custom port flag. Got: %s", cmdStr)
 		}
 	}
@@ -675,7 +678,10 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 		t.Error("ReadinessProbe should be set on Postgres container")
 	} else {
 		cmdStr := strings.Join(container.ReadinessProbe.Exec.Command, " ")
-		if !strings.Contains(cmdStr, "-p $(PGPORT)") {
+		if len(container.ReadinessProbe.Exec.Command) != 3 || container.ReadinessProbe.Exec.Command[0] != "sh" || container.ReadinessProbe.Exec.Command[1] != "-c" {
+			t.Errorf("ReadinessProbe command should use shell expansion, got: %v", container.ReadinessProbe.Exec.Command)
+		}
+		if !strings.Contains(cmdStr, `-p "$PGPORT"`) {
 			t.Errorf("ReadinessProbe command missing custom port flag. Got: %s", cmdStr)
 		}
 	}
@@ -1112,6 +1118,118 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		changed := InjectDatabaseEnvVars(deploy, "test-secret")
 		if changed {
 			t.Error("Expected no changes for Deployment with no containers")
+		}
+	})
+
+	t.Run("TargetsNamedContainerWhenPresent", func(t *testing.T) {
+		deploy := &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "istio-proxy", Image: "proxy:v1"},
+							{Name: "api-server", Image: "myregistry/api:v1"},
+						},
+					},
+				},
+			},
+		}
+
+		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "api-server-db-secret", "api-server")
+		if !changed {
+			t.Fatal("Expected env injection changes")
+		}
+		if !exactMatch {
+			t.Fatal("Expected exact container match")
+		}
+
+		proxyEnvCount := len(deploy.Spec.Template.Spec.Containers[0].Env)
+		if proxyEnvCount != 0 {
+			t.Fatalf("Expected sidecar env to stay unchanged, got %d", proxyEnvCount)
+		}
+
+		appContainer := deploy.Spec.Template.Spec.Containers[1]
+		expected := map[string]bool{"DB_HOST": false, "DB_USER": false, "DB_PASS": false}
+		for _, env := range appContainer.Env {
+			if _, ok := expected[env.Name]; ok {
+				expected[env.Name] = true
+			}
+		}
+		for name, found := range expected {
+			if !found {
+				t.Errorf("Expected env %s on target container", name)
+			}
+		}
+	})
+
+	t.Run("FallsBackToFirstContainerWhenPreferredMissing", func(t *testing.T) {
+		deploy := &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "only-container", Image: "myregistry/app:v1"},
+						},
+					},
+				},
+			},
+		}
+
+		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "app-db-secret", "missing-app")
+		if !changed {
+			t.Fatal("Expected env injection changes")
+		}
+		if exactMatch {
+			t.Fatal("Expected fallback because preferred container does not exist")
+		}
+		if len(deploy.Spec.Template.Spec.Containers[0].Env) != 3 {
+			t.Fatalf("Expected 3 injected DB env vars, got %d", len(deploy.Spec.Template.Spec.Containers[0].Env))
+		}
+	})
+}
+
+func TestValidateDatabaseSecret(t *testing.T) {
+	t.Run("ValidSecret", func(t *testing.T) {
+		secret := &corev1.Secret{
+			Data: map[string][]byte{
+				"DB_USER": []byte("user"),
+				"DB_PASS": []byte("pass"),
+				"DB_HOST": []byte("api-server-db"),
+			},
+		}
+
+		if err := ValidateDatabaseSecret(secret, "api-server-db"); err != nil {
+			t.Fatalf("Expected secret to be valid, got %v", err)
+		}
+	})
+
+	t.Run("MissingRequiredKeys", func(t *testing.T) {
+		secret := &corev1.Secret{Data: map[string][]byte{"DB_USER": []byte("user")}}
+
+		err := ValidateDatabaseSecret(secret, "api-server-db")
+		if err == nil {
+			t.Fatal("Expected validation error for missing keys")
+		}
+		if !strings.Contains(err.Error(), "missing required keys") {
+			t.Fatalf("Expected missing keys error, got %v", err)
+		}
+	})
+
+	t.Run("MismatchedHost", func(t *testing.T) {
+		secret := &corev1.Secret{
+			Data: map[string][]byte{
+				"DB_USER": []byte("user"),
+				"DB_PASS": []byte("pass"),
+				"DB_HOST": []byte("wrong-host"),
+			},
+		}
+
+		err := ValidateDatabaseSecret(secret, "api-server-db")
+		if err == nil {
+			t.Fatal("Expected validation error for host mismatch")
+		}
+		if !strings.Contains(err.Error(), "DB_HOST mismatch") {
+			t.Fatalf("Expected host mismatch error, got %v", err)
 		}
 	})
 }

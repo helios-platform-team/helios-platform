@@ -51,8 +51,8 @@ func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Un
 				map[string]any{
 					"group": "apps",
 					"kind":  "Deployment",
-					"jsonPointers": []any{
-						"/spec/template/spec/containers/0/env",
+					"jqPathExpressions": []any{
+						`.spec.template.spec.containers[].env[] | select(.name == "DB_HOST" or .name == "DB_USER" or .name == "DB_PASS")`,
 					},
 				},
 			},

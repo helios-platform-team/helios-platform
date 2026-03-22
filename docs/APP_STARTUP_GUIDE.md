@@ -81,7 +81,7 @@ The sections below describe each step that `task setup` performs automatically. 
 
 Ensure you have the following installed (run `task check` to verify):
 
-- **Go** >= 1.24 ([install](https://go.dev/dl/))
+- **Go** >= 1.26 ([install](https://go.dev/dl/))
 - **Docker** ([install](https://docs.docker.com/get-docker/))
 - **kubectl** ([install](https://kubernetes.io/docs/tasks/tools/))
 - **k3d** ([install](https://k3d.io/) or `curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash`)

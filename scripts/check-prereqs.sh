@@ -30,6 +30,49 @@ version_gte() {
   printf '%s\n%s' "$2" "$1" | sort -t. -k1,1n -k2,2n -k3,3n -C
 }
 
+trim_ws() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+read_env_value() {
+  local env_file="$1"
+  local wanted_key="$2"
+  local line key value
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="$(trim_ws "$line")"
+    [[ -z "$line" || "${line:0:1}" == "#" ]] && continue
+
+    if [[ "$line" == export\ * ]]; then
+      line="${line#export }"
+      line="$(trim_ws "$line")"
+    fi
+
+    [[ "$line" != *=* ]] && continue
+
+    key="$(trim_ws "${line%%=*}")"
+    value="$(trim_ws "${line#*=}")"
+
+    if [[ "$key" != "$wanted_key" ]]; then
+      continue
+    fi
+
+    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+      value="${value:1:${#value}-2}"
+    elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+
+    printf '%s' "$value"
+    return 0
+  done < "$env_file"
+
+  return 1
+}
+
 # ---------------------------------------------------------------------------
 # Check a single binary
 # $1 = binary name
@@ -67,29 +110,29 @@ echo -e "\n${BOLD}Helios Platform - Prerequisite Check${NC}\n"
 echo "----------------------------------------------"
 
 echo -e "\n${BOLD}Core Tools${NC}"
-check_tool "go" "1.24" \
-  "go version | grep -oP 'go\K[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1" \
+check_tool "go" "1.26" \
+  "go version | awk '{print \$3}' | sed -E 's/^go//' | head -1" \
   "https://go.dev/dl/"
 
 check_tool "docker" "" \
-  "docker --version | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1" \
+  "docker --version | sed -E 's/.* ([0-9]+\.[0-9]+\.[0-9]+).*/\\1/' | head -1" \
   "https://docs.docker.com/get-docker/"
 
 check_tool "kubectl" "" \
-  "kubectl version --client -o json 2>/dev/null | grep -oP '\"gitVersion\":\\s*\"v\K[0-9]+\.[0-9]+\.[0-9]+' | head -1" \
+  "kubectl version --client -o json 2>/dev/null | sed -n -E 's/.*\"gitVersion\"[[:space:]]*:[[:space:]]*\"v([^\"]+)\".*/\\1/p' | head -1" \
   "https://kubernetes.io/docs/tasks/tools/"
 
 check_tool "k3d" "" \
-  "k3d version | head -1 | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+'" \
+  "k3d version | head -1 | sed -n -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
   "https://k3d.io/ or: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash"
 
 check_tool "cue" "" \
-  "cue version | head -1 | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+'" \
+  "cue version | head -1 | sed -n -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
   "go install cuelang.org/go/cmd/cue@latest"
 
 echo -e "\n${BOLD}Node.js / Frontend${NC}"
 check_tool "node" "22.0.0" \
-  "node --version | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+'" \
+  "node --version | sed -E 's/^v//'" \
   "https://nodejs.org/ or use nvm: nvm install 22"
 
 check_tool "yarn" "" \
@@ -130,10 +173,9 @@ if $CHECK_ENV; then
     pass ".env file exists"
 
     REQUIRED_VARS=(GITHUB_TOKEN GITHUB_USER AUTH_GITHUB_CLIENT_ID AUTH_GITHUB_CLIENT_SECRET)
-    set -a; source "$ENV_FILE"; set +a
 
     for var in "${REQUIRED_VARS[@]}"; do
-      val="${!var:-}"
+      val="$(read_env_value "$ENV_FILE" "$var" || true)"
       if [[ -z "$val" || "$val" == ghp_xxxx* || "$val" == "your-"* ]]; then
         fail "$var is not set (or still has placeholder value) in .env"
       else

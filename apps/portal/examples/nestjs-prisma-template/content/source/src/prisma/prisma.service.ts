@@ -13,8 +13,10 @@ import * as pg from 'pg';
  *   - DB_HOST: database hostname (from K8s Secret)
  *   - DB_USER: database username (from K8s Secret)
  *   - DB_PASS: database password (from K8s Secret)
- *   - DB_NAME: database name (from K8s ConfigMap, or defaults to component-db)
- *   - DB_PORT: database port (from K8s ConfigMap, or defaults to 5432)
+ *
+ * Optional vars below are application-level overrides and may be unset:
+ *   - DB_NAME: database name (defaults to postgres)
+ *   - DB_PORT: database port (defaults to 5432)
  */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {

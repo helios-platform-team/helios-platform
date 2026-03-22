@@ -1,6 +1,12 @@
-import React from 'react';
+import type { ChangeEvent } from 'react';
 import { FieldExtensionComponentProps } from '@backstage/plugin-scaffolder-react';
-import { FormControl, InputLabel, Select, MenuItem, TextField } from '@material-ui/core';
+import {
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
+} from '@material-ui/core';
 
 // Define the exact state structure expected by PhuocHoan's CUE schema
 interface DatabaseConfig {
@@ -18,7 +24,7 @@ export const DatabasePicker = ({
   const dbType = formData?.dbType || 'none';
   const dbName = formData?.dbName || '';
 
-  const handleTypeChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+  const handleTypeChange = (event: ChangeEvent<{ value: unknown }>) => {
     const newType = event.target.value as string;
     onChange({
       dbType: newType,
@@ -27,7 +33,7 @@ export const DatabasePicker = ({
     });
   };
 
-  const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNameChange = (event: ChangeEvent<HTMLInputElement>) => {
     onChange({
       dbType,
       dbName: event.target.value,

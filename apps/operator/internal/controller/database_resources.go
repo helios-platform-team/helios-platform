@@ -62,6 +62,8 @@ const (
 	PostgresDataSubPath = "pgdata"
 )
 
+var requiredDatabaseSecretKeys = []string{"DB_USER", "DB_PASS", "DB_HOST"}
+
 // DatabaseCredentials holds generated database credentials
 type DatabaseCredentials struct {
 	Username string
@@ -86,7 +88,7 @@ func GenerateSecurePassword(length int) (string, error) {
 	password := make([]byte, length)
 	charsetLen := big.NewInt(int64(len(PasswordCharset)))
 
-	for i := range length {
+	for i := 0; i < length; i++ {
 		idx, err := rand.Int(rand.Reader, charsetLen)
 		if err != nil {
 			return "", fmt.Errorf("failed to generate random index: %w", err)
@@ -224,6 +226,13 @@ func (r *HeliosAppReconciler) reconcileDatabaseSecrets(ctx context.Context, app 
 	}
 
 	for _, dbTrait := range dbTraits {
+		if strings.ToLower(dbTrait.Properties.DBType) != "postgres" {
+			log.V(1).Info("Skipping credential secret creation for non-postgres database type",
+				"component", dbTrait.ComponentName,
+				"dbType", dbTrait.Properties.DBType)
+			continue
+		}
+
 		secretName := GetDatabaseSecretName(dbTrait.ComponentName)
 		dbHost := GetDatabaseHost(dbTrait.ComponentName)
 
@@ -235,6 +244,13 @@ func (r *HeliosAppReconciler) reconcileDatabaseSecrets(ctx context.Context, app 
 		}, existingSecret)
 
 		if err == nil {
+			if validateErr := ValidateDatabaseSecret(existingSecret, dbHost); validateErr != nil {
+				log.Error(validateErr, "Existing database secret is missing required keys",
+					"component", dbTrait.ComponentName,
+					"secret", secretName)
+				return fmt.Errorf("existing database secret %s is invalid: %w", secretName, validateErr)
+			}
+
 			// Secret already exists - do not overwrite to preserve credentials
 			log.Info("Database secret already exists, skipping",
 				"component", dbTrait.ComponentName,
@@ -462,11 +478,25 @@ var databaseEnvVarNames = []string{"DB_HOST", "DB_USER", "DB_PASS"}
 // If an env var exists but points to a different source (wrong secret, plain
 // value, etc.), it is updated to the expected secretKeyRef.
 func InjectDatabaseEnvVars(deploy *appsv1.Deployment, secretName string) bool {
+	changed, _ := InjectDatabaseEnvVarsForContainer(deploy, secretName, "")
+	return changed
+}
+
+// InjectDatabaseEnvVarsForContainer patches a Deployment container to include
+// DB_HOST, DB_USER, DB_PASS env vars referencing the given K8s Secret.
+// If preferredContainerName is not found, it falls back to the first container.
+// Returns (changed, exactMatch).
+func InjectDatabaseEnvVarsForContainer(deploy *appsv1.Deployment, secretName, preferredContainerName string) (bool, bool) {
 	if len(deploy.Spec.Template.Spec.Containers) == 0 {
-		return false
+		return false, false
 	}
 
-	container := &deploy.Spec.Template.Spec.Containers[0]
+	containerIndex, exactMatch := selectTargetContainerIndex(deploy.Spec.Template.Spec.Containers, preferredContainerName)
+	if containerIndex < 0 {
+		return false, false
+	}
+
+	container := &deploy.Spec.Template.Spec.Containers[containerIndex]
 
 	changed := false
 	for _, envName := range databaseEnvVarNames {
@@ -510,7 +540,25 @@ func InjectDatabaseEnvVars(deploy *appsv1.Deployment, secretName string) bool {
 		}
 	}
 
-	return changed
+	return changed, exactMatch
+}
+
+func selectTargetContainerIndex(containers []corev1.Container, preferredContainerName string) (int, bool) {
+	if len(containers) == 0 {
+		return -1, false
+	}
+
+	if preferredContainerName == "" {
+		return 0, true
+	}
+
+	for i := range containers {
+		if containers[i].Name == preferredContainerName {
+			return i, true
+		}
+	}
+
+	return 0, false
 }
 
 // reconcileDatabaseSecretInjection patches live Deployments (deployed by ArgoCD)
@@ -533,6 +581,13 @@ func (r *HeliosAppReconciler) reconcileDatabaseSecretInjection(ctx context.Conte
 	pendingInjection := false
 
 	for _, dbTrait := range dbTraits {
+		if strings.ToLower(dbTrait.Properties.DBType) != "postgres" {
+			log.V(1).Info("Skipping env var injection for non-postgres database type",
+				"component", dbTrait.ComponentName,
+				"dbType", dbTrait.Properties.DBType)
+			continue
+		}
+
 		secretName := GetDatabaseSecretName(dbTrait.ComponentName)
 		deployName := dbTrait.ComponentName
 
@@ -556,7 +611,16 @@ func (r *HeliosAppReconciler) reconcileDatabaseSecretInjection(ctx context.Conte
 		}
 
 		// Inject env vars if not already present.
-		if !InjectDatabaseEnvVars(deploy, secretName) {
+		changed, exactContainerMatch := InjectDatabaseEnvVarsForContainer(deploy, secretName, dbTrait.ComponentName)
+		if !exactContainerMatch {
+			log.Info("Preferred application container not found, using first container for DB env injection",
+				"component", dbTrait.ComponentName,
+				"deployment", deployName,
+				"preferredContainer", dbTrait.ComponentName,
+				"fallbackContainer", deploy.Spec.Template.Spec.Containers[0].Name)
+		}
+
+		if !changed {
 			log.V(1).Info("Database env vars already injected, skipping",
 				"component", dbTrait.ComponentName,
 				"deployment", deployName)
@@ -592,6 +656,8 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 		"helios.io/trait":      "database",
 		"helios.io/db-type":    "postgres",
 	}
+
+	probeCommand := fmt.Sprintf("pg_isready -U \"$POSTGRES_USER\" -d %q -p \"$PGPORT\"", dbName)
 
 	return &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -684,7 +750,7 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
-										Command: []string{"pg_isready", "-U", "$(POSTGRES_USER)", "-d", dbName, "-p", "$(PGPORT)"},
+										Command: []string{"sh", "-c", probeCommand},
 									},
 								},
 								InitialDelaySeconds: 5,
@@ -693,7 +759,7 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									Exec: &corev1.ExecAction{
-										Command: []string{"pg_isready", "-U", "$(POSTGRES_USER)", "-d", dbName, "-p", "$(PGPORT)"},
+										Command: []string{"sh", "-c", probeCommand},
 									},
 								},
 								InitialDelaySeconds: 30,
@@ -722,6 +788,32 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 			},
 		},
 	}, nil
+}
+
+// ValidateDatabaseSecret ensures an existing database credential Secret has all
+// required keys and the expected DB_HOST value.
+func ValidateDatabaseSecret(secret *corev1.Secret, expectedHost string) error {
+	if secret == nil {
+		return fmt.Errorf("secret is nil")
+	}
+
+	missingKeys := make([]string, 0, len(requiredDatabaseSecretKeys))
+	for _, key := range requiredDatabaseSecretKeys {
+		value, ok := secret.Data[key]
+		if !ok || len(value) == 0 {
+			missingKeys = append(missingKeys, key)
+		}
+	}
+
+	if len(missingKeys) > 0 {
+		return fmt.Errorf("missing required keys: %s", strings.Join(missingKeys, ", "))
+	}
+
+	if expectedHost != "" && string(secret.Data["DB_HOST"]) != expectedHost {
+		return fmt.Errorf("DB_HOST mismatch: got %q, expected %q", string(secret.Data["DB_HOST"]), expectedHost)
+	}
+
+	return nil
 }
 
 // GenerateDatabaseService creates a headless Service for a database StatefulSet.

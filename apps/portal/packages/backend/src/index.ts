@@ -6,12 +6,13 @@
  * Happy hacking!
  */
 
-import { resolve } from 'path';
 import * as dotenv from 'dotenv';
 import { createBackend } from '@backstage/backend-defaults';
+import { customAuth } from './extensions/auth';
+import { scaffolderModuleCustomActions } from './extensions/scaffolder';
 
 // Load env vars from root .env
-dotenv.config({ path: resolve(__dirname, '../../../.env'), debug: true });
+dotenv.config({ debug: true });
 
 const backend = createBackend();
 
@@ -21,9 +22,7 @@ backend.add(import('@backstage/plugin-proxy-backend'));
 // scaffolder plugin
 backend.add(import('@backstage/plugin-scaffolder-backend'));
 backend.add(import('@backstage/plugin-scaffolder-backend-module-github'));
-import { scaffolderModuleCustomActions } from './extensions/scaffolder';
 backend.add(scaffolderModuleCustomActions);
-import { customAuth } from './extensions/auth';
 
 backend.add(
   import('@backstage/plugin-scaffolder-backend-module-notifications'),

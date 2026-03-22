@@ -29,7 +29,7 @@ spec:
             port: ${{ values.port }}
         - type: database
           properties:
-            dbType: postgres
-            dbName: ${{ values.name | replace('-', '_') }}_db
+            dbType: ${{ values.databaseType | default("postgres") }}
+            dbName: ${{ values.databaseName }}
             version: "16"
             storage: "1Gi"
