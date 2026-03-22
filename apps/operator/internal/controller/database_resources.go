@@ -37,8 +37,8 @@ const (
 	DefaultUsernameLength = 16
 
 	// PasswordCharset contains valid characters for password generation
-	// Includes uppercase, lowercase, digits, and special characters
-	PasswordCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+"
+	// Includes uppercase, lowercase, digits, and URL/shell-safe symbols.
+	PasswordCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"
 
 	// UsernameCharset contains valid characters for username generation
 	// Lowercase letters and digits only for database compatibility
@@ -588,7 +588,7 @@ func selectTargetContainerIndex(containers []corev1.Container, preferredContaine
 	}
 
 	if preferredContainerName == "" {
-		return 0, true
+		return 0, false
 	}
 
 	for i := range containers {

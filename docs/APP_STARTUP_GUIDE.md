@@ -146,7 +146,6 @@ kubectl rollout restart deployment tekton-pipelines-controller -n tekton-pipelin
 
 > [!WARNING]
 > **Only apply this patch if your k3s node version is below 1.28.**
-
 > k3d typically ships with a recent k3s version (1.28+), so this patch is rarely needed. Check with `kubectl version`.
 
 ```bash

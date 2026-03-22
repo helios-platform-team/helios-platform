@@ -9,7 +9,7 @@ import {
 } from '@material-ui/core';
 
 // Define the exact state structure expected by PhuocHoan's CUE schema
-interface DatabaseConfig {
+export interface DatabaseConfig {
   dbType: string;
   dbName?: string;
 }

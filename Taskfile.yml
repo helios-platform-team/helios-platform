@@ -74,7 +74,7 @@ tasks:
       - k3d cluster list 2>/dev/null | grep -q '{{.CLUSTER_NAME}}'
     cmds:
       - echo "Creating k3d cluster '{{.CLUSTER_NAME}}'..."
-      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 0.0.0.0:6550
+      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 127.0.0.1:6550
       - kubectl config set-cluster k3d-{{.CLUSTER_NAME}} --server=https://localhost:6550
       - kubectl cluster-info
 
@@ -170,8 +170,6 @@ tasks:
     dir: apps/operator
     env:
       HELIOS_CUE_PATH: '{{.ROOT_DIR}}/cue'
-      GITHUB_TOKEN: $GITHUB_TOKEN
-      GITHUB_USER: $GITHUB_USER
     cmds:
       - cmd: make run
         platforms: [linux, darwin]
@@ -180,82 +178,8 @@ tasks:
 
   dev:portal:
     desc: Run the Backstage portal with ArgoCD + kubectl proxy
-    dir: apps/portal
-    env:
-      AUTH_GITHUB_CLIENT_ID: $AUTH_GITHUB_CLIENT_ID
-      AUTH_GITHUB_CLIENT_SECRET: $AUTH_GITHUB_CLIENT_SECRET
-      GITHUB_TOKEN: $GITHUB_TOKEN
-      GITHUB_ORG: $GITHUB_ORG
     cmds:
-      - task: dev:portal:proxy
-      - task: dev:portal:start
-
-  dev:portal:proxy:
-    desc: Start kubectl proxy and ArgoCD port-forward
-    internal: true
-    cmds:
-      - echo "Starting ArgoCD port-forward (localhost:{{.ARGOCD_PORT}})..."
-      - cmd: kubectl port-forward -n argocd svc/argocd-server {{.ARGOCD_PORT}}:443 &>/dev/null &
-        platforms: [linux, darwin]
-      - cmd: powershell -Command "Start-Process kubectl -ArgumentList 'port-forward', '-n', 'argocd', 'svc/argocd-server', '{{.ARGOCD_PORT}}:443' -WindowStyle Hidden"
-        platforms: [windows]
-      - cmd: sleep 2
-        platforms: [linux, darwin]
-      - cmd: powershell -Command "Start-Sleep -Seconds 2"
-        platforms: [windows]
-      - echo "Starting kubectl proxy (localhost:{{.KUBECTL_PROXY_PORT}})..."
-      - cmd: kubectl proxy --port={{.KUBECTL_PROXY_PORT}} &>/dev/null &
-        platforms: [linux, darwin]
-      - cmd: powershell -Command "Start-Process kubectl -ArgumentList 'proxy', '--port={{.KUBECTL_PROXY_PORT}}' -WindowStyle Hidden"
-        platforms: [windows]
-      - cmd: sleep 1
-        platforms: [linux, darwin]
-      - cmd: powershell -Command "Start-Sleep -Seconds 1"
-        platforms: [windows]
-
-  dev:portal:start:
-    desc: Generate ArgoCD token and start Backstage
-    internal: true
-    dir: apps/portal
-    cmds:
-      - cmd: |
-          decode_base64() {
-            if printf 'Zg==' | base64 --decode >/dev/null 2>&1; then
-              base64 --decode
-              return
-            fi
-            if printf 'Zg==' | base64 -d >/dev/null 2>&1; then
-              base64 -d
-              return
-            fi
-            if printf 'Zg==' | base64 -D >/dev/null 2>&1; then
-              base64 -D
-              return
-            fi
-            if command -v openssl >/dev/null 2>&1; then
-              openssl base64 -d -A
-              return
-            fi
-            echo "No compatible base64 decoder found" >&2
-            return 1
-          }
-
-          ARGOCD_PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | decode_base64)
-          TOKEN_JSON=$(curl -k -s -X POST \
-            -H "Content-Type: application/json" \
-            -d "{\"username\":\"admin\",\"password\":\"$ARGOCD_PASS\"}" \
-            https://127.0.0.1:{{.ARGOCD_PORT}}/api/v1/session)
-          if command -v jq >/dev/null 2>&1; then
-            export ARGOCD_AUTH_TOKEN=$(echo "$TOKEN_JSON" | jq -r '.token // empty')
-          else
-            export ARGOCD_AUTH_TOKEN=$(echo "$TOKEN_JSON" | sed 's/.*"token":"\([^"]*\)".*/\1/')
-          fi
-          if [ -z "$ARGOCD_AUTH_TOKEN" ] || [ "${#ARGOCD_AUTH_TOKEN}" -lt 20 ]; then
-            echo "WARNING: Could not generate ArgoCD token. ArgoCD features may not work."
-          else
-            echo "ArgoCD token generated."
-          fi
-          yarn start
+      - cmd: cd apps/portal && ./start-dev.sh
         platforms: [linux, darwin]
       - cmd: powershell -ExecutionPolicy Bypass -File ../../scripts/start-portal.ps1 -ArgocdPort {{.ARGOCD_PORT}}
         platforms: [windows]

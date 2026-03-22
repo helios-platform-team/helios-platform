@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -11,10 +12,43 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
 )
+
+func newControllerTestScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add corev1 to scheme: %v", err)
+	}
+	if err := appv1alpha1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add appv1alpha1 to scheme: %v", err)
+	}
+	if err := appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("failed to add appsv1 to scheme: %v", err)
+	}
+
+	return scheme
+}
+
+func newControllerTestReconciler(t *testing.T, objs ...client.Object) (*HeliosAppReconciler, client.Client) {
+	t.Helper()
+
+	scheme := newControllerTestScheme(t)
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(objs...).
+		Build()
+
+	return &HeliosAppReconciler{
+		Client: fakeClient,
+		Scheme: scheme,
+	}, fakeClient
+}
 
 func TestGenerateSecurePassword(t *testing.T) {
 	tests := []struct {
@@ -316,11 +350,6 @@ func TestExtractDatabaseTraits(t *testing.T) {
 }
 
 func TestReconcileDatabaseSecrets(t *testing.T) {
-	// Create a fake client
-	scheme := runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
-	_ = appv1alpha1.AddToScheme(scheme)
-
 	dbProps := map[string]any{
 		"dbType":  "postgres",
 		"dbName":  "mydb",
@@ -353,15 +382,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 	}
 
 	t.Run("CreateNewSecret", func(t *testing.T) {
-		client := fake.NewClientBuilder().
-			WithScheme(scheme).
-			WithObjects(app).
-			Build()
-
-		r := &HeliosAppReconciler{
-			Client: client,
-			Scheme: scheme,
-		}
+		r, fakeClient := newControllerTestReconciler(t, app)
 
 		ctx := t.Context()
 		err := r.reconcileDatabaseSecrets(ctx, app)
@@ -371,7 +392,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 
 		// Verify secret was created
 		secret := &corev1.Secret{}
-		err = client.Get(ctx, types.NamespacedName{
+		err = fakeClient.Get(ctx, types.NamespacedName{
 			Name:      "api-server-db-secret",
 			Namespace: "default",
 		}, secret)
@@ -404,15 +425,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 			},
 		}
 
-		client := fake.NewClientBuilder().
-			WithScheme(scheme).
-			WithObjects(app, existingSecret).
-			Build()
-
-		r := &HeliosAppReconciler{
-			Client: client,
-			Scheme: scheme,
-		}
+		r, fakeClient := newControllerTestReconciler(t, app, existingSecret)
 
 		ctx := t.Context()
 		err := r.reconcileDatabaseSecrets(ctx, app)
@@ -422,7 +435,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 
 		// Verify existing secret was not modified
 		secret := &corev1.Secret{}
-		err = client.Get(ctx, types.NamespacedName{
+		err = fakeClient.Get(ctx, types.NamespacedName{
 			Name:      "api-server-db-secret",
 			Namespace: "default",
 		}, secret)
@@ -433,6 +446,12 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 		// The existing secret should preserve the original values
 		if string(secret.Data["DB_USER"]) != "existing-user" {
 			t.Errorf("Expected existing DB_USER to be preserved, got %s", string(secret.Data["DB_USER"]))
+		}
+		if string(secret.Data["DB_PASS"]) != "existing-pass" {
+			t.Errorf("Expected existing DB_PASS to be preserved, got %s", string(secret.Data["DB_PASS"]))
+		}
+		if string(secret.Data["DB_HOST"]) != "api-server-db" {
+			t.Errorf("Expected existing DB_HOST to be preserved, got %s", string(secret.Data["DB_HOST"]))
 		}
 	})
 
@@ -461,15 +480,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 			},
 		}
 
-		client := fake.NewClientBuilder().
-			WithScheme(scheme).
-			WithObjects(appWithoutDB).
-			Build()
-
-		r := &HeliosAppReconciler{
-			Client: client,
-			Scheme: scheme,
-		}
+		r, fakeClient := newControllerTestReconciler(t, appWithoutDB)
 
 		ctx := t.Context()
 		err := r.reconcileDatabaseSecrets(ctx, appWithoutDB)
@@ -479,7 +490,7 @@ func TestReconcileDatabaseSecrets(t *testing.T) {
 
 		// Verify no secret was created
 		secretList := &corev1.SecretList{}
-		err = client.List(ctx, secretList)
+		err = fakeClient.List(ctx, secretList)
 		if err != nil {
 			t.Fatalf("Failed to list secrets: %v", err)
 		}
@@ -523,6 +534,14 @@ func TestGenerateBase64Token(t *testing.T) {
 			expectedBase64Len := ((expectedLen + 2) / 3) * 4
 			if len(token) != expectedBase64Len {
 				t.Errorf("Expected base64 length %d, got %d", expectedBase64Len, len(token))
+			}
+
+			decoded, decodeErr := base64.StdEncoding.DecodeString(token)
+			if decodeErr != nil {
+				t.Fatalf("Token is not valid base64: %v", decodeErr)
+			}
+			if len(decoded) != expectedLen {
+				t.Errorf("Expected decoded token length %d, got %d", expectedLen, len(decoded))
 			}
 		})
 	}
@@ -777,20 +796,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 	}
 
 	t.Run("CreatesStatefulSetAndService", func(t *testing.T) {
-		fullScheme := runtime.NewScheme()
-		_ = corev1.AddToScheme(fullScheme)
-		_ = appv1alpha1.AddToScheme(fullScheme)
-		_ = appsv1.AddToScheme(fullScheme)
-
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(fullScheme).
-			WithObjects(app).
-			Build()
-
-		r := &HeliosAppReconciler{
-			Client: fakeClient,
-			Scheme: fullScheme,
-		}
+		r, fakeClient := newControllerTestReconciler(t, app)
 
 		ctx := t.Context()
 		err := r.reconcileDatabaseInstance(ctx, app)
@@ -859,20 +865,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			},
 		}
 
-		fullScheme := runtime.NewScheme()
-		_ = corev1.AddToScheme(fullScheme)
-		_ = appv1alpha1.AddToScheme(fullScheme)
-		_ = appsv1.AddToScheme(fullScheme)
-
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(fullScheme).
-			WithObjects(appWithoutDB).
-			Build()
-
-		r := &HeliosAppReconciler{
-			Client: fakeClient,
-			Scheme: fullScheme,
-		}
+		r, fakeClient := newControllerTestReconciler(t, appWithoutDB)
 
 		ctx := t.Context()
 		err := r.reconcileDatabaseInstance(ctx, appWithoutDB)
@@ -925,20 +918,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			},
 		}
 
-		fullScheme := runtime.NewScheme()
-		_ = corev1.AddToScheme(fullScheme)
-		_ = appv1alpha1.AddToScheme(fullScheme)
-		_ = appsv1.AddToScheme(fullScheme)
-
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(fullScheme).
-			WithObjects(appWithRedis).
-			Build()
-
-		r := &HeliosAppReconciler{
-			Client: fakeClient,
-			Scheme: fullScheme,
-		}
+		r, fakeClient := newControllerTestReconciler(t, appWithRedis)
 
 		ctx := t.Context()
 		err := r.reconcileDatabaseInstance(ctx, appWithRedis)
@@ -955,11 +935,6 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 	})
 
 	t.Run("UpdatesExistingStatefulSetAndService", func(t *testing.T) {
-		fullScheme := runtime.NewScheme()
-		_ = corev1.AddToScheme(fullScheme)
-		_ = appv1alpha1.AddToScheme(fullScheme)
-		_ = appsv1.AddToScheme(fullScheme)
-
 		existingSts := &appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "api-server-db", Namespace: app.Namespace},
 			Spec: appsv1.StatefulSetSpec{
@@ -991,12 +966,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			},
 		}
 
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(fullScheme).
-			WithObjects(app, existingSts, existingSvc).
-			Build()
-
-		r := &HeliosAppReconciler{Client: fakeClient, Scheme: fullScheme}
+		r, fakeClient := newControllerTestReconciler(t, app, existingSts, existingSvc)
 
 		ctx := t.Context()
 		err := r.reconcileDatabaseInstance(ctx, app)
@@ -1024,11 +994,6 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 	})
 
 	t.Run("FailsOnStatefulSetStorageDrift", func(t *testing.T) {
-		fullScheme := runtime.NewScheme()
-		_ = corev1.AddToScheme(fullScheme)
-		_ = appv1alpha1.AddToScheme(fullScheme)
-		_ = appsv1.AddToScheme(fullScheme)
-
 		existingSts := &appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "api-server-db", Namespace: app.Namespace},
 			Spec: appsv1.StatefulSetSpec{
@@ -1049,12 +1014,7 @@ func TestReconcileDatabaseInstance(t *testing.T) {
 			Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Name: "db", Port: 5432}}},
 		}
 
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(fullScheme).
-			WithObjects(app, existingSts, existingSvc).
-			Build()
-
-		r := &HeliosAppReconciler{Client: fakeClient, Scheme: fullScheme}
+		r, _ := newControllerTestReconciler(t, app, existingSts, existingSvc)
 
 		err := r.reconcileDatabaseInstance(t.Context(), app)
 		if err == nil {
@@ -1314,6 +1274,28 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			t.Fatalf("Expected 4 injected DB env vars, got %d", len(deploy.Spec.Template.Spec.Containers[0].Env))
 		}
 	})
+
+	t.Run("NoPreferredContainerUsesFallback", func(t *testing.T) {
+		deploy := &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "app", Image: "myregistry/app:v1"},
+						},
+					},
+				},
+			},
+		}
+
+		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "app-db-secret", "", 5432)
+		if !changed {
+			t.Fatal("Expected env injection changes")
+		}
+		if exactMatch {
+			t.Fatal("Expected fallback semantics when preferred container is empty")
+		}
+	})
 }
 
 func TestValidateDatabaseSecret(t *testing.T) {
@@ -1395,11 +1377,6 @@ func TestReconcileDatabaseSecretInjection(t *testing.T) {
 	}
 
 	t.Run("InjectsIntoExistingDeployment", func(t *testing.T) {
-		fullScheme := runtime.NewScheme()
-		_ = corev1.AddToScheme(fullScheme)
-		_ = appv1alpha1.AddToScheme(fullScheme)
-		_ = appsv1.AddToScheme(fullScheme)
-
 		existingDeploy := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "api-server",
@@ -1428,15 +1405,7 @@ func TestReconcileDatabaseSecretInjection(t *testing.T) {
 			},
 		}
 
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(fullScheme).
-			WithObjects(app, existingDeploy).
-			Build()
-
-		r := &HeliosAppReconciler{
-			Client: fakeClient,
-			Scheme: fullScheme,
-		}
+		r, fakeClient := newControllerTestReconciler(t, app, existingDeploy)
 
 		ctx := t.Context()
 		pending, err := r.reconcileDatabaseSecretInjection(ctx, app)
@@ -1498,20 +1467,7 @@ func TestReconcileDatabaseSecretInjection(t *testing.T) {
 			},
 		}
 
-		fullScheme := runtime.NewScheme()
-		_ = corev1.AddToScheme(fullScheme)
-		_ = appv1alpha1.AddToScheme(fullScheme)
-		_ = appsv1.AddToScheme(fullScheme)
-
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(fullScheme).
-			WithObjects(appWithoutDB).
-			Build()
-
-		r := &HeliosAppReconciler{
-			Client: fakeClient,
-			Scheme: fullScheme,
-		}
+		r, _ := newControllerTestReconciler(t, appWithoutDB)
 
 		ctx := t.Context()
 		pending, err := r.reconcileDatabaseSecretInjection(ctx, appWithoutDB)
@@ -1526,20 +1482,7 @@ func TestReconcileDatabaseSecretInjection(t *testing.T) {
 	t.Run("DeploymentNotFound_GracefulSkip", func(t *testing.T) {
 		// When Deployment doesn't exist yet (ArgoCD hasn't synced),
 		// the reconciler should skip without error.
-		fullScheme := runtime.NewScheme()
-		_ = corev1.AddToScheme(fullScheme)
-		_ = appv1alpha1.AddToScheme(fullScheme)
-		_ = appsv1.AddToScheme(fullScheme)
-
-		fakeClient := fake.NewClientBuilder().
-			WithScheme(fullScheme).
-			WithObjects(app).
-			Build()
-
-		r := &HeliosAppReconciler{
-			Client: fakeClient,
-			Scheme: fullScheme,
-		}
+		r, _ := newControllerTestReconciler(t, app)
 
 		ctx := t.Context()
 		pending, err := r.reconcileDatabaseSecretInjection(ctx, app)
