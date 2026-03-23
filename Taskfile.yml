@@ -17,14 +17,14 @@
 #   Linux/macOS: works natively
 #   Windows:     requires Git Bash or WSL (for bash-based sub-scripts)
 # =============================================================================
-version: '3'
+version: "3"
 
-dotenv: ['.env']
+dotenv: [".env"]
 
 vars:
   CLUSTER_NAME: helios-dev
-  ARGOCD_PORT: '8080'
-  KUBECTL_PROXY_PORT: '8001'
+  ARGOCD_PORT: "8080"
+  KUBECTL_PROXY_PORT: "8001"
 
 set: [errexit, pipefail]
 
@@ -57,6 +57,7 @@ tasks:
     cmds:
       - task: setup:cluster
       - task: setup:tekton
+      - task: setup:tekton-pruner
       - task: setup:argocd
       - task: setup:crds
       - task: setup:tekton-rbac
@@ -74,12 +75,16 @@ tasks:
       - k3d kubeconfig get {{.CLUSTER_NAME}}
     cmds:
       - echo "Creating k3d cluster '{{.CLUSTER_NAME}}'..."
-      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 127.0.0.1:6550
+      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 127.0.0.1:6550 --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0"
       - kubectl config set-cluster k3d-{{.CLUSTER_NAME}} --server=https://localhost:6550
       - kubectl cluster-info
 
   setup:tekton:
     desc: Install Tekton Pipeline, Triggers, and Interceptors
+    status:
+      - kubectl get namespace tekton-pipelines
+      - kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines
+      - kubectl get deployment/tekton-pipelines-webhook -n tekton-pipelines
     cmds:
       - echo "Installing Tekton Pipeline..."
       - kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml --request-timeout=120s
@@ -103,18 +108,67 @@ tasks:
       - kubectl rollout restart deployment tekton-pipelines-controller -n tekton-pipelines
       - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
 
+  setup:tekton-pruner:
+    desc: Install Tekton Pruner to clean old PipelineRuns/TaskRuns
+    status:
+      - kubectl get deployment/tekton-pruner-controller -n tekton-pipelines
+      - kubectl get configmap/tekton-pruner-default-spec -n tekton-pipelines
+    cmds:
+      - echo "Installing Tekton Pruner..."
+      - kubectl apply -f "https://infra.tekton.dev/tekton-releases/pruner/previous/v0.3.3/release.yaml"
+      - echo "Waiting for Tekton Pruner deployments..."
+      - kubectl rollout status deployment/tekton-pruner-controller -n tekton-pipelines --timeout=300s
+      - kubectl rollout status deployment/tekton-pruner-webhook -n tekton-pipelines --timeout=300s
+      - echo "Waiting for webhook endpoints to register..."
+      - cmd: sleep 10
+        platforms: [linux, darwin]
+      - cmd: powershell -Command "Start-Sleep -Seconds 10"
+        platforms: [windows]
+      - echo "Configuring Tekton Pruner (global TTL)..."
+      - cmd: |
+          kubectl apply -f - <<'EOF'
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: tekton-pruner-default-spec
+            namespace: tekton-pipelines
+            labels:
+              app.kubernetes.io/part-of: tekton-pruner
+              pruner.tekton.dev/config-type: global
+          data:
+            global-config: |
+              enforcedConfigLevel: global
+              ttlSecondsAfterFinished: 7200
+              successfulHistoryLimit: 3
+              failedHistoryLimit: 3
+          EOF
+      - echo "Waiting for Tekton Pruner controller..."
+      - kubectl wait --for=condition=Ready pod -l app=tekton-pruner-controller -n tekton-pipelines --timeout=180s
+
   setup:argocd:
     desc: Install ArgoCD
+    status:
+      - kubectl get namespace argocd
+      - kubectl get deployment/argocd-repo-server -n argocd
     cmds:
       - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
       - echo "Installing ArgoCD..."
-      - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-      - echo "Waiting for ArgoCD server..."
-      - kubectl rollout status deployment/argocd-server -n argocd --timeout=600s
+      - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/core-install.yaml
+      - echo "Waiting for ArgoCD components to be created..."
+      - cmd: sleep 10
+        platforms: [linux, darwin]
+      - cmd: powershell -Command "Start-Sleep -Seconds 10"
+        platforms: [windows]
+      - echo "Waiting for ArgoCD repo server..."
+      - kubectl rollout status deployment/argocd-repo-server -n argocd --timeout=600s
+      - echo "Waiting for ArgoCD application controller..."
+      - kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=600s
 
   setup:crds:
     desc: Install Helios CRDs into the cluster
     dir: apps/operator
+    status:
+      - kubectl get crd heliosapps.app.helios.io
     cmds:
       - cmd: make install
         platforms: [linux, darwin]
@@ -123,6 +177,9 @@ tasks:
 
   setup:tekton-rbac:
     desc: Grant Tekton Triggers SA the permissions to create PipelineRuns
+    status:
+      - kubectl get role tekton-triggers-pipelinerun-runner --namespace default
+      - kubectl get rolebinding tekton-triggers-pipelinerun-runner --namespace default
     cmds:
       - >-
         kubectl create role tekton-triggers-pipelinerun-runner
@@ -188,7 +245,7 @@ tasks:
     desc: Run the Helios operator locally
     dir: apps/operator
     env:
-      HELIOS_CUE_PATH: '{{.ROOT_DIR}}/cue'
+      HELIOS_CUE_PATH: "{{.ROOT_DIR}}/cue"
     cmds:
       - cmd: make run
         platforms: [linux, darwin]

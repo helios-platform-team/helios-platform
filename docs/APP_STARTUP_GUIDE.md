@@ -111,7 +111,7 @@ GITHUB_TOKEN=
 ## Step 1: Create a Fresh k3d Cluster
 
 ```bash
-k3d cluster create helios-dev --agents 1 --wait
+k3d cluster create helios-dev --agents 1 --wait --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0"
 ```
 
 ---
@@ -154,13 +154,39 @@ kubectl set env deployment/tekton-pipelines-controller -n tekton-pipelines KUBER
 kubectl set env deployment/tekton-pipelines-webhook -n tekton-pipelines KUBERNETES_MIN_VERSION=1.20.0
 ```
 
+### 2.5 Install Tekton Pruner (dọn `PipelineRun`/`TaskRun` cũ)
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/tektoncd/pruner/main/release.yaml
+
+# Global retention (local/dev): delete completed runs after 1 hour.
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tekton-pruner-default-spec
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/part-of: tekton-pruner
+    pruner.tekton.dev/config-type: global
+data:
+  global-config: |
+    enforcedConfigLevel: global
+    ttlSecondsAfterFinished: 3600
+    successfulHistoryLimit: 3
+    failedHistoryLimit: 3
+EOF
+
+kubectl wait --for=condition=Ready pod -l app=tekton-pruner-controller -n tekton-pipelines --timeout=180s
+```
+
 ---
 
 ## Step 3: Install ArgoCD
 
 ```bash
 kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/core-install.yaml
 ```
 
 ---
@@ -374,9 +400,9 @@ kubectl get pods -n default | grep "advanced-nodejs-app-v14-run"
 
 | Step | Description | Command |
 |------|-------------|---------|
-| 1 | Create cluster | `k3d cluster create helios-dev --agents 1 --wait` |
-| 2 | Install Tekton | `kubectl apply -f https://storage.googleapis.com/tekton-releases/...` |
-| 3 | Install ArgoCD | `kubectl apply -n argocd -f https://...argo-cd/.../install.yaml` |
+| 1 | Create cluster | `k3d cluster create helios-dev --agents 1 --wait --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0"` |
+| 2 | Install Tekton + Pruner | `kubectl apply -f https://storage.googleapis.com/tekton-releases/...` + `kubectl apply -f https://raw.githubusercontent.com/tektoncd/pruner/main/release.yaml` |
+| 3 | Install ArgoCD | `kubectl apply -n argocd -f https://...argo-cd/.../core-install.yaml` |
 | 4 | Run operator | `make -C apps/operator run` |
 | 5 | Apply Tekton resources | `kubectl apply -f apps/operator/tekton/` |
 | 6 | Grant permissions | `kubectl create clusterrolebinding tekton-triggers-sa-admin ...` |
