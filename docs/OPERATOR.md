@@ -12,7 +12,7 @@ The **Helios Operator** is the core control plane component of the Helios Platfo
 
 To develop or run the operator, you need:
 
-- **Go**: v1.24.0+
+- **Go**: v1.26.0+
 - **Docker**: 17.03+
 - **kubectl**: v1.11.3+
 - **Kubernetes Cluster**: Access to a `v1.11.3+` cluster (e.g., Kind, Minikube, or EKS).

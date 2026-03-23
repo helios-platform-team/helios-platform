@@ -1,5 +1,31 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=../../scripts/lib/env_helpers.sh
+source "$SCRIPT_DIR/../../scripts/lib/env_helpers.sh"
+
+decode_base64() {
+  if printf 'Zg==' | base64 --decode >/dev/null 2>&1; then
+    base64 --decode
+    return
+  fi
+  if printf 'Zg==' | base64 -d >/dev/null 2>&1; then
+    base64 -d
+    return
+  fi
+  if printf 'Zg==' | base64 -D >/dev/null 2>&1; then
+    base64 -D
+    return
+  fi
+  if command -v openssl >/dev/null 2>&1; then
+    openssl base64 -d -A
+    return
+  fi
+
+  echo "No compatible base64 decoder found" >&2
+  return 1
+}
 
 # Colors
 GREEN='\033[0;32m'
@@ -9,7 +35,7 @@ NC='\033[0m' # No Color
 
 # 1. ArgoCD Token Automation
 echo -e "${YELLOW}🔑  Fetching ArgoCD Admin Password...${NC}"
-ARGOCD_PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+ARGOCD_PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | decode_base64)
 
 echo -e "${YELLOW}🔄  Generating ArgoCD Token...${NC}"
 # Use temporary port-forward to get token if not running
@@ -58,9 +84,13 @@ trap cleanup EXIT INT TERM
 echo -e "${GREEN}🌟  Starting Backstage Portal...${NC}"
 # Load existing .env if present (but override TOKEN)
 if [ -f .env ]; then
-  set -a
-  source .env
-  set +a
+  SAFE_ENV_KEYS=(AUTH_GITHUB_CLIENT_ID AUTH_GITHUB_CLIENT_SECRET GITHUB_ORG GITHUB_TOKEN)
+  for key in "${SAFE_ENV_KEYS[@]}"; do
+    value="$(read_env_value .env "$key" || true)"
+    if [ -n "$value" ]; then
+      export "$key=$value"
+    fi
+  done
 fi
 export ARGOCD_AUTH_TOKEN # Re-export to ensure override
 

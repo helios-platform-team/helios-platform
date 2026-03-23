@@ -11,7 +11,7 @@ on:
   pull_request:
     branches:
       - main
-      - 'features/*'
+      - "features/*"
 
 jobs:
   test:
@@ -23,12 +23,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.26'
+          go-version: "1.26"
           cache-dependency-path: apps/operator/go.sum
 
       - name: Run tests

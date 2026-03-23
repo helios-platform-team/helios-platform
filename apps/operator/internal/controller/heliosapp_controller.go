@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -59,7 +60,7 @@ type HeliosAppReconciler struct {
 // +kubebuilder:rbac:groups=app.helios.io,resources=heliosapps/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile handles the reconciliation loop for HeliosApp
 // Controller does NOT iterate components/traits - all orchestration is in CUE
@@ -85,19 +86,6 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	// VALIDATION: Ensure image is present (Fix "First Commit Missing Image")
-	for _, comp := range appModel.App.Components {
-		// We can add more specific checks here based on component type
-		// For now, checks if 'image' property exists and is not empty for all components
-		// assuming all workloads need an image.
-		if img, ok := comp.Properties["image"].(string); !ok || img == "" {
-			msg := fmt.Sprintf("Component '%s' is waiting for image (likely building). Status: Pending.", comp.Name)
-			log.Info(msg)
-			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhasePending, msg)
-			return ctrl.Result{}, nil // Wait for next update (CI/CD will update CR with image)
-		}
-	}
-
 	// 3. Render via CUE Engine
 	manifestBytes, err := r.CueEngine.Render(appModel)
 	if err != nil {
@@ -114,6 +102,58 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "Failed to reconcile Tekton resources via CUE")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("CUE Tekton rendering failed: %v", err))
 		return ctrl.Result{}, err
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.5: Database Credential Secrets
+	// Generate and store secure credentials for components with database traits.
+	// Secrets are created BEFORE GitOps sync to ensure credentials exist
+	// when the application is deployed.
+	// ------------------------------------------------------------------
+	if err := r.reconcileDatabaseSecrets(ctx, &heliosApp); err != nil {
+		log.Error(err, "Failed to reconcile database secrets")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database secret creation failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.7: Database Instance Provisioning
+	// Provision StatefulSets and headless Services for database traits.
+	// Runs AFTER secrets so that the credential Secret already exists
+	// when the database pod starts.
+	// ------------------------------------------------------------------
+	if err := r.reconcileDatabaseInstance(ctx, &heliosApp); err != nil {
+		log.Error(err, "Failed to reconcile database instance")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database instance provisioning failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.9: Inject Database Credentials into Backend Deployment
+	// Patches the live Deployment (deployed by ArgoCD) to add DB_HOST,
+	// DB_USER, DB_PASS env vars referencing the operator-managed Secret.
+	// Runs AFTER secrets and instances so the Secret already exists.
+	// ------------------------------------------------------------------
+	dbInjectionPending, err := r.reconcileDatabaseSecretInjection(ctx, &heliosApp)
+	if err != nil {
+		log.Error(err, "Failed to inject database secrets into Deployment")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database secret injection failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	// VALIDATION: Ensure image is present (Fix "First Commit Missing Image")
+	// This validation is for application workloads (GitOps pipeline downstream).
+	// We run this AFTER DB provisioning so databases can come up while app is building.
+	for _, comp := range appModel.App.Components {
+		// We can add more specific checks here based on component type
+		// For now, checks if 'image' property exists and is not empty for all components
+		// assuming all workloads need an image.
+		if img, ok := comp.Properties["image"].(string); !ok || img == "" {
+			msg := fmt.Sprintf("Component '%s' is waiting for image (likely building). Status: Pending.", comp.Name)
+			log.Info(msg)
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhasePending, msg)
+			return ctrl.Result{}, nil // Wait for next update (CI/CD will update CR with image)
+		}
 	}
 
 	// ------------------------------------------------------------------
@@ -277,6 +317,13 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// NOTE: Ingress removed - use port-forwarding for EventListener:
 	// kubectl port-forward svc/el-<app>-listener 8080:8080
+
+	// If database secret injection is pending (Deployment not yet created by
+	// ArgoCD), requeue so the operator retries once the Deployment appears.
+	if dbInjectionPending {
+		log.Info("Database secret injection pending, requeuing")
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -495,6 +542,7 @@ func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appv1alpha1.HeliosApp{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Service{}).
 		Owns(&networkingv1.Ingress{}).
 		Watches(

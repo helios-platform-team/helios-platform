@@ -37,3 +37,9 @@ spec:
           properties:
             port: ${{ values.port }}
             targetPort: ${{ values.port }}
+        - type: database
+          properties:
+            dbType: ${{ values.databaseType | default("none") }}
+            dbName: ${{ values.databaseName }}
+            version: "16"
+            storage: "1Gi"

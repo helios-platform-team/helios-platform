@@ -1,0 +1,239 @@
+# =============================================================================
+# Helios Platform - Root Taskfile
+# =============================================================================
+# Usage:
+#   task check          Verify all prerequisites are installed
+#   task setup          Bootstrap the full local environment (cluster + deps)
+#   task dev            Run operator + portal concurrently
+#   task test           Run all tests
+#   task clean          Tear down the k3d cluster
+#
+# First-time setup:
+#   cp .env.example .env   # fill in your credentials
+#   task setup             # ~5-10 minutes
+#   task dev               # opens operator + portal
+#
+# Cross-platform:
+#   Linux/macOS: works natively
+#   Windows:     requires Git Bash or WSL (for bash-based sub-scripts)
+# =============================================================================
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  CLUSTER_NAME: helios-dev
+  ARGOCD_PORT: '8080'
+  KUBECTL_PROXY_PORT: '8001'
+
+set: [errexit, pipefail]
+
+# =============================================================================
+# Prerequisite Checking
+# =============================================================================
+tasks:
+  check:
+    desc: Verify all development prerequisites are installed
+    cmds:
+      - cmd: bash scripts/check-prereqs.sh
+        platforms: [linux, darwin]
+      - cmd: cmd /c scripts\\check-prereqs.bat
+        platforms: [windows]
+
+  check:env:
+    desc: Verify prerequisites and .env configuration
+    cmds:
+      - cmd: bash scripts/check-prereqs.sh --env
+        platforms: [linux, darwin]
+      - cmd: cmd /c scripts\\check-prereqs.bat --env
+        platforms: [windows]
+
+  # ===========================================================================
+  # Setup Tasks
+  # ===========================================================================
+  setup:
+    desc: Bootstrap the full local development environment
+    deps: [check:env]
+    cmds:
+      - task: setup:cluster
+      - task: setup:tekton
+      - task: setup:argocd
+      - task: setup:crds
+      - task: setup:tekton-rbac
+      - task: setup:credentials
+      - task: setup:portal-deps
+      - echo ""
+      - echo "============================================="
+      - echo "  Helios local environment is ready!"
+      - echo "  Run 'task dev' to start developing."
+      - echo "============================================="
+
+  setup:cluster:
+    desc: Create a k3d cluster (idempotent)
+    status:
+      - k3d kubeconfig get {{.CLUSTER_NAME}}
+    cmds:
+      - echo "Creating k3d cluster '{{.CLUSTER_NAME}}'..."
+      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 127.0.0.1:6550
+      - kubectl config set-cluster k3d-{{.CLUSTER_NAME}} --server=https://localhost:6550
+      - kubectl cluster-info
+
+  setup:tekton:
+    desc: Install Tekton Pipeline, Triggers, and Interceptors
+    cmds:
+      - echo "Installing Tekton Pipeline..."
+      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml --request-timeout=120s
+      - echo "Installing Tekton Triggers..."
+      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml --request-timeout=120s
+      - echo "Installing Tekton Interceptors..."
+      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml --request-timeout=120s
+      - echo "Waiting for Tekton Pipelines controller..."
+      - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
+      - echo "Waiting for Tekton Pipelines webhook..."
+      - kubectl rollout status deployment/tekton-pipelines-webhook -n tekton-pipelines --timeout=600s
+      - echo "Waiting for webhook endpoints to register..."
+      - cmd: sleep 10
+        platforms: [linux, darwin]
+      - cmd: powershell -Command "Start-Sleep -Seconds 10"
+        platforms: [windows]
+      - echo "Patching Tekton feature flags..."
+      - >-
+        kubectl patch configmap feature-flags -n tekton-pipelines
+        -p '{"data":{"disable-affinity-assistant":"true","coschedule":"disabled"}}'
+      - kubectl rollout restart deployment tekton-pipelines-controller -n tekton-pipelines
+      - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
+
+  setup:argocd:
+    desc: Install ArgoCD
+    cmds:
+      - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+      - echo "Installing ArgoCD..."
+      - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      - echo "Waiting for ArgoCD server..."
+      - kubectl rollout status deployment/argocd-server -n argocd --timeout=600s
+
+  setup:crds:
+    desc: Install Helios CRDs into the cluster
+    dir: apps/operator
+    cmds:
+      - cmd: make install
+        platforms: [linux, darwin]
+      - cmd: kubectl kustomize config/crd | kubectl apply -f -
+        platforms: [windows]
+
+  setup:tekton-rbac:
+    desc: Grant Tekton Triggers SA the permissions to create PipelineRuns
+    cmds:
+      - >-
+        kubectl create role tekton-triggers-pipelinerun-runner
+        --namespace default
+        --verb=get,list,watch,create,update,patch
+        --resource=pipelineruns.tekton.dev,taskruns.tekton.dev
+        --dry-run=client -o yaml | kubectl apply -f -
+      - >-
+        kubectl create rolebinding tekton-triggers-pipelinerun-runner
+        --namespace default
+        --role=tekton-triggers-pipelinerun-runner
+        --serviceaccount=default:tekton-triggers-sa
+        --dry-run=client -o yaml | kubectl apply -f -
+
+  setup:credentials:
+    desc: Create Docker registry secret and link to pipeline SA
+    cmds:
+      - cmd: |
+          if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_PASSWORD" ]; then
+            echo "DOCKER_USERNAME and DOCKER_PASSWORD must be set in .env" >&2
+            exit 1
+          fi
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -Command "if ([string]::IsNullOrEmpty($env:DOCKER_USERNAME) -or [string]::IsNullOrEmpty($env:DOCKER_PASSWORD)) { Write-Error 'DOCKER_USERNAME and DOCKER_PASSWORD must be set in .env'; exit 1 }"
+        platforms: [windows]
+      - cmd: |
+          kubectl create secret docker-registry docker-credentials \
+            --docker-server=${DOCKER_SERVER:-https://index.docker.io/v1/} \
+            --docker-username=$DOCKER_USERNAME \
+            --docker-password=$DOCKER_PASSWORD \
+            --docker-email=${DOCKER_EMAIL:-dev@helios.io} \
+            --dry-run=client -o yaml | kubectl apply -f -
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -Command "$server = if ([string]::IsNullOrEmpty($env:DOCKER_SERVER)) { 'https://index.docker.io/v1/' } else { $env:DOCKER_SERVER }; $email = if ([string]::IsNullOrEmpty($env:DOCKER_EMAIL)) { 'dev@helios.io' } else { $env:DOCKER_EMAIL }; kubectl create secret docker-registry docker-credentials --docker-server=$server --docker-username=$env:DOCKER_USERNAME --docker-password=$env:DOCKER_PASSWORD --docker-email=$email --dry-run=client -o yaml | kubectl apply -f -"
+        platforms: [windows]
+      - cmd: |
+          if kubectl get sa pipeline >/dev/null 2>&1; then
+            kubectl patch sa pipeline -p '{"secrets": [{"name": "docker-credentials"}]}'
+          else
+            echo "pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)"
+          fi
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -Command "kubectl get sa pipeline *> $null; if ($LASTEXITCODE -eq 0) { kubectl patch sa pipeline -p '{\"secrets\": [{\"name\": \"docker-credentials\"}]}' } else { Write-Host 'pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)' }"
+        platforms: [windows]
+
+  setup:portal-deps:
+    desc: Install Backstage portal dependencies
+    dir: apps/portal
+    cmds:
+      - yarn install
+
+  # ===========================================================================
+  # Development Tasks
+  # ===========================================================================
+  dev:
+    desc: Run operator and portal concurrently
+    deps: [dev:operator, dev:portal]
+
+  dev:operator:
+    desc: Run the Helios operator locally
+    dir: apps/operator
+    env:
+      HELIOS_CUE_PATH: '{{.ROOT_DIR}}/cue'
+    cmds:
+      - cmd: make run
+        platforms: [linux, darwin]
+      - cmd: go run ./cmd/main.go
+        platforms: [windows]
+
+  dev:portal:
+    desc: Run the Backstage portal with ArgoCD + kubectl proxy
+    cmds:
+      - cmd: cd apps/portal && ./start-dev.sh
+        platforms: [linux, darwin]
+      - cmd: powershell -ExecutionPolicy Bypass -File ../../scripts/start-portal.ps1 -ArgocdPort {{.ARGOCD_PORT}}
+        platforms: [windows]
+
+  # ===========================================================================
+  # Testing Tasks
+  # ===========================================================================
+  test:
+    desc: Run all tests
+    cmds:
+      - task: test:operator
+      - task: test:portal
+
+  test:operator:
+    desc: Run operator unit tests
+    dir: apps/operator
+    cmds:
+      - make test
+
+  test:portal:
+    desc: Run portal tests
+    dir: apps/portal
+    cmds:
+      - yarn test
+
+  # ===========================================================================
+  # Teardown Tasks
+  # ===========================================================================
+  clean:
+    desc: Delete the k3d cluster and clean up
+    cmds:
+      - task: clean:cluster
+
+  clean:cluster:
+    desc: Delete the k3d cluster
+    cmds:
+      - k3d cluster delete {{.CLUSTER_NAME}}
+      - echo "Cluster '{{.CLUSTER_NAME}}' deleted."
