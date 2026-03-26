@@ -12,8 +12,7 @@ spec:
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: ${{ values.name }}
   pipelineName: from-code-to-cluster
-  webhookDomain: ${{ values.webhookUrl }}
-  webhookSecret: github-webhook-secret
+  webhookSecret: git-credentials-${{ values.name }}
   port: ${{ values.port }}
   testCommand: "npm ci && npm test"
   components:

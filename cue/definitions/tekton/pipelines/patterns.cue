@@ -24,6 +24,9 @@ import "helios.io/cue/definitions/tekton"
 	gitopsRepoUrl: tekton.#CommonParams.gitops.repoUrl
 	manifestPath:  tekton.#CommonParams.gitops.manifestPath
 	gitopsBranch:  tekton.#CommonParams.gitops.branch
+	gitopsSecretRef: tekton.#CommonParams.gitops.secretRef
+	gitopsAuthorName: tekton.#CommonParams.gitops.authorName
+	gitopsAuthorEmail: tekton.#CommonParams.gitops.authorEmail
 
 	// Image params
 	contextSubpath: tekton.#CommonParams.image.contextSubpath
@@ -51,6 +54,9 @@ import "helios.io/cue/definitions/tekton"
 	#PipelineParams.gitopsRepoUrl,
 	#PipelineParams.manifestPath,
 	#PipelineParams.gitopsBranch,
+	#PipelineParams.gitopsSecretRef,
+	#PipelineParams.gitopsAuthorName,
+	#PipelineParams.gitopsAuthorEmail,
 	#PipelineParams.contextSubpath,
 	#PipelineParams.replicas,
 	#PipelineParams.port,
@@ -186,6 +192,9 @@ import "helios.io/cue/definitions/tekton"
 			{name: tekton.#CommonParams.gitops.manifestPath.name, value: "$(params.\(#PipelineParams.manifestPath.name))"},
 			{name: tekton.#CommonParams.gitops.newImageUrl.name, value:  "$(tasks.\(_imageSourceTask).results.IMAGE_URL)"},
 			{name: tekton.#CommonParams.gitops.branch.name, value:       "$(params.\(#PipelineParams.gitopsBranch.name))"},
+			{name: tekton.#CommonParams.gitops.secretRef.name, value:    "$(params.\(#PipelineParams.gitopsSecretRef.name))"},
+			{name: tekton.#CommonParams.gitops.authorName.name, value:   "$(params.\(#PipelineParams.gitopsAuthorName.name))"},
+			{name: tekton.#CommonParams.gitops.authorEmail.name, value:  "$(params.\(#PipelineParams.gitopsAuthorEmail.name))"},
 			{name: "REPLICAS", value:                             "$(params.\(#PipelineParams.replicas.name))"},
 			{name: "PORT", value:                                 "$(params.\(#PipelineParams.port.name))"},
 		]

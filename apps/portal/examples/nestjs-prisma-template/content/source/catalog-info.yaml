@@ -4,9 +4,9 @@ metadata:
   name: ${{ values.name }}
   description: ${{ values.description }}
   annotations:
-    github.com/project-slug: ${{ values.owner }}/${{ values.name }}
+    gitea.org/repo-url: http://localhost:3030/${{ values.owner }}/${{ values.name }}
     backstage.io/techdocs-ref: dir:.
 spec:
   type: service
   lifecycle: production
-  owner: ${{ values.owner }}
+  owner: "${{ values.owner }}"

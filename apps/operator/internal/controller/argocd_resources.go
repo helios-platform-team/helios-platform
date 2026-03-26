@@ -28,7 +28,7 @@ func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Un
 		"spec": map[string]any{
 			"project": project,
 			"source": map[string]any{
-				"repoURL":        heliosApp.Spec.GitOpsRepo,
+				"repoURL":        rewriteGiteaURL(heliosApp.Spec.GitOpsRepo),
 				"targetRevision": gitOpsBranch,
 				"path":           heliosApp.Spec.GitOpsPath,
 			},

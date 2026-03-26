@@ -148,7 +148,7 @@ package tekton
 		gitopsRepo:     string
 		gitopsPath:     string
 		gitopsBranch:   string | *"main"
-		gitopsSecret:   string | *"github-credentials"
+		gitopsSecret:   string | *"helios-gitops-bot"
 		pvcName:        string | *"shared-workspace-pvc"
 		contextSubpath: string | *""
 		

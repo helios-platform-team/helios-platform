@@ -195,8 +195,8 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// ------------------------------------------------------------------
 
 	// 4. GitOps Helper: Get Token & Username
-	token := os.Getenv("GITHUB_TOKEN")
-	username := os.Getenv("GITHUB_USER")
+	token := os.Getenv("GITEA_TOKEN")
+	username := os.Getenv("GITEA_USER")
 	if username == "" {
 		username = "git" // Default fallback
 	}
@@ -228,7 +228,7 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// 5. GitOps Sync
 
 	if token == "" {
-		err := fmt.Errorf("GitOps token is empty. Check Secret or GITHUB_TOKEN env var")
+		err := fmt.Errorf("GitOps token is empty. Check Secret or GITEA_TOKEN env var")
 		log.Error(err, "Authentication failed")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, "GitOps token missing")
 		return ctrl.Result{}, nil // Don't retry immediately if config is missing
@@ -392,7 +392,7 @@ func (r *HeliosAppReconciler) mapCRDToTektonInput(app *appv1alpha1.HeliosApp) he
 		WebhookSecret:   app.Spec.WebhookSecret,
 		PipelineName:    app.Spec.PipelineName,
 		PipelineType:    app.Spec.PipelineName, // pipelineType uses same value as pipelineName
-		TriggerType:     "github-push",         // Default; extend HeliosAppSpec if needed
+		TriggerType:     "gitea-push",          // Default; extend HeliosAppSpec if needed
 		ServiceAccount:  app.Spec.ServiceAccount,
 		PVCName:         app.Spec.PVCName,
 		ContextSubpath:  app.Spec.ContextSubpath,
@@ -407,8 +407,8 @@ func (r *HeliosAppReconciler) mapCRDToTektonInput(app *appv1alpha1.HeliosApp) he
 	// Apply defaults for fields that may be empty
 	input.GitBranch = cmp.Or(input.GitBranch, "main")
 	input.GitOpsBranch = cmp.Or(input.GitOpsBranch, "main")
-	input.GitOpsSecretRef = cmp.Or(input.GitOpsSecretRef, "github-credentials")
-	input.WebhookSecret = cmp.Or(input.WebhookSecret, "github-webhook-secret")
+	input.GitOpsSecretRef = cmp.Or(input.GitOpsSecretRef, "helios-gitops-bot")
+	input.WebhookSecret = cmp.Or(input.WebhookSecret, "gitea-webhook-secret")
 	if input.PipelineName == "" {
 		input.PipelineName = "from-code-to-cluster"
 		input.PipelineType = "from-code-to-cluster"

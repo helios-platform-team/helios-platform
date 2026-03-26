@@ -21,7 +21,7 @@ backend.add(import('@backstage/plugin-proxy-backend'));
 
 // scaffolder plugin
 backend.add(import('@backstage/plugin-scaffolder-backend'));
-backend.add(import('@backstage/plugin-scaffolder-backend-module-github'));
+backend.add(import('@backstage/plugin-scaffolder-backend-module-gitea'));
 backend.add(scaffolderModuleCustomActions);
 
 backend.add(
@@ -30,9 +30,9 @@ backend.add(
 
 // auth plugin
 backend.add(import('@backstage/plugin-auth-backend'));
-backend.add(customAuth);
 backend.add(import('@backstage/plugin-auth-backend-module-guest-provider'));
-// See https://backstage.io/docs/auth/guest/provider
+// Optional: uncomment to enable GitHub OAuth login (also uncomment in app-config.yaml)
+// backend.add(customAuth);
 
 // catalog plugin
 backend.add(import('@backstage/plugin-catalog-backend'));
@@ -40,8 +40,8 @@ backend.add(
   import('@backstage/plugin-catalog-backend-module-scaffolder-entity-model'),
 );
 
-// GitHub Org Entity Provider
-backend.add(import('@backstage/plugin-catalog-backend-module-github-org'));
+// Gitea catalog discovery
+backend.add(import('@backstage/plugin-catalog-backend-module-gitea'));
 
 // See https://backstage.io/docs/features/software-catalog/configuration#subscribing-to-catalog-errors
 backend.add(import('@backstage/plugin-catalog-backend-module-logs'));

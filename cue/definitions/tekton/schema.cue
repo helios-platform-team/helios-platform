@@ -21,16 +21,16 @@ package tekton
 	gitopsRepo:      string
 	gitopsPath:      string
 	gitopsBranch:    string | *"main"
-	gitopsSecretRef: string | *"github-credentials"
+	gitopsSecretRef: string | *"helios-gitops-bot"
 
 	// === WEBHOOK (optional - triggers only created if set) ===
 	webhookDomain?: string
-	webhookSecret:  string | *"github-webhook-secret"
+	webhookSecret:  string | *"gitea-webhook-secret"
 
 	// === PIPELINE CONFIG ===
 	pipelineName:   string | *"from-code-to-cluster"
 	pipelineType:   string | *"from-code-to-cluster" // For registry lookup
-	triggerType:    string | *"github-push"          // For registry lookup
+	triggerType:    string | *"gitea-push"           // For registry lookup
 	serviceAccount: string | *"default"
 	pvcName:        string | *"shared-workspace-pvc"
 	contextSubpath: string | *""

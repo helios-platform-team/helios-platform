@@ -5,17 +5,17 @@ import (
 )
 
 // =====================================================
-// GITHUB PUSH TRIGGER BUNDLE
+// GITEA PUSH TRIGGER BUNDLE
 // =====================================================
 
-#GitHubPushTriggerBundle: tekton.#TriggerBundle & {
+#GiteaPushTriggerBundle: tekton.#TriggerBundle & {
     // Alias the parameter field to bundleParams for global access
     bundleParams=parameter: _
 
     // 1. TRIGGER BINDING
     _binding: tekton.#TektonTriggerBinding & {
         parameter: {
-            name:      "\(bundleParams.appName)-github-binding"
+            name:      "\(bundleParams.appName)-gitea-binding"
             namespace: bundleParams.namespace
         }
         config: params: [
@@ -30,7 +30,7 @@ import (
         let _bp = bundleParams
 
         parameter: {
-            name:      "\(_bp.appName)-github-template"
+            name:      "\(_bp.appName)-gitea-template"
             namespace: _bp.namespace
         }
         config: {
@@ -64,6 +64,9 @@ import (
                         {name: "GITOPS_REPO_URL", value:    _bp.gitopsRepo},
                         {name: "MANIFEST_PATH", value:      _bp.gitopsPath},
                         {name: "GITOPS_REPO_BRANCH", value: _bp.gitopsBranch},
+                        {name: "GITOPS_SECRET_REF", value:  _bp.gitopsSecret},
+                        {name: "GITOPS_AUTHOR_NAME", value: "Helios Bot"},
+                        {name: "GITOPS_AUTHOR_EMAIL", value: "helios-bot@helios.local"},
                         {name: "CONTEXT_SUBPATH", value:    _bp.contextSubpath},
                         {name: "replicas", value:           "\(_bp.replicas)"},
                         {name: "port", value:               "\(_bp.port)"},
@@ -105,11 +108,11 @@ import (
         }
         config: {
             triggers: [{
-                name: "github-push"
+                name: "gitea-push"
                 bindings: [{ref: _binding.parameter.name}]
                 template: {ref: _template.parameter.name}
                 
-                // Add GitHub Interceptor for security (Validates webhook secret)
+                // Use the cluster Git webhook interceptor for push event validation.
                 interceptors: [{
                     ref: {name: "github", kind: "ClusterInterceptor"}
                     params: [

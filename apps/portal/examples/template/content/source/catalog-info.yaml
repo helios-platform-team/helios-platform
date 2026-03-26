@@ -7,5 +7,5 @@ metadata:
     janus-idp.io/tekton: ${{ values.name }}-service
 spec:
   type: service
-  owner: ${{ values.owner }}
+  owner: "${{ values.owner }}"
   lifecycle: experimental

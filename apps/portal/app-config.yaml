@@ -1,9 +1,9 @@
 app:
-  title: Scaffolded Backstage App
+  title: Helios
   baseUrl: http://localhost:3000
 
 organization:
-  name: My Company
+  name: Helios Platform
 
 backend:
   # Used for enabling authentication, secret is shared by all backend plugins
@@ -33,15 +33,19 @@ backend:
   # workingDirectory: /tmp # Use this to configure a working directory for the scaffolder, defaults to the OS temp-dir
 
 integrations:
-  github:
-    - host: github.com
-      # This is a Personal Access Token or PAT from GitHub. You can find out how to generate this token, and more information
-      # about setting up the GitHub integration here: https://backstage.io/docs/integrations/github/locations#configuration
-      token: ${GITHUB_TOKEN}
-    ### Example for how to add your GitHub Enterprise instance using the API:
-    # - host: ghe.example.net
-    #   apiBaseUrl: https://ghe.example.net/api/v3
-    #   token: ${GHE_TOKEN}
+  gitea:
+    - host: localhost:3030
+      baseUrl: http://127.0.0.1:3030
+      username: ${GITEA_USER}
+      password: ${GITEA_TOKEN}
+    - host: 127.0.0.1:3030
+      baseUrl: http://127.0.0.1:3030
+      username: ${GITEA_USER}
+      password: ${GITEA_TOKEN}
+  # Optional: GitHub integration (uncomment if you still need GitHub access)
+  # github:
+  #   - host: github.com
+  #     token: ${GITHUB_TOKEN}
 
 proxy:
   ### Example for how to add a proxy endpoint for the frontend.
@@ -78,26 +82,27 @@ auth:
   providers:
     # See https://backstage.io/docs/auth/guest/provider
     guest: {}
-    github:
-      development:
-        clientId: ${AUTH_GITHUB_CLIENT_ID}
-        clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
-        additionalScopes:
-          - repo
-          - workflow
+    # Optional: GitHub OAuth (uncomment to enable GitHub login)
+    # github:
+    #   development:
+    #     clientId: ${AUTH_GITHUB_CLIENT_ID}
+    #     clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+    #     additionalScopes:
+    #       - repo
+    #       - workflow
 
 scaffolder:
   # see https://backstage.io/docs/features/software-templates/configuration for software template options
   defaultEnvironment:
     secrets:
-      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITEA_TOKEN: ${GITEA_TOKEN}
 
 catalog:
   import:
     entityFilename: catalog-info.yaml
     pullRequestBranchName: backstage-integration
   rules:
-    - allow: [Component, System, API, Resource, Location]
+    - allow: [Component, System, API, Resource, Location, Template]
   locations:
     # Local example data, file locations are relative to the backend process, typically `packages/backend`
     - type: file
@@ -121,6 +126,12 @@ catalog:
       rules:
         - allow: [Template]
 
+    # Nest.js
+    - type: file
+      target: ../../examples/nestjs-prismas-template/template.yaml
+      rules:
+        - allow: [Template]
+
     ## Uncomment these lines to add more example data
     # - type: url
     #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml
@@ -130,22 +141,15 @@ catalog:
       target: https://github.com/hoangphuc841/advanced-nodejs-app-v22/blob/main/catalog-info.yaml
 
   providers:
-    githubOrg:
-      id: production
-      githubUrl: https://github.com
-      orgs: ['${GITHUB_ORG}']
-      schedule:
-        initialDelay: { seconds: 5 }
-        frequency: { minutes: 1 }
-        timeout: { minutes: 50 }
-
-    ## Uncomment these lines to add an example org
-
-    ## Uncomment these lines to add an example org
-    # - type: url
-    #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/acme-corp.yaml
-    #   rules:
-    #     - allow: [User, Group]
+    gitea:
+      helios:
+        host: 127.0.0.1:3030
+        organization: 'helios-platform'
+        catalogPath: 'catalog-info.yaml'
+        branch: 'main'
+        schedule:
+          frequency: { minutes: 5 }
+          timeout: { minutes: 3 }
 
 kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options

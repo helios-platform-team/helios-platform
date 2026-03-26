@@ -25,6 +25,15 @@ vars:
   CLUSTER_NAME: helios-dev
   ARGOCD_PORT: "8080"
   KUBECTL_PROXY_PORT: "8001"
+  GITEA_PORT: "3030"
+  GITEA_INTERNAL_HOST: gitea-http.gitea.svc.cluster.local:3000
+  GITOPS_SECRET_NAME: helios-gitops-bot
+  # Cap Tekton resource usage during local builds/tests to avoid host lockups.
+  TEKTON_LIMIT_NAMESPACE: default
+  TEKTON_LIMIT_CPU: "2"
+  TEKTON_LIMIT_MEMORY: 2Gi
+  TEKTON_LIMIT_REQUEST_CPU: "500m"
+  TEKTON_LIMIT_REQUEST_MEMORY: 512Mi
 
 set: [errexit, pipefail]
 
@@ -59,6 +68,10 @@ tasks:
       - task: setup:tekton
       - task: setup:tekton-pruner
       - task: setup:argocd
+      - task: setup:gitea
+      - task: setup:gitea-token
+      - task: setup:gitea-gitops-secret
+      - task: setup:argocd-gitea
       - task: setup:crds
       - task: setup:tekton-rbac
       - task: setup:credentials
@@ -66,6 +79,7 @@ tasks:
       - echo ""
       - echo "============================================="
       - echo "  Helios local environment is ready!"
+      - echo "  Gitea is available at http://localhost:{{.GITEA_PORT}}"
       - echo "  Run 'task dev' to start developing."
       - echo "============================================="
 
@@ -75,7 +89,7 @@ tasks:
       - k3d kubeconfig get {{.CLUSTER_NAME}}
     cmds:
       - echo "Creating k3d cluster '{{.CLUSTER_NAME}}'..."
-      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 127.0.0.1:6550 --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0"
+      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 127.0.0.1:6550 --k3s-arg "--disable=traefik@server:0"
       - kubectl config set-cluster k3d-{{.CLUSTER_NAME}} --server=https://localhost:6550
       - kubectl cluster-info
 
@@ -96,10 +110,10 @@ tasks:
       - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
       - echo "Waiting for Tekton Pipelines webhook..."
       - kubectl rollout status deployment/tekton-pipelines-webhook -n tekton-pipelines --timeout=600s
-      - echo "Waiting for webhook endpoints to register..."
-      - cmd: sleep 10
+      - echo "Ensuring Tekton webhook deployment is still healthy..."
+      - cmd: kubectl rollout status deployment/tekton-pipelines-webhook -n tekton-pipelines --timeout=120s
         platforms: [linux, darwin]
-      - cmd: powershell -Command "Start-Sleep -Seconds 10"
+      - cmd: kubectl rollout status deployment/tekton-pipelines-webhook -n tekton-pipelines --timeout=120s
         platforms: [windows]
       - echo "Patching Tekton feature flags..."
       - >-
@@ -107,6 +121,24 @@ tasks:
         -p '{"data":{"disable-affinity-assistant":"true","coschedule":"disabled"}}'
       - kubectl rollout restart deployment tekton-pipelines-controller -n tekton-pipelines
       - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
+      - echo "Applying LimitRange to cap Tekton build resources..."
+      - cmd: |
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: LimitRange
+          metadata:
+            name: tekton-resource-limits
+            namespace: {{.TEKTON_LIMIT_NAMESPACE}}
+          spec:
+            limits:
+              - type: Container
+                default:
+                  memory: {{.TEKTON_LIMIT_MEMORY}}
+                  cpu: "{{.TEKTON_LIMIT_CPU}}"
+                defaultRequest:
+                  memory: {{.TEKTON_LIMIT_REQUEST_MEMORY}}
+                  cpu: "{{.TEKTON_LIMIT_REQUEST_CPU}}"
+          EOF
 
   setup:tekton-pruner:
     desc: Install Tekton Pruner to clean old PipelineRuns/TaskRuns
@@ -119,10 +151,10 @@ tasks:
       - echo "Waiting for Tekton Pruner deployments..."
       - kubectl rollout status deployment/tekton-pruner-controller -n tekton-pipelines --timeout=300s
       - kubectl rollout status deployment/tekton-pruner-webhook -n tekton-pipelines --timeout=300s
-      - echo "Waiting for webhook endpoints to register..."
-      - cmd: sleep 10
+      - echo "Ensuring Tekton pruner webhook deployment is still healthy..."
+      - cmd: kubectl rollout status deployment/tekton-pruner-webhook -n tekton-pipelines --timeout=120s
         platforms: [linux, darwin]
-      - cmd: powershell -Command "Start-Sleep -Seconds 10"
+      - cmd: kubectl rollout status deployment/tekton-pruner-webhook -n tekton-pipelines --timeout=120s
         platforms: [windows]
       - echo "Configuring Tekton Pruner (global TTL)..."
       - cmd: |
@@ -149,20 +181,179 @@ tasks:
     desc: Install ArgoCD
     status:
       - kubectl get namespace argocd
+      - kubectl get deployment/argocd-server -n argocd
       - kubectl get deployment/argocd-repo-server -n argocd
     cmds:
       - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
       - echo "Installing ArgoCD..."
-      - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/core-install.yaml
+      - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
       - echo "Waiting for ArgoCD components to be created..."
-      - cmd: sleep 10
+      - cmd: kubectl wait --for=condition=Available deployment/argocd-repo-server -n argocd --timeout=180s
         platforms: [linux, darwin]
-      - cmd: powershell -Command "Start-Sleep -Seconds 10"
+      - cmd: kubectl wait --for=condition=Available deployment/argocd-repo-server -n argocd --timeout=180s
         platforms: [windows]
+      - echo "Waiting for ArgoCD API server..."
+      - kubectl rollout status deployment/argocd-server -n argocd --timeout=600s
       - echo "Waiting for ArgoCD repo server..."
       - kubectl rollout status deployment/argocd-repo-server -n argocd --timeout=600s
       - echo "Waiting for ArgoCD application controller..."
       - kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=600s
+
+  setup:gitea:
+    desc: Install Gitea (lightweight Git server) with SQLite
+    status:
+      - kubectl get namespace gitea
+      - kubectl get deployment/gitea -n gitea
+    cmds:
+      - echo "Installing Gitea via Helm (SQLite, minimal resources)..."
+      - cmd: >-
+          helm install gitea oci://registry-1.docker.io/giteacharts/gitea
+          --namespace gitea --create-namespace
+          --set gitea.admin.username=${GITEA_ADMIN_USER:-helios}
+          --set gitea.admin.password=${GITEA_ADMIN_PASS:-helios123}
+          --set postgresql.enabled=false
+          --set postgresql-ha.enabled=false
+          --set redis-cluster.enabled=false
+          --set redis.enabled=false
+          --set gitea.config.database.DB_TYPE=sqlite3
+          --set gitea.config.session.PROVIDER=memory
+          --set gitea.config.cache.ADAPTER=memory
+          --set gitea.config.queue.TYPE=level
+          --set gitea.config.server.ROOT_URL=http://localhost:{{.GITEA_PORT}}
+          --set gitea.config.server.HTTP_PORT=3000
+          --set gitea.config.webhook.ALLOWED_HOST_LIST=*
+          --set persistence.size=1Gi
+          --set resources.requests.memory=128Mi
+          --set resources.limits.memory=256Mi
+        platforms: [linux, darwin]
+      - echo "Waiting for Gitea deployment..."
+      - kubectl rollout status deployment/gitea -n gitea --timeout=300s
+
+  setup:gitea-token:
+    desc: Create Gitea API token, default org, and write to .env
+    cmds:
+      - echo "Port-forwarding Gitea for setup..."
+      - cmd: |
+          kubectl port-forward -n gitea svc/gitea-http {{.GITEA_PORT}}:3000 &
+          PF_PID=$!
+          sleep 3
+
+          GITEA_ADMIN_USER="${GITEA_ADMIN_USER:-helios}"
+          GITEA_ADMIN_PASS="${GITEA_ADMIN_PASS:-helios123}"
+          GITEA_BASE="http://localhost:{{.GITEA_PORT}}"
+
+          echo "Creating Gitea organization 'helios'..."
+          curl -s -X POST "$GITEA_BASE/api/v1/orgs" \
+            -u "$GITEA_ADMIN_USER:$GITEA_ADMIN_PASS" \
+            -H "Content-Type: application/json" \
+            -d '{"username":"helios-platform", "full_name":"Helios Platform", "visibility":"public"}' || true
+
+          echo "Creating Gitea API token..."
+          TOKEN_RESP=$(curl -s -X POST "$GITEA_BASE/api/v1/users/$GITEA_ADMIN_USER/tokens" \
+            -u "$GITEA_ADMIN_USER:$GITEA_ADMIN_PASS" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"helios-platform-'"$(date +%s)"'","scopes":["all"]}')
+
+          TOKEN=$(echo "$TOKEN_RESP" | jq -r '.sha1 // .token // empty')
+
+          if [ -z "$TOKEN" ]; then
+            echo "Warning: Could not extract token. You may need to create one manually."
+            echo "Response was: $TOKEN_RESP"
+          else
+            ENV_FILE=".env"
+            PORTAL_ENV="apps/portal/.env"
+            GITEA_URL="http://localhost:{{.GITEA_PORT}}"
+            GITEA_INTERNAL_URL="http://gitea-http.gitea.svc.cluster.local:3000"
+
+            update_env_var() {
+              local file="$1" key="$2" val="$3"
+              if [ ! -f "$file" ]; then touch "$file"; fi
+              if grep -q "^${key}=" "$file" 2>/dev/null; then
+                sed -i "s|^${key}=.*|${key}=${val}|" "$file"
+              else
+                echo "${key}=${val}" >> "$file"
+              fi
+            }
+
+            for f in "$ENV_FILE" "$PORTAL_ENV"; do
+              update_env_var "$f" "GITEA_TOKEN"        "$TOKEN"
+              update_env_var "$f" "GITEA_USER"         "$GITEA_ADMIN_USER"
+              update_env_var "$f" "GITEA_URL"          "$GITEA_URL"
+              update_env_var "$f" "GITEA_INTERNAL_URL" "$GITEA_INTERNAL_URL"
+            done
+
+            echo ""
+            echo "============================================="
+            echo "  Gitea API token created and saved!"
+            echo "  Updated: $ENV_FILE, $PORTAL_ENV"
+            echo "  GITEA_TOKEN=$TOKEN"
+            echo "============================================="
+          fi
+
+          kill $PF_PID 2>/dev/null || true
+        platforms: [linux, darwin]
+
+  setup:argocd-gitea:
+    desc: Register Gitea repository credentials with ArgoCD
+    cmds:
+      - echo "Configuring ArgoCD to access Gitea repos..."
+      - cmd: |
+          GITEA_ADMIN_USER="${GITEA_ADMIN_USER:-helios}"
+          GITEA_ADMIN_PASS="${GITEA_ADMIN_PASS:-helios123}"
+
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: gitea-repo-creds
+            namespace: argocd
+            labels:
+              argocd.argoproj.io/secret-type: repo-creds
+          stringData:
+            type: git
+            url: http://{{.GITEA_INTERNAL_HOST}}
+            username: "$GITEA_ADMIN_USER"
+            password: "$GITEA_ADMIN_PASS"
+          EOF
+        platforms: [linux, darwin]
+      - echo "ArgoCD can now access Gitea repositories."
+
+  setup:gitea-gitops-secret:
+    desc: Create/refresh Tekton GitOps credentials secret (dedicated bot preferred)
+    cmds:
+      - echo "Creating Tekton GitOps credentials secret '{{.GITOPS_SECRET_NAME}}' in namespace default..."
+      - cmd: |
+          GITOPS_GIT_USER="${GITOPS_GIT_USER:-${GITEA_BOT_USER:-${GITEA_ADMIN_USER:-helios}}}"
+          GITOPS_GIT_PASSWORD="${GITOPS_GIT_PASSWORD:-${GITEA_BOT_PASSWORD:-${GITEA_ADMIN_PASS:-helios123}}}"
+          GITOPS_SECRET_NAME="{{.GITOPS_SECRET_NAME}}"
+
+          kubectl create secret generic "$GITOPS_SECRET_NAME" \
+            --type=kubernetes.io/basic-auth \
+            --from-literal=username="$GITOPS_GIT_USER" \
+            --from-literal=password="$GITOPS_GIT_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl annotate secret "$GITOPS_SECRET_NAME" \
+            tekton.dev/git-0=http://{{.GITEA_INTERNAL_HOST}} \
+            --overwrite
+
+          ENV_FILE=".env"
+          PORTAL_ENV="apps/portal/.env"
+          update_env_var() {
+            local file="$1" key="$2" val="$3"
+            if [ ! -f "$file" ]; then touch "$file"; fi
+            if grep -q "^${key}=" "$file" 2>/dev/null; then
+              sed -i "s|^${key}=.*|${key}=${val}|" "$file"
+            else
+              echo "${key}=${val}" >> "$file"
+            fi
+          }
+          for f in "$ENV_FILE" "$PORTAL_ENV"; do
+            update_env_var "$f" "GITOPS_SECRET_REF" "$GITOPS_SECRET_NAME"
+          done
+
+          echo "Created secret '$GITOPS_SECRET_NAME' and wrote GITOPS_SECRET_REF to .env files."
+        platforms: [linux, darwin]
 
   setup:crds:
     desc: Install Helios CRDs into the cluster
@@ -241,6 +432,11 @@ tasks:
     desc: Run operator and portal concurrently
     deps: [dev:operator, dev:portal]
 
+  operator:
+    desc: Alias for running the Helios operator
+    cmds:
+      - task: dev:operator
+
   dev:operator:
     desc: Run the Helios operator locally
     dir: apps/operator
@@ -251,6 +447,11 @@ tasks:
         platforms: [linux, darwin]
       - cmd: go run ./cmd/main.go
         platforms: [windows]
+
+  portal:
+    desc: Alias for running the Backstage portal
+    cmds:
+      - task: dev:portal
 
   dev:portal:
     desc: Run the Backstage portal with ArgoCD + kubectl proxy

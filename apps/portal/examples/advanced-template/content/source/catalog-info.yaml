@@ -11,7 +11,7 @@ metadata:
     argocd/app-name: ${{ values.name }}-argocd
 spec:
   type: service
-  owner: ${{ values.owner }}
+  owner: "${{ values.owner }}"
   lifecycle: experimental
   providesApis:
     - ${{ values.name }}-api

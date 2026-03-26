@@ -18,7 +18,8 @@ package tekton
 	// Secret names
 	secrets: {
 		docker: "docker-credentials"
-		github: "github-credentials"
+		gitea:  "gitea-credentials"
+		gitops: "helios-gitops-bot"
 	}
 
 	// Tekton API versions
@@ -89,6 +90,12 @@ package tekton
 			description: "GitOps repository URL"
 			type:        "string"
 		}
+		secretRef: {
+			name:        "GITOPS_SECRET_REF"
+			description: "Kubernetes Secret name containing Git credentials (basic-auth)"
+			type:        "string"
+			default:     #Defaults.secrets.gitops
+		}
 		branch: {
 			name:    "GITOPS_REPO_BRANCH"
 			type:    "string"
@@ -103,6 +110,18 @@ package tekton
 			name:        "NEW_IMAGE_URL"
 			description: "New image URL to update in manifest"
 			type:        "string"
+		}
+		authorName: {
+			name:        "GITOPS_AUTHOR_NAME"
+			description: "Git author name for automated GitOps commits"
+			type:        "string"
+			default:     "Helios Bot"
+		}
+		authorEmail: {
+			name:        "GITOPS_AUTHOR_EMAIL"
+			description: "Git author email for automated GitOps commits"
+			type:        "string"
+			default:     "helios-bot@helios.local"
 		}
 	}
 
