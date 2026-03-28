@@ -152,6 +152,9 @@ catalog:
           timeout: { minutes: 3 }
 
 kubernetes:
+  frontend:
+    podDelete:
+      enabled: true
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
   # Production: In-cluster auth with ServiceAccount
   # Local dev: Overridden in app-config.local.yaml to use localKubectlProxy

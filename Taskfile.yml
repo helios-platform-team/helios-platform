@@ -187,10 +187,12 @@ tasks:
       - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
       - echo "Installing ArgoCD..."
       - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      # Repo-server often needs several minutes on first install (image pull + scheduling).
+      # Use the same budget as rollout status below; 180s is too easy to hit on k3d/minikube.
       - echo "Waiting for ArgoCD components to be created..."
-      - cmd: kubectl wait --for=condition=Available deployment/argocd-repo-server -n argocd --timeout=180s
+      - cmd: kubectl wait --for=condition=Available deployment/argocd-repo-server -n argocd --timeout=600s
         platforms: [linux, darwin]
-      - cmd: kubectl wait --for=condition=Available deployment/argocd-repo-server -n argocd --timeout=180s
+      - cmd: kubectl wait --for=condition=Available deployment/argocd-repo-server -n argocd --timeout=600s
         platforms: [windows]
       - echo "Waiting for ArgoCD API server..."
       - kubectl rollout status deployment/argocd-server -n argocd --timeout=600s

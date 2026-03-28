@@ -235,12 +235,13 @@ func main() {
 	}
 	setupLog.Info("Tekton CUE renderer initialized", "cuePath", cuePath)
 
-	if err := (&controller.HeliosAppReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		CueEngine:      cueEngine,
-		TektonRenderer: tektonRenderer,
-	}).SetupWithManager(mgr); err != nil {
+	if err := controller.NewHeliosAppReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		cueEngine,
+		tektonRenderer,
+		nil, // use default GitOps client factory
+	).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HeliosApp")
 		os.Exit(1)
 	}

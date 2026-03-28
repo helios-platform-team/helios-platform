@@ -1,13 +1,14 @@
-package controller
+package argocd
 
 import (
 	"cmp"
 
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/shared"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// GenerateArgoApplication creates an ArgoCD Application manifest
+// GenerateArgoApplication creates an ArgoCD Application manifest.
 func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Unstructured, error) {
 	appName := heliosApp.Name + "-argocd"
 	targetNamespace := cmp.Or(heliosApp.Spec.ArgoCDNamespace, "argocd")
@@ -28,7 +29,7 @@ func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Un
 		"spec": map[string]any{
 			"project": project,
 			"source": map[string]any{
-				"repoURL":        rewriteGiteaURL(heliosApp.Spec.GitOpsRepo),
+				"repoURL":        shared.RewriteGiteaURL(heliosApp.Spec.GitOpsRepo),
 				"targetRevision": gitOpsBranch,
 				"path":           heliosApp.Spec.GitOpsPath,
 			},
@@ -45,8 +46,6 @@ func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Un
 					"CreateNamespace=true",
 				},
 			},
-			// Ignore env var diffs on Deployments so that ArgoCD self-heal
-			// does not revert the DB_* env vars injected by the operator.
 			"ignoreDifferences": []any{
 				map[string]any{
 					"group": "apps",

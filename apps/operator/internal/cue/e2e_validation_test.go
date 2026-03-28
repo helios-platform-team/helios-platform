@@ -114,8 +114,8 @@ func TestE2E_CueVsLegacy_TaskNames(t *testing.T) {
 		t.Fatalf("RenderTektonResources failed: %v", err)
 	}
 
-	// Legacy Go code generated these exact task names:
-	expectedTaskNames := []string{"git-clone", "kaniko-build", "git-update-manifest"}
+	// CUE TaskRegistry: clone, build, gitops update, Argo CD sync
+	expectedTaskNames := []string{"argocd-sync", "git-clone", "git-update-manifest", "kaniko-build"}
 	slices.Sort(expectedTaskNames)
 
 	var actualTaskNames []string

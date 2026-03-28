@@ -1,15 +1,15 @@
-package controller
+package shared
 
 import (
 	"os"
 	"strings"
 )
 
-// rewriteGiteaURL translates an external Gitea URL (e.g. http://localhost:3030/...)
+// RewriteGiteaURL translates an external Gitea URL (e.g. http://localhost:3030/...)
 // to the in-cluster service URL so in-cluster components can reach it.
 //
 // Falls back to the original URL if GITEA_URL / GITEA_INTERNAL_URL are not set.
-func rewriteGiteaURL(repoURL string) string {
+func RewriteGiteaURL(repoURL string) string {
 	externalURL := os.Getenv("GITEA_URL")
 	internalURL := os.Getenv("GITEA_INTERNAL_URL")
 	if externalURL != "" && internalURL != "" {
@@ -18,8 +18,6 @@ func rewriteGiteaURL(repoURL string) string {
 			return rewritten
 		}
 
-		// Common dev mismatch: external URL is "localhost" but repos use "127.0.0.1" (or vice versa).
-		// Keep this intentionally simple: only handle the loopback hostname swap.
 		const (
 			localhost = "localhost"
 			loopback  = "127.0.0.1"

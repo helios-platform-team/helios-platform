@@ -6,6 +6,7 @@ package tasks
 	"git-clone":           #GitClone
 	"kaniko-build":        #KanikoBuild
 	"git-update-manifest": #GitUpdateManifest
+	"argocd-sync":         #ArgoCDSync
 }
 
 // Helper to render a specific task with optional context injection

@@ -4,6 +4,7 @@
 
 | Document | Description |
 |----------|-------------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | High-level platform architecture overview |
 | [SETUP.md](./SETUP.md) | Development environment setup |
 | [OPERATOR.md](./OPERATOR.md) | Helios Operator architecture and usage |
 | [CICD_OBSERVABILITY.md](./CICD_OBSERVABILITY.md) | Tekton & ArgoCD integration in Backstage |

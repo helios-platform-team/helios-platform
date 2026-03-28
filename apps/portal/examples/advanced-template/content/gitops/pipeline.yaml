@@ -3,7 +3,7 @@ kind: PipelineRun
 metadata:
   name: ${{ values.name }}-pipeline-run
   annotations:
-    janus-idp.io/tekton: ${{ values.name }}-service
+    janus-idp.io/tekton: ${{ values.name }}
 spec:
   serviceAccountName: pipeline
   pipelineRef:
@@ -25,6 +25,10 @@ spec:
     value: docker-credentials 
   - name: test-command
     value: ${{ values.testCommand }}
+  - name: argocd-namespace
+    value: argocd
+  - name: argocd-app-name
+    value: ${{ values.name }}-argocd
   # (Optional override – can be omitted to use the pipeline default)
   # - name: test-image
   #   value: node:20

@@ -1832,44 +1832,42 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage-community/plugin-tekton-common@npm:^1.18.0":
-  version: 1.18.0
-  resolution: "@backstage-community/plugin-tekton-common@npm:1.18.0"
+"@backstage-community/plugin-tekton-common@npm:^1.20.0":
+  version: 1.20.0
+  resolution: "@backstage-community/plugin-tekton-common@npm:1.20.0"
   peerDependencies:
-    "@backstage/plugin-permission-common": ^0.9.5
-  checksum: 10c0/9de48949739466d5e69be7434411fbe341a27e027d35c618d9668f339c50e18db63fb31af1df8a4619af41e5aa250b1e34dec722650998b2363e8fd8a699c937
+    "@backstage/plugin-permission-common": ^0.9.7
+  checksum: 10c0/72f103694e83e280437f0f92ca1140fdd477208fb4d74b268f5bbfbc3f74d09a999a7c32896616ca533a8bc276a640f8e84bfc9ce5c1c54adbc7986336e934be
   languageName: node
   linkType: hard
 
-"@backstage-community/plugin-tekton-react@npm:^0.3.0":
-  version: 0.3.0
-  resolution: "@backstage-community/plugin-tekton-react@npm:0.3.0"
+"@backstage-community/plugin-tekton-react@npm:^0.5.0":
+  version: 0.5.0
+  resolution: "@backstage-community/plugin-tekton-react@npm:0.5.0"
   dependencies:
-    "@backstage/core-plugin-api": "npm:^1.12.2"
     "@kubernetes/client-node": "npm:1.4.0"
-    "@material-ui/core": "npm:^4.9.13"
   peerDependencies:
     react: ^16.13.1 || ^17.0.0 || ^18.0.0
-  checksum: 10c0/f210e45e025746982a0a18c361af1f178fe7eeb24b46150549d0bdddee00bd92245dbad34c16ae7e110d30e7fc2200572e9fd45269f4b738fa15255fe32f497c
+  checksum: 10c0/16f0a688c17b3b302bd680360e09687ecf7520a2612859943b847e8f155845eea0248d98d85bf9f37e4cf5c2a11c1a3e53d5e0fed08100c3f3c3fb248ad031ee
   languageName: node
   linkType: hard
 
-"@backstage-community/plugin-tekton@npm:^3.34.1":
-  version: 3.35.0
-  resolution: "@backstage-community/plugin-tekton@npm:3.35.0"
+"@backstage-community/plugin-tekton@npm:^3.37.0":
+  version: 3.37.0
+  resolution: "@backstage-community/plugin-tekton@npm:3.37.0"
   dependencies:
     "@aonic-ui/pipelines": "npm:^3.1.0"
-    "@backstage-community/plugin-tekton-common": "npm:^1.18.0"
-    "@backstage-community/plugin-tekton-react": "npm:^0.3.0"
-    "@backstage/catalog-model": "npm:^1.7.6"
-    "@backstage/core-components": "npm:^0.18.6"
-    "@backstage/core-plugin-api": "npm:^1.12.2"
-    "@backstage/frontend-plugin-api": "npm:^0.13.4"
-    "@backstage/plugin-catalog-react": "npm:^1.21.6"
-    "@backstage/plugin-kubernetes-common": "npm:^0.9.9"
-    "@backstage/plugin-kubernetes-react": "npm:^0.5.15"
-    "@backstage/plugin-permission-react": "npm:^0.4.39"
-    "@backstage/theme": "npm:^0.7.1"
+    "@backstage-community/plugin-tekton-common": "npm:^1.20.0"
+    "@backstage-community/plugin-tekton-react": "npm:^0.5.0"
+    "@backstage/catalog-model": "npm:^1.7.7"
+    "@backstage/core-components": "npm:^0.18.8"
+    "@backstage/core-plugin-api": "npm:^1.12.4"
+    "@backstage/frontend-plugin-api": "npm:^0.15.1"
+    "@backstage/plugin-catalog-react": "npm:^2.1.0"
+    "@backstage/plugin-kubernetes-common": "npm:^0.9.10"
+    "@backstage/plugin-kubernetes-react": "npm:^0.5.17"
+    "@backstage/plugin-permission-react": "npm:^0.4.41"
+    "@backstage/theme": "npm:^0.7.2"
     "@kubernetes/client-node": "npm:1.4.0"
     "@material-ui/core": "npm:^4.9.13"
     "@material-ui/icons": "npm:^4.11.3"
@@ -1889,7 +1887,7 @@ __metadata:
     react: ^17.0.0 || ^18.0.0
     react-dom: ^17.0.0 || ^18.0.0
     react-router-dom: ^6.0.0
-  checksum: 10c0/0e932e23f79dc2cecd33fd0b4a4bfb3b510c78f3b1bc625747260551f87f0522b484255ded6dba54bfb79d6f49b3017797c98b4b1049f46aa9cd2801e6f41eb3
+  checksum: 10c0/03a2f467c24cc9a56f3a8c9ac6cdd5d52cde8321735411ed9cba09c32db80c8c4bcd43f6460923b91defc9aa97eea17dfc823bddf9897d452243f0856d95a4a8
   languageName: node
   linkType: hard
 
@@ -2670,7 +2668,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/core-components@npm:^0.18.2, @backstage/core-components@npm:^0.18.5, @backstage/core-components@npm:^0.18.6":
+"@backstage/core-components@npm:^0.18.2, @backstage/core-components@npm:^0.18.6":
   version: 0.18.6
   resolution: "@backstage/core-components@npm:0.18.6"
   dependencies:
@@ -3822,21 +3820,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/plugin-kubernetes-common@npm:^0.9.9":
-  version: 0.9.9
-  resolution: "@backstage/plugin-kubernetes-common@npm:0.9.9"
-  dependencies:
-    "@backstage/catalog-model": "npm:^1.7.6"
-    "@backstage/plugin-permission-common": "npm:^0.9.3"
-    "@backstage/types": "npm:^1.2.2"
-    "@kubernetes/client-node": "npm:1.4.0"
-    kubernetes-models: "npm:^4.3.1"
-    lodash: "npm:^4.17.21"
-    luxon: "npm:^3.0.0"
-  checksum: 10c0/1dd1c7ef46e6fdc0d9164eb28cfd1a2eee30b8dc142c6716120066e4efc328f0137b088ebd362eee62d8f3bd86507e8713efd9f4d5b4a97589f9e629652cd9af
-  languageName: node
-  linkType: hard
-
 "@backstage/plugin-kubernetes-node@npm:^0.4.2":
   version: 0.4.2
   resolution: "@backstage/plugin-kubernetes-node@npm:0.4.2"
@@ -3850,43 +3833,6 @@ __metadata:
     node-fetch: "npm:^2.7.0"
     winston: "npm:^3.2.1"
   checksum: 10c0/42bd7bd9a416b135c6c74c1fe42cd8ebe7f37c43fa37b85af04c76051c9826e5c75674e85b8545a7aa466b5a0fb0972d0983a592e63d2b39275d9fae0d4e258c
-  languageName: node
-  linkType: hard
-
-"@backstage/plugin-kubernetes-react@npm:^0.5.15":
-  version: 0.5.15
-  resolution: "@backstage/plugin-kubernetes-react@npm:0.5.15"
-  dependencies:
-    "@backstage/catalog-model": "npm:^1.7.6"
-    "@backstage/core-components": "npm:^0.18.5"
-    "@backstage/core-plugin-api": "npm:^1.12.1"
-    "@backstage/errors": "npm:^1.2.7"
-    "@backstage/plugin-kubernetes-common": "npm:^0.9.9"
-    "@backstage/types": "npm:^1.2.2"
-    "@kubernetes-models/apimachinery": "npm:^2.0.0"
-    "@kubernetes-models/base": "npm:^5.0.0"
-    "@kubernetes/client-node": "npm:1.4.0"
-    "@material-ui/core": "npm:^4.9.13"
-    "@material-ui/icons": "npm:^4.11.3"
-    "@material-ui/lab": "npm:^4.0.0-alpha.61"
-    "@xterm/addon-attach": "npm:^0.11.0"
-    "@xterm/addon-fit": "npm:^0.10.0"
-    "@xterm/xterm": "npm:^5.5.0"
-    cronstrue: "npm:^2.32.0"
-    js-yaml: "npm:^4.1.0"
-    kubernetes-models: "npm:^4.3.1"
-    lodash: "npm:^4.17.21"
-    luxon: "npm:^3.0.0"
-    react-use: "npm:^17.4.0"
-  peerDependencies:
-    "@types/react": ^17.0.0 || ^18.0.0
-    react: ^17.0.0 || ^18.0.0
-    react-dom: ^17.0.0 || ^18.0.0
-    react-router-dom: ^6.3.0
-  peerDependenciesMeta:
-    "@types/react":
-      optional: true
-  checksum: 10c0/fd48d6c3549e8eec8c055d708478b9683c4a529ad0dce022848584ae86127fc97dceb46fba725210ffcc71b88e7f35de8c99631f36f39a1f739c5b8e9fcdbf68
   languageName: node
   linkType: hard
 
@@ -15531,28 +15477,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@xterm/addon-attach@npm:^0.11.0":
-  version: 0.11.0
-  resolution: "@xterm/addon-attach@npm:0.11.0"
-  peerDependencies:
-    "@xterm/xterm": ^5.0.0
-  checksum: 10c0/7646e4a4ec1588f922bfed81e0361db435e4db73656847eda1f5724f7580a522b0ad9b636c76ddb3fad785feb4c594cc813b7e7a990d780d2d7aa78c69ad092f
-  languageName: node
-  linkType: hard
-
 "@xterm/addon-attach@npm:^0.12.0":
   version: 0.12.0
   resolution: "@xterm/addon-attach@npm:0.12.0"
   checksum: 10c0/afc8543d20172d18ac4777d70ed62d273e52033fbb859adac19f66b7f7658f4c0cecf400f46cb7befd4db12a75868f727a3ae0d492d8191ea7689db2f554ea67
-  languageName: node
-  linkType: hard
-
-"@xterm/addon-fit@npm:^0.10.0":
-  version: 0.10.0
-  resolution: "@xterm/addon-fit@npm:0.10.0"
-  peerDependencies:
-    "@xterm/xterm": ^5.0.0
-  checksum: 10c0/76926120fc940376afef2cb68b15aec2a99fc628b6e3cc84f2bcb1682ca9b87f982b3c10ff206faf4ebc5b410467b81a7b5e83be37b4ac386586f472e4fa1c61
   languageName: node
   linkType: hard
 
@@ -15970,7 +15898,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "app@workspace:packages/app"
   dependencies:
-    "@backstage-community/plugin-tekton": "npm:^3.34.1"
+    "@backstage-community/plugin-tekton": "npm:^3.37.0"
     "@backstage/app-defaults": "npm:^1.7.6"
     "@backstage/catalog-model": "npm:^1.7.7"
     "@backstage/cli": "npm:^0.36.0"

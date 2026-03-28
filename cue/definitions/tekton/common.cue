@@ -13,6 +13,7 @@ package tekton
 		kaniko:   "gcr.io/kaniko-project/executor:v1.19.2"
 		alpine:   "alpine:3.19"
 		yq:       "mikefarah/yq:4.40.5"
+		kubectl:  "bitnami/kubectl:1.31.4"
 	}
 
 	// Secret names
@@ -163,6 +164,21 @@ package tekton
 			description: "Image to use for running tests"
 			type:        "string"
 			default:     "node:20"
+		}
+	}
+
+	// Argo CD sync via kubectl patch on Application (see Argo CD "Sync Applications with Kubectl")
+	argocd: {
+		namespace: {
+			name:        "argocd-namespace"
+			description: "Namespace where the Argo CD Application CR lives"
+			type:        "string"
+			default:     "argocd"
+		}
+		appName: {
+			name:        "argocd-app-name"
+			description: "Argo CD Application resource name to sync"
+			type:        "string"
 		}
 	}
 }

@@ -9,6 +9,7 @@ import "helios.io/cue/definitions/tekton"
 	gitClone:          "git-clone"
 	kanikoBuild:       "kaniko-build"
 	gitUpdateManifest: "git-update-manifest"
+	argocdSync:        "argocd-sync"
 }
 
 // =====================================================
@@ -45,6 +46,10 @@ import "helios.io/cue/definitions/tekton"
 		name:    "port"
 		default: "8080"
 	}
+
+	// Argo CD sync (after GitOps push) — kubectl patch Application
+	argocdNamespace: tekton.#CommonParams.argocd.namespace
+	argocdAppName:   tekton.#CommonParams.argocd.appName
 }
 
 #PipelineParamsList: [
@@ -63,6 +68,8 @@ import "helios.io/cue/definitions/tekton"
 	#PipelineParams.dockerSecret,
 	#PipelineParams.testCommand,
 	#PipelineParams.testImage,
+	#PipelineParams.argocdNamespace,
+	#PipelineParams.argocdAppName,
 ]
 
 // =====================================================
@@ -197,6 +204,22 @@ import "helios.io/cue/definitions/tekton"
 			{name: tekton.#CommonParams.gitops.authorEmail.name, value:  "$(params.\(#PipelineParams.gitopsAuthorEmail.name))"},
 			{name: "REPLICAS", value:                             "$(params.\(#PipelineParams.replicas.name))"},
 			{name: "PORT", value:                                 "$(params.\(#PipelineParams.port.name))"},
+		]
+	}
+}
+
+// #ArgoCDSyncPattern — kubectl patch Application.operation (see Argo CD sync-kubectl docs)
+#ArgoCDSyncPattern: {
+	_name:     string | *"argocd-sync"
+	_runAfter: [...string]
+
+	task: {
+		name:     _name
+		taskRef: name: #TaskNames.argocdSync
+		runAfter: _runAfter
+		params: [
+			{name: tekton.#CommonParams.argocd.namespace.name, value: "$(params.\(#PipelineParams.argocdNamespace.name))"},
+			{name: tekton.#CommonParams.argocd.appName.name, value:  "$(params.\(#PipelineParams.argocdAppName.name))"},
 		]
 	}
 }

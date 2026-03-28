@@ -1,4 +1,4 @@
-package controller
+package shared
 
 import (
 	"os"
@@ -12,7 +12,7 @@ func TestRewriteGiteaURL(t *testing.T) {
 		t.Setenv("GITEA_URL", "http://localhost:3030")
 		in := "http://localhost:3030/helios-platform/test-2.git"
 		want := "http://gitea-http.gitea.svc.cluster.local:3000/helios-platform/test-2.git"
-		if got := rewriteGiteaURL(in); got != want {
+		if got := RewriteGiteaURL(in); got != want {
 			t.Fatalf("got %q, want %q", got, want)
 		}
 	})
@@ -21,7 +21,7 @@ func TestRewriteGiteaURL(t *testing.T) {
 		t.Setenv("GITEA_URL", "http://localhost:3030")
 		in := "http://127.0.0.1:3030/helios-platform/test-2.git"
 		want := "http://gitea-http.gitea.svc.cluster.local:3000/helios-platform/test-2.git"
-		if got := rewriteGiteaURL(in); got != want {
+		if got := RewriteGiteaURL(in); got != want {
 			t.Fatalf("got %q, want %q", got, want)
 		}
 	})
@@ -30,7 +30,7 @@ func TestRewriteGiteaURL(t *testing.T) {
 		_ = os.Unsetenv("GITEA_URL")
 		_ = os.Unsetenv("GITEA_INTERNAL_URL")
 		in := "http://127.0.0.1:3030/helios-platform/test-2.git"
-		if got := rewriteGiteaURL(in); got != in {
+		if got := RewriteGiteaURL(in); got != in {
 			t.Fatalf("got %q, want %q", got, in)
 		}
 	})

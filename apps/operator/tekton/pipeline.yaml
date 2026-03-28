@@ -23,6 +23,9 @@ spec:
       default: ""          # Empty => no tests (no-op)
     - name: test-image
       default: "node:20"   # Default image for tests; can be overridden per app
+    - name: argocd-namespace
+      default: "argocd"
+    - name: argocd-app-name
 
   # CHANGE 1: Define two separate workspaces for the pipeline
   workspaces:
@@ -116,3 +119,13 @@ spec:
           value: $(params.replicas)
         - name: PORT
           value: $(params.port)
+
+    - name: argocd-sync
+      taskRef:
+        name: argocd-sync
+      runAfter: [update-gitops-manifest]
+      params:
+        - name: argocd-namespace
+          value: $(params.argocd-namespace)
+        - name: argocd-app-name
+          value: $(params.argocd-app-name)

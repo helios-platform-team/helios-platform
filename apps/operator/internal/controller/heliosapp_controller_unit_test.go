@@ -17,9 +17,14 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/argocd"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/database"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/gitopssync"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/tekton"
 )
 
-// FakeGitOpsClient is a mock implementation of GitOpsClientInterface for unit tests
+// FakeGitOpsClient is a mock implementation of GitOpsClientInterface for unit tests.
 type FakeGitOpsClient struct {
 	SyncedFiles map[string]string
 }
@@ -32,7 +37,7 @@ func (m *FakeGitOpsClient) SyncManifest(ctx context.Context, filePath, content s
 	return nil
 }
 
-// FakeCueEngine is a mock implementation of CueEngineInterface
+// FakeCueEngine is a mock implementation of CueEngineInterface.
 type FakeCueEngine struct{}
 
 func (f *FakeCueEngine) Render(app heliosCue.Application) ([]byte, error) {
@@ -44,7 +49,6 @@ func (f *FakeCueEngine) RenderToObjects(app heliosCue.Application) ([]map[string
 }
 
 // FakeTektonRenderer is a mock implementation of TektonRendererInterface.
-// Returns empty resource list (sufficient for controller unit tests).
 type FakeTektonRenderer struct{}
 
 func (f *FakeTektonRenderer) RenderTektonResources(input heliosCue.TektonInput) ([]*unstructured.Unstructured, error) {
@@ -52,13 +56,11 @@ func (f *FakeTektonRenderer) RenderTektonResources(input heliosCue.TektonInput) 
 }
 
 func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
-	// 1. Setup Scheme
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 
-	// 2. Setup Mock Objects
 	heliosApp := &appv1alpha1.HeliosApp{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-app",
@@ -89,29 +91,26 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		},
 	}
 
-	// 3. Setup Fake Client
-	// We init with the object existing
-	client := fake.NewClientBuilder().
+	fakeClient := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(heliosApp, gitOpsSecret).
 		WithStatusSubresource(heliosApp).
 		Build()
 
-	// 4. Setup Mock GitOps
 	mockGit := &FakeGitOpsClient{}
 
-	// 5. Setup Reconciler
 	r := &HeliosAppReconciler{
-		Client:         client,
-		Scheme:         scheme,
-		CueEngine:      &FakeCueEngine{},
-		TektonRenderer: &FakeTektonRenderer{},
-		GitFactory: func(repo, user, token string) gitops.GitOpsClientInterface {
+		Client:    fakeClient,
+		Scheme:    scheme,
+		CueEngine: &FakeCueEngine{},
+		Tekton:    tekton.NewReconciler(fakeClient, scheme, &FakeTektonRenderer{}),
+		ArgoCD:    argocd.NewReconciler(fakeClient, scheme),
+		Database:  database.NewReconciler(fakeClient, scheme),
+		GitOps: gitopssync.NewReconciler(fakeClient, scheme, func(repo, user, token string) gitops.GitOpsClientInterface {
 			return mockGit
-		},
+		}),
 	}
 
-	// 6. Run Reconcile
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      "test-app",
@@ -122,16 +121,13 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 	ctx := t.Context()
 	res, err := r.Reconcile(ctx, req)
 
-	// 7. Assertions
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, wantErr %v", err, nil)
 	}
-	if res.Requeue {
-		t.Errorf("Reconcile() Requeue = %v, want %v", res.Requeue, false)
+	if res.RequeueAfter != 0 {
+		t.Errorf("Reconcile() RequeueAfter = %v, want 0", res.RequeueAfter)
 	}
 
-	// Verify GitOps was called
-	// SyncManifest(ctx, targetPath, content)
 	expectedPath := "apps/test-app/manifest.yaml"
 	found := false
 	for path := range mockGit.SyncedFiles {
@@ -144,15 +140,13 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		t.Errorf("GitOps SyncManifest was not called for path %s. Synced: %v", expectedPath, mockGit.SyncedFiles)
 	}
 
-	// Verify Status Update (Optional, requires fetching object again)
 	updatedApp := &appv1alpha1.HeliosApp{}
-	_ = client.Get(ctx, req.NamespacedName, updatedApp)
+	_ = fakeClient.Get(ctx, req.NamespacedName, updatedApp)
 	if updatedApp.Status.Phase != appv1alpha1.PhaseReady {
 		t.Errorf("Expected Phase to be %s, got %s", appv1alpha1.PhaseReady, updatedApp.Status.Phase)
 	}
 }
 
-// Add a test for missing image (Pending phase)
 func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -165,19 +159,22 @@ func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 				{
 					Name:       "backend",
 					Type:       "worker",
-					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd": "run"}`)}, // Missing image
+					Properties: &runtime.RawExtension{Raw: []byte(`{"cmd": "run"}`)},
 				},
 			},
 		},
 	}
 
-	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(heliosApp).WithStatusSubresource(heliosApp).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(heliosApp).WithStatusSubresource(heliosApp).Build()
 
 	r := &HeliosAppReconciler{
-		Client:         client,
-		Scheme:         scheme,
-		CueEngine:      &FakeCueEngine{},
-		TektonRenderer: &FakeTektonRenderer{},
+		Client:    fakeClient,
+		Scheme:    scheme,
+		CueEngine: &FakeCueEngine{},
+		Tekton:    tekton.NewReconciler(fakeClient, scheme, &FakeTektonRenderer{}),
+		ArgoCD:    argocd.NewReconciler(fakeClient, scheme),
+		Database:  database.NewReconciler(fakeClient, scheme),
+		GitOps:    gitopssync.NewReconciler(fakeClient, scheme, nil),
 	}
 
 	res, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Name: "pending-app", Namespace: "default"}})
@@ -190,7 +187,7 @@ func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 	}
 
 	updatedApp := &appv1alpha1.HeliosApp{}
-	_ = client.Get(t.Context(), types.NamespacedName{Name: "pending-app", Namespace: "default"}, updatedApp)
+	_ = fakeClient.Get(t.Context(), types.NamespacedName{Name: "pending-app", Namespace: "default"}, updatedApp)
 	if updatedApp.Status.Phase != appv1alpha1.PhasePending {
 		t.Errorf("Expected Phase to be %s, got %s", appv1alpha1.PhasePending, updatedApp.Status.Phase)
 	}

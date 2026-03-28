@@ -29,11 +29,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/argocd"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/database"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/gitopssync"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/tekton"
 	heliosCue "github.com/helios-platform-team/helios-platform/apps/operator/internal/cue"
 	"github.com/helios-platform-team/helios-platform/apps/operator/internal/gitops"
 )
 
-// MockGitOpsClient is a mock implementation of GitOpsClientInterface
+// MockGitOpsClient is a mock implementation of GitOpsClientInterface.
 type MockGitOpsClient struct {
 	SyncedFiles map[string]string
 }
@@ -54,7 +58,7 @@ var _ = Describe("HeliosApp Controller", func() {
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
 		heliosapp := &appv1alpha1.HeliosApp{}
 
@@ -78,7 +82,7 @@ var _ = Describe("HeliosApp Controller", func() {
 						},
 						GitOpsRepo:      "https://github.com/example/repo.git",
 						GitOpsPath:      "apps/test-app",
-						GitOpsSecretRef: "my-secret", // Add secret ref to trigger logic path
+						GitOpsSecretRef: "my-secret",
 					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
@@ -86,7 +90,6 @@ var _ = Describe("HeliosApp Controller", func() {
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
 			resource := &appv1alpha1.HeliosApp{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
@@ -99,29 +102,21 @@ var _ = Describe("HeliosApp Controller", func() {
 			mockGit := &MockGitOpsClient{}
 
 			controllerReconciler := &HeliosAppReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-				// Inject the mock
-				GitFactory: func(repo, user, token string) gitops.GitOpsClientInterface {
-					return mockGit
-				},
-				// Note: CueEngine needs to be mocked or real if possible.
-				// For this test, we instantiate a dummy engine.
+				Client:    k8sClient,
+				Scheme:    k8sClient.Scheme(),
 				CueEngine: &heliosCue.Engine{},
+				Tekton:    tekton.NewReconciler(k8sClient, k8sClient.Scheme(), nil),
+				ArgoCD:    argocd.NewReconciler(k8sClient, k8sClient.Scheme()),
+				Database:  database.NewReconciler(k8sClient, k8sClient.Scheme()),
+				GitOps: gitopssync.NewReconciler(k8sClient, k8sClient.Scheme(), func(repo, user, token string) gitops.GitOpsClientInterface {
+					return mockGit
+				}),
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
 			})
-
-			// We expect Reconcile to attempt GitOps if CUE rendering succeeds.
-			// If CUE rendering fails (likely due to empty engine), err will be present.
-			// However, the test structure is now correct for injecting the mock.
-			// We allow error here because we haven't fully mocked CUE.
-			if err == nil {
-				// If no error, we check if mock was called (only if logic reached GitOps)
-				// Expect(mockGit.SyncedFiles).NotTo(BeEmpty())
-			}
+			_ = err
 		})
 	})
 })

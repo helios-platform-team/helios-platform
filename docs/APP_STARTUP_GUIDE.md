@@ -49,11 +49,17 @@ task setup
 
 ### 5. Start developing
 
-Runs the Go operator and Backstage portal concurrently:
+Runs the Go operator:
 
 ```bash
-task dev
+task dev:operator
 ```
+
+Runs the Backstage portal:
+```bash
+task dev:portal
+```
+
 
 The portal will be available at http://localhost:3000 and the backend API at http://localhost:7007.
 

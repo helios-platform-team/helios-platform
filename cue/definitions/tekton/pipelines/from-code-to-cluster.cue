@@ -36,6 +36,11 @@ _fromCodeToClusterConfig: {
 			_runAfter:        ["build-and-push-image"]
 			_imageSourceTask: "build-and-push-image"
 		}).task,
+
+		// 5. Trigger Argo CD sync (after GitOps commit/push)
+		(#ArgoCDSyncPattern & {
+			_runAfter: ["update-gitops-manifest"]
+		}).task,
 	]
 }
 

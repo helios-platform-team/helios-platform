@@ -20,7 +20,7 @@ import (
         }
         config: params: [
             {name: "git-repo-url", value: "$(body.repository.clone_url)"},
-            {name: "git-revision", value: "$(body.head_commit.id)"},
+            {name: "git-revision", value: "$(body.after)"},
         ]
     }
 
@@ -51,6 +51,7 @@ import (
                         "app.kubernetes.io/part-of":  "helios-platform"
                         "app.kubernetes.io/instance": _bp.pipelineName
                         "app.kubernetes.io/name":     _bp.pipelineName
+                        "janus-idp.io/tekton":        _bp.appName
                     }
                 }
                 spec: {
@@ -58,7 +59,8 @@ import (
                     serviceAccountName: _bp.serviceAccount
                     
                     params: [
-                        {name: "app-repo-url", value:       "$(tt.params.git-repo-url)"},
+                        // Use operator-provided repo URL (already rewritten to in-cluster URL if needed).
+                        {name: "app-repo-url", value:       _bp.gitRepo},
                         {name: "app-repo-revision", value:  "$(tt.params.git-revision)"},
                         {name: "image-repo", value:         _bp.imageRepo},
                         {name: "GITOPS_REPO_URL", value:    _bp.gitopsRepo},
@@ -73,6 +75,8 @@ import (
                         {name: "docker-secret", value:      _bp.dockerSecret},
                         {name: "test-command", value:       _bp.testCommand},
                         {name: "test-image", value:         _bp.testImage},
+                        {name: "argocd-namespace", value: _bp.argoCDNamespace},
+                        {name: "argocd-app-name", value:  _bp.argoCDAppName},
                     ]
 
                     workspaces: [
