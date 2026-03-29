@@ -31,7 +31,7 @@ export class DatabaseService {
   async getDatabaseInfo(componentName: string): Promise<DatabaseInfo> {
     try {
       // Get the secret
-      const secretName = `${componentName}-backend-db-secret`;
+      const secretName = `${componentName}-db-secret`;
       const namespace = 'default'; // This can be made configurable
 
       const secretResponse = await this.coreApi.readNamespacedSecret({
@@ -44,21 +44,27 @@ export class DatabaseService {
         throw new Error(`Secret ${secretName} not found`);
       }
 
-      // Decode base64 data
+      // Decode base64 data (operator secrets use DB_* keys; see operator database/resources.go)
       const data = secret.data;
-      const decodeBase64 = (str: string): string => {
+      const decodeBase64 = (str: string | undefined): string => {
+        if (!str) return '';
         return Buffer.from(str, 'base64').toString('utf-8');
       };
 
       // Get pod status
       const status = await this.getPodStatus(componentName);
 
+      const portStr = decodeBase64(data.DB_PORT || data.port);
+      const port = portStr ? parseInt(portStr, 10) : 5432;
+
       return {
-        host: decodeBase64(data.host || ''),
-        port: parseInt(decodeBase64(data.port || '5432'), 10),
-        user: decodeBase64(data.user || ''),
-        password: decodeBase64(data.password || ''),
-        database: decodeBase64(data.database || ''),
+        host: decodeBase64(data.DB_HOST || data.host),
+        port,
+        user: decodeBase64(data.DB_USER || data.user),
+        password: decodeBase64(data.DB_PASS || data.password),
+        database:
+          decodeBase64(data.DB_NAME || data.database) ||
+          `${componentName}-db`,
         status,
       };
     } catch (error) {
@@ -73,7 +79,7 @@ export class DatabaseService {
     componentName: string,
   ): Promise<'Running' | 'Failed' | 'Unknown'> {
     try {
-      const labelSelector = `app=${componentName}-backend-db`;
+      const labelSelector = `app=${componentName}-db`;
       const namespace = 'default';
 
       const podsResponse = await this.coreApi.listNamespacedPod({

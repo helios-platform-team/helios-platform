@@ -19,7 +19,7 @@ export default createBackendModule({
         router.get('/api/helios/database/info/:componentName', async (req, res) => {
           try {
             const { componentName } = req.params;
-            const secretName = `${componentName}-backend-db-secret`;
+            const secretName = `${componentName}-db-secret`;
 
             // Use kubectl to fetch secret
             const secretCmd = `kubectl get secret ${secretName} -n default -o json`;
@@ -48,7 +48,7 @@ export default createBackendModule({
             // Get pod status
             let status = 'Unknown';
             try {
-              const podLabel = `app=${componentName}-backend-db`;
+              const podLabel = `app=${componentName}-db`;
               const podCmd = `kubectl get pods -l ${podLabel} -n default -o json`;
               const podsJson = JSON.parse(execSync(podCmd, { encoding: 'utf-8' }));
               

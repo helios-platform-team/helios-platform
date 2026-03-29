@@ -22,7 +22,7 @@ func GenerateSyncRole(app *appv1alpha1.HeliosApp) *unstructured.Unstructured {
 				"namespace": argoNS,
 				"labels": map[string]any{
 					"app.kubernetes.io/managed-by": "helios-operator",
-					"helios.io/heliosapp":          fmt.Sprintf("%s/%s", app.Namespace, app.Name),
+					"helios.io/heliosapp":          fmt.Sprintf("%s.%s", app.Namespace, app.Name),
 				},
 			},
 			"rules": []any{
@@ -52,7 +52,7 @@ func GenerateSyncRoleBinding(app *appv1alpha1.HeliosApp) *unstructured.Unstructu
 				"namespace": argoNS,
 				"labels": map[string]any{
 					"app.kubernetes.io/managed-by": "helios-operator",
-					"helios.io/heliosapp":          fmt.Sprintf("%s/%s", app.Namespace, app.Name),
+					"helios.io/heliosapp":          fmt.Sprintf("%s.%s", app.Namespace, app.Name),
 				},
 			},
 			"roleRef": map[string]any{

@@ -180,8 +180,8 @@ cursor = conn.cursor()`;
           <br />
           <Typography variant="caption" style={{ marginTop: '8px', display: 'block' }}>
             Make sure the backend service is running and the component has a corresponding
-            Kubernetes secret named &quot;{componentName}-backend-db-secret&quot; and pod with label
-            &quot;app={componentName}-backend-db&quot;.
+            Kubernetes secret named &quot;{componentName}-db-secret&quot; and pod with label
+            &quot;app={componentName}-db&quot; (Helios operator naming).
           </Typography>
         </Alert>
       </Box>

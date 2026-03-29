@@ -26,7 +26,7 @@ export default createBackendModule({
             const k8sApi = kc.makeApiClient(CoreV1Api);
 
             // Get the secret
-            const secretName = `${componentName}-backend-db-secret`;
+            const secretName = `${componentName}-db-secret`;
             const secret = await k8sApi.readNamespacedSecret(secretName, 'default');
 
             if (!secret.body?.data) {
@@ -61,7 +61,7 @@ export default createBackendModule({
             // Try to get pod status
             let status = 'Unknown';
             try {
-              const podLabel = `app=${componentName}-backend-db`;
+              const podLabel = `app=${componentName}-db`;
               const pods = await k8sApi.listNamespacedPod('default', undefined, undefined, undefined, undefined, podLabel);
               
               if (pods.body?.items && pods.body.items.length > 0) {

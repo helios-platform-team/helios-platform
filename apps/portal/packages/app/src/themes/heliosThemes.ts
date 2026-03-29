@@ -65,7 +65,7 @@ const heliosPaletteDark = {
     contrastText: '#000000',
   },
   background: {
-    default: 'transparent', // Void Black
+    default: 'rgba(0, 0, 0, 0)', // Void Black
     paper: COLORS_DARK.panelSurface,
   },
   text: {
@@ -242,7 +242,7 @@ export const darkTheme = createUnifiedTheme({
     MuiCssBaseline: {
       styleOverrides: {
         body: {
-          backgroundColor: 'transparent',
+          backgroundColor: 'rgba(0, 0, 0, 0)',
           scrollbarColor: '#333 #000',
         },
       },
@@ -384,7 +384,7 @@ export const darkTheme = createUnifiedTheme({
 
         /* --- NEON VARIANT --- */
         outlinedPrimary: {
-          backgroundColor: 'transparent',
+          backgroundColor: 'rgba(0, 0, 0, 0)',
           borderColor: 'rgba(245,158,11,0.5)', // amber-500/50
           color: '#f59e0b', // amber-500
           boxShadow: 'inset 0 0 10px rgba(245,158,11,0.1)',
@@ -403,7 +403,7 @@ export const darkTheme = createUnifiedTheme({
 
         /* --- GHOST VARIANT --- */
         text: {
-          backgroundColor: 'transparent',
+          backgroundColor: 'rgba(0, 0, 0, 0)',
           color: '#a1a1aa', // zinc-400
           '&:hover': {
             backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -477,7 +477,7 @@ export const darkTheme = createUnifiedTheme({
           backgroundImage: 'none',
           boxShadow: 'none',
           // borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          backgroundColor: 'transparent',
+          backgroundColor: 'rgba(0, 0, 0, 0)',
           padding: '48px 48px 24px 48px',
         },
         title: {
@@ -496,7 +496,7 @@ export const darkTheme = createUnifiedTheme({
           paddingLeft: '48px',
           paddingRight: '48px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          backgroundColor: 'transparent',
+          backgroundColor: 'rgba(0, 0, 0, 0)',
         },
       },
     },
@@ -589,7 +589,7 @@ export const lightTheme = createUnifiedTheme({
     MuiCssBaseline: {
       styleOverrides: {
         body: {
-          backgroundColor: 'transparent', // Usually set by the app background layer
+          backgroundColor: 'rgba(0, 0, 0, 0)', // Usually set by the app background layer
           scrollbarColor: '#d4d4d8 #f4f4f5', // Zinc 300 on Zinc 100
         },
       },
@@ -745,7 +745,7 @@ export const lightTheme = createUnifiedTheme({
 
         /* --- GHOST VARIANT --- */
         text: {
-          backgroundColor: 'transparent',
+          backgroundColor: 'rgba(0, 0, 0, 0)',
           color: '#52525b', // zinc-600
           '&:hover': {
             backgroundColor: '#f4f4f5', // zinc-100
@@ -818,7 +818,7 @@ export const lightTheme = createUnifiedTheme({
         header: {
           backgroundImage: 'none',
           boxShadow: 'none',
-          backgroundColor: 'transparent',
+          backgroundColor: 'rgba(0, 0, 0, 0)',
           padding: '48px 48px 24px 48px',
         },
         title: {
@@ -854,7 +854,7 @@ export const lightTheme = createUnifiedTheme({
       styleOverrides: {
         tabsWrapper: {
           borderBottom: `1px solid ${COLORS_LIGHT.borderSubtle}`,
-          backgroundColor: 'transparent',
+          backgroundColor: 'rgba(0, 0, 0, 0)',
           fontFamily: FONTS.sans,
           paddingRight: '48px',
           paddingLeft: '48px',
