@@ -57,6 +57,9 @@ import "helios.io/cue/definitions/tekton"
 			// Step 2: Update Manifests using YQ image
 			name:  "update-manifests"
 			image: _config.images.yq
+			securityContext: {
+				runAsUser: 0
+			}
 			entrypoint: ["/bin/sh"] // Override default yq entrypoint
 			script: """
 				#!/bin/sh

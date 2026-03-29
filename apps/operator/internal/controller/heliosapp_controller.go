@@ -86,6 +86,7 @@ func NewHeliosAppReconciler(
 func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
+	// 1. Fetch HeliosApp CRD
 	var heliosApp appv1alpha1.HeliosApp
 	if err := r.Get(ctx, req.NamespacedName, &heliosApp); err != nil {
 		if errors.IsNotFound(err) {
@@ -97,12 +98,14 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	log.Info("Reconciling HeliosApp", "name", heliosApp.Name, "namespace", heliosApp.Namespace)
 
+	// 2. Map CRD to Application Model
 	appModel, err := mapCRDToModel(&heliosApp)
 	if err != nil {
 		log.Error(err, "Failed to map CRD to application model")
 		return ctrl.Result{}, err
 	}
 
+	// 3. Render via CUE Engine
 	manifestBytes, err := r.CueEngine.Render(appModel)
 	if err != nil {
 		log.Error(err, "Failed to render application via CUE")
@@ -110,24 +113,46 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
+	// ------------------------------------------------------------------
+	// PHASE -1 & 0: Tekton CI/CD Resources (Tasks, Pipeline, Triggers)
+	// All Tekton resources are rendered via CUE engine.
+	// ------------------------------------------------------------------
 	if err := r.Tekton.Reconcile(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile Tekton resources")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Tekton reconciliation failed: %v", err))
 		return ctrl.Result{}, err
 	}
 
+	// ------------------------------------------------------------------
+	// PHASE 0.5: Database Credential Secrets
+	// Generate and store secure credentials for components with database traits.
+	// Secrets are created BEFORE GitOps sync to ensure credentials exist
+	// when the application is deployed.
+	// ------------------------------------------------------------------
 	if err := r.Database.ReconcileSecrets(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile database secrets")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database secret creation failed: %v", err))
 		return ctrl.Result{}, err
 	}
 
+	// ------------------------------------------------------------------
+	// PHASE 0.7: Database Instance Provisioning
+	// Provision StatefulSets and headless Services for database traits.
+	// Runs AFTER secrets so that the credential Secret already exists
+	// when the database pod starts.
+	// ------------------------------------------------------------------
 	if err := r.Database.ReconcileInstances(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile database instance")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database instance provisioning failed: %v", err))
 		return ctrl.Result{}, err
 	}
 
+	// ------------------------------------------------------------------
+	// PHASE 0.9: Inject Database Credentials into Backend Deployment
+	// Patches the live Deployment (deployed by ArgoCD) to add DB_HOST,
+	// DB_USER, DB_PASS env vars referencing the operator-managed Secret.
+	// Runs AFTER secrets and instances so the Secret already exists.
+	// ------------------------------------------------------------------
 	dbInjectionPending, err := r.Database.ReconcileInjection(ctx, &heliosApp)
 	if err != nil {
 		log.Error(err, "Failed to inject database secrets into Deployment")
@@ -148,6 +173,10 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "Failed to reconcile initial PipelineRun")
 		return ctrl.Result{}, err
 	}
+
+	// ------------------------------------------------------------------
+	// PHASE 1: Render & GitOps
+	// ------------------------------------------------------------------
 
 	if err := r.GitOps.Reconcile(ctx, &heliosApp, manifestBytes); err != nil {
 		log.Error(err, "GitOps sync failed")
@@ -193,9 +222,11 @@ func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // findObjectsForSecret maps Secret changes to HeliosApp reconcile requests.
+// This ensures the controller re-reconciles when a referenced secret changes.
 func (r *HeliosAppReconciler) findObjectsForSecret(ctx context.Context, obj client.Object) []reconcile.Request {
 	log := logf.FromContext(ctx)
 
+	// List all HeliosApps in the same namespace
 	var heliosAppList appv1alpha1.HeliosAppList
 	if err := r.List(ctx, &heliosAppList, client.InNamespace(obj.GetNamespace())); err != nil {
 		log.Error(err, "Failed to list HeliosApps for secret watch")
@@ -204,6 +235,7 @@ func (r *HeliosAppReconciler) findObjectsForSecret(ctx context.Context, obj clie
 
 	var requests []reconcile.Request
 	for _, app := range heliosAppList.Items {
+		// Check if this app references the changed secret
 		if app.Spec.GitOpsSecretRef == obj.GetName() ||
 			app.Spec.WebhookSecret == obj.GetName() {
 			requests = append(requests, reconcile.Request{

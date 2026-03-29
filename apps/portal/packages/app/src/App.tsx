@@ -24,6 +24,7 @@ import { apis } from './apis';
 import { entityPage } from './components/catalog/EntityPage';
 import { searchPage } from './components/search/SearchPage';
 import { Root } from './components/Root';
+import { HeliosBackground } from './components/theme/HeliosBackground';
 
 import {
   AlertDisplay,
@@ -39,6 +40,13 @@ import { NotificationsPage } from '@backstage/plugin-notifications';
 import { SignalsDisplay } from '@backstage/plugin-signals';
 import { ScaffolderFieldExtensions } from '@backstage/plugin-scaffolder-react';
 import { DatabasePickerExtension } from './scaffolder';
+import { ScaffolderFieldExtensions } from '@backstage/plugin-scaffolder-react';
+import { DatabasePickerExtension } from './scaffolder';
+import { UnifiedThemeProvider } from '@backstage/theme';
+import { darkTheme, lightTheme } from './themes/heliosThemes';
+import './styles.css';
+import { HeliosHomepage } from './components/home/HeliosHomepage.tsx'; // Backstage UI (BUI) theme
+import { HomepageCompositionRoot } from '@backstage/plugin-home';
 
 const app = createApp({
   apis,
@@ -62,11 +70,33 @@ const app = createApp({
   components: {
     SignInPage: props => <SignInPage {...props} auto providers={['guest']} />,
   },
+  themes: [
+    {
+      id: 'light',
+      title: 'Light theme',
+      variant: 'light',
+      Provider: ({ children }) => (
+        <UnifiedThemeProvider theme={lightTheme} children={children} />
+      ),
+    },
+    {
+      id: 'dark',
+      title: 'Dark theme',
+      variant: 'dark',
+      Provider: ({ children }) => (
+        <UnifiedThemeProvider theme={darkTheme} children={children} />
+      ),
+    },
+  ],
 });
+
+// const scaffolderFieldExtensions = [DatabasePickerExtension];
 
 const routes = (
   <FlatRoutes>
-    <Route path="/" element={<Navigate to="catalog" />} />
+    <Route path="/" element={<HomepageCompositionRoot />}>
+      <HeliosHomepage />
+    </Route>
     <Route path="/catalog" element={<CatalogIndexPage />} />
     <Route
       path="/catalog/:namespace/:kind/:name"
@@ -113,6 +143,7 @@ const routes = (
 
 export default app.createRoot(
   <>
+    <HeliosBackground />
     <AlertDisplay />
     <OAuthRequestDialog />
     <SignalsDisplay />

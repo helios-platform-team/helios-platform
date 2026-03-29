@@ -42,9 +42,6 @@ spec:
         databaseConfig:
           title: Database Settings
           type: object
-          default:
-            dbType: none
-            dbName: ""
           ui:field: DatabasePicker
     # --- END OF NEW STEP ---
 
@@ -128,6 +125,9 @@ spec:
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "npm install && npm test"
+          dbType: ${{ parameters.databaseConfig.dbType }}
+          dbName: ${{ parameters.databaseConfig.dbName }}
+          dbVersion: ${{ parameters.databaseConfig.dbVersion }}
 
     - id: publish-gitops
       name: Publish GitOps Manifests
@@ -182,3 +182,6 @@ spec:
         url: ${{ steps['publish-source'].output.remoteUrl }}
       - title: GitOps Repository
         url: ${{ steps['publish-gitops'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}

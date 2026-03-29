@@ -56,11 +56,13 @@ func (f *FakeTektonRenderer) RenderTektonResources(input heliosCue.TektonInput) 
 }
 
 func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
+	// 1. Setup Scheme
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 
+	// 2. Setup Mock Objects
 	heliosApp := &appv1alpha1.HeliosApp{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-app",
@@ -91,14 +93,18 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		},
 	}
 
+	// 3. Setup Fake Client
+	// We init with the object existing
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(heliosApp, gitOpsSecret).
 		WithStatusSubresource(heliosApp).
 		Build()
 
+	// 4. Setup Mock GitOps
 	mockGit := &FakeGitOpsClient{}
 
+	// 5. Setup Reconciler
 	r := &HeliosAppReconciler{
 		Client:    fakeClient,
 		Scheme:    scheme,
@@ -111,6 +117,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		}),
 	}
 
+	// 6. Run Reconcile
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      "test-app",
@@ -121,6 +128,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 	ctx := t.Context()
 	res, err := r.Reconcile(ctx, req)
 
+	// 7. Assertions
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, wantErr %v", err, nil)
 	}
@@ -128,6 +136,8 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		t.Errorf("Reconcile() RequeueAfter = %v, want 0", res.RequeueAfter)
 	}
 
+	// Verify GitOps was called
+	// SyncManifest(ctx, targetPath, content)
 	expectedPath := "apps/test-app/manifest.yaml"
 	found := false
 	for path := range mockGit.SyncedFiles {
@@ -140,6 +150,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		t.Errorf("GitOps SyncManifest was not called for path %s. Synced: %v", expectedPath, mockGit.SyncedFiles)
 	}
 
+	// Verify Status Update (Optional, requires fetching object again)
 	updatedApp := &appv1alpha1.HeliosApp{}
 	_ = fakeClient.Get(ctx, req.NamespacedName, updatedApp)
 	if updatedApp.Status.Phase != appv1alpha1.PhaseReady {
@@ -147,6 +158,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 	}
 }
 
+// Add a test for missing image (Pending phase)
 func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))

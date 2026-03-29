@@ -43,9 +43,6 @@ spec:
         databaseConfig:
           title: Database Settings
           type: object
-          default:
-            dbType: none
-            dbName: ""
           ui:field: DatabasePicker
 
     - title: Repository & Webhook
@@ -180,3 +177,6 @@ spec:
         url: ${{ steps['publish-source'].output.remoteUrl }}
       - title: GitOps Repository
         url: ${{ steps['publish-gitops'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}

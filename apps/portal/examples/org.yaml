@@ -29,6 +29,6 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
-  name: PhamHoangKha1403
+  name: hoangphuc841
 spec:
   memberOf: [helios-platform-team]

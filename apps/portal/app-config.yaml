@@ -126,9 +126,9 @@ catalog:
       rules:
         - allow: [Template]
 
-    # Nest.js
+    # NestJS + Prisma Template
     - type: file
-      target: ../../examples/nestjs-prismas-template/template.yaml
+      target: ../../examples/nestjs-prisma-template/template.yaml
       rules:
         - allow: [Template]
 
