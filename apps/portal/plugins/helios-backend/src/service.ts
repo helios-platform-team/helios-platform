@@ -63,8 +63,7 @@ export class DatabaseService {
         user: decodeBase64(data.DB_USER || data.user),
         password: decodeBase64(data.DB_PASS || data.password),
         database:
-          decodeBase64(data.DB_NAME || data.database) ||
-          `${componentName}-db`,
+          decodeBase64(data.DB_NAME || data.database) || `${componentName}-db`,
         status,
       };
     } catch (error) {

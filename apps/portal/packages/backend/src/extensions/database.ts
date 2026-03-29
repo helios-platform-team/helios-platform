@@ -1,26 +1,24 @@
-import { createBackendFeature } from '@backstage/backend-plugin-api';
-import { createDatabaseRouter } from '@helios/plugin-database-backend';
+import {
+  coreServices,
+  createBackendModule,
+} from '@backstage/backend-plugin-api';
+import createDatabaseRouter from './database-router';
 
 /**
  * Database router feature for Helios platform
  * Provides API endpoints for fetching database information from Kubernetes
  */
-export const databaseFeature = createBackendFeature({
-  pluginId: 'database',
-  register(reg) {
-    reg.registerInit({
+export const databaseFeature = createBackendModule({
+  pluginId: 'app',
+  moduleId: 'database-feature-legacy',
+  register(env) {
+    env.registerInit({
       deps: {
-        logger: 'logger' as unknown as any,
+        httpRouter: coreServices.httpRouter,
       },
-      init: async () => {
-        const databaseRouter = createDatabaseRouter();
-        return {
-          router: databaseRouter,
-        };
+      async init({ httpRouter }) {
+        httpRouter.use(createDatabaseRouter() as any);
       },
     });
   },
 });
-
-// Export router for direct use
-export { createDatabaseRouter };

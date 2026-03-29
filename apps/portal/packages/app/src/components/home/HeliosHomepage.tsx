@@ -44,6 +44,7 @@ const StatusBadge: React.FC<{ status: StatusType; label?: string }> = ({
   >
     <Box
       className="helios-hp-status-dot"
+      children={null}
       style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0 }}
     />
     {label || status}
@@ -73,6 +74,7 @@ const MetricCard: React.FC<{
     {/* Corner markers (solar accent) */}
     <Box
       position="absolute"
+      children={null}
       style={{
         top: 0,
         left: 0,
@@ -85,6 +87,7 @@ const MetricCard: React.FC<{
     />
     <Box
       position="absolute"
+      children={null}
       style={{
         top: 0,
         right: 0,
@@ -97,6 +100,7 @@ const MetricCard: React.FC<{
     />
     <Box
       position="absolute"
+      children={null}
       style={{
         bottom: 0,
         left: 0,
@@ -109,6 +113,7 @@ const MetricCard: React.FC<{
     />
     <Box
       position="absolute"
+      children={null}
       style={{
         bottom: 0,
         right: 0,
@@ -263,6 +268,7 @@ const ServiceRow: React.FC<{ service: Service; index: number }> = ({
               }}
             >
               <Box
+                children={null}
                 style={{
                   width: `${service.cpu}%`,
                   height: '100%',
@@ -539,6 +545,7 @@ export const HeliosHomepage = () => {
               </Flex>
               <Flex align="center" gap="2">
                 <Box
+                  children={null}
                   style={{
                     width: 8,
                     height: 8,

@@ -8,7 +8,6 @@
 
 import * as dotenv from 'dotenv';
 import { createBackend } from '@backstage/backend-defaults';
-import { customAuth } from './extensions/auth';
 import { scaffolderModuleCustomActions } from './extensions/scaffolder';
 
 // Load env vars from root .env

@@ -13,7 +13,7 @@ export default createBackendModule({
         http: coreServices.httpRouter,
       },
       async init({ http }) {
-        http.use(createDatabaseRouter());
+        http.use(createDatabaseRouter() as any);
       },
     });
   },

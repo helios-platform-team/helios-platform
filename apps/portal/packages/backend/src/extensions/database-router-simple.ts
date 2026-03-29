@@ -16,7 +16,9 @@ export default createBackendModule({
       async init({ httpRouter }) {
         const router = Router();
 
-        router.get('/api/helios/database/info/:componentName', async (req, res) => {
+        router.get(
+          '/api/helios/database/info/:componentName',
+          async (req, res): Promise<void> => {
           try {
             const { componentName } = req.params;
             const secretName = `${componentName}-db-secret`;
@@ -26,7 +28,10 @@ export default createBackendModule({
             const secretJson = JSON.parse(execSync(secretCmd, { encoding: 'utf-8' }));
 
             if (!secretJson.data) {
-              return res.status(404).json({ error: `Secret ${secretName} not found or has no data` });
+              res
+                .status(404)
+                .json({ error: `Secret ${secretName} not found or has no data` });
+              return;
             }
 
             const data = secretJson.data;
@@ -68,15 +73,18 @@ export default createBackendModule({
               database,
               status,
             });
+            return;
           } catch (error: any) {
             console.error('Error fetching database info:', error);
             res.status(500).json({
               error: error?.message || 'Failed to fetch database information',
             });
+            return;
           }
-        });
+          },
+        );
 
-        httpRouter.use(router);
+        httpRouter.use(router as any);
       },
     });
   },

@@ -104,7 +104,9 @@ export const DatabaseTab: React.FC = () => {
           `${backendUrl}/api/helios/info/${componentName}`,
         );
         if (!response.ok) {
-          throw new Error(`Failed to fetch database info: ${response.statusText}`);
+          throw new Error(
+            `Failed to fetch database info: ${response.statusText}`,
+          );
         }
         const data = await response.json();
         setDatabaseInfo(data);
@@ -178,10 +180,14 @@ cursor = conn.cursor()`;
           <br />
           {error}
           <br />
-          <Typography variant="caption" style={{ marginTop: '8px', display: 'block' }}>
-            Make sure the backend service is running and the component has a corresponding
-            Kubernetes secret named &quot;{componentName}-db-secret&quot; and pod with label
-            &quot;app={componentName}-db&quot; (Helios operator naming).
+          <Typography
+            variant="caption"
+            style={{ marginTop: '8px', display: 'block' }}
+          >
+            Make sure the backend service is running and the component has a
+            corresponding Kubernetes secret named &quot;{componentName}
+            -db-secret&quot; and pod with label &quot;app={componentName}
+            -db&quot; (Helios operator naming).
           </Typography>
         </Alert>
       </Box>
@@ -202,10 +208,7 @@ cursor = conn.cursor()`;
         {/* Status Card */}
         <Grid item xs={12}>
           <Card className={classes.card}>
-            <CardHeader
-              title="Database Status"
-              className={classes.cardTitle}
-            />
+            <CardHeader title="Database Status" className={classes.cardTitle} />
             <CardContent>
               <Box className={classes.statusBadge}>
                 <Chip
@@ -228,11 +231,7 @@ cursor = conn.cursor()`;
               className={classes.cardTitle}
             />
             <CardContent>
-              <Grid
-                container
-                spacing={2}
-                className={classes.connectivityGrid}
-              >
+              <Grid container spacing={2} className={classes.connectivityGrid}>
                 {/* Host */}
                 <Grid item xs={12} sm={6}>
                   <Box className={classes.connectivityItem}>
@@ -247,10 +246,7 @@ cursor = conn.cursor()`;
                     <IconButton
                       size="small"
                       onClick={() =>
-                        handleCopyToClipboard(
-                          databaseInfo.host,
-                          'host',
-                        )
+                        handleCopyToClipboard(databaseInfo.host, 'host')
                       }
                       title="Copy to clipboard"
                     >
@@ -273,10 +269,7 @@ cursor = conn.cursor()`;
                     <IconButton
                       size="small"
                       onClick={() =>
-                        handleCopyToClipboard(
-                          String(databaseInfo.port),
-                          'port',
-                        )
+                        handleCopyToClipboard(String(databaseInfo.port), 'port')
                       }
                       title="Copy to clipboard"
                     >
@@ -299,10 +292,7 @@ cursor = conn.cursor()`;
                     <IconButton
                       size="small"
                       onClick={() =>
-                        handleCopyToClipboard(
-                          databaseInfo.user,
-                          'user',
-                        )
+                        handleCopyToClipboard(databaseInfo.user, 'user')
                       }
                       title="Copy to clipboard"
                     >
@@ -325,10 +315,7 @@ cursor = conn.cursor()`;
                     <IconButton
                       size="small"
                       onClick={() =>
-                        handleCopyToClipboard(
-                          databaseInfo.database,
-                          'database',
-                        )
+                        handleCopyToClipboard(databaseInfo.database, 'database')
                       }
                       title="Copy to clipboard"
                     >
@@ -367,10 +354,7 @@ cursor = conn.cursor()`;
                 <IconButton
                   size="small"
                   onClick={() =>
-                    handleCopyToClipboard(
-                      databaseInfo.password,
-                      'password',
-                    )
+                    handleCopyToClipboard(databaseInfo.password, 'password')
                   }
                   className={classes.snippetButton}
                   title="Copy to clipboard"
@@ -407,10 +391,7 @@ cursor = conn.cursor()`;
                   size="small"
                   startIcon={<FileCopy />}
                   onClick={() =>
-                    handleCopyToClipboard(
-                      generatePsqlSnippet(),
-                      'psql',
-                    )
+                    handleCopyToClipboard(generatePsqlSnippet(), 'psql')
                   }
                   className={classes.snippetButton}
                 >

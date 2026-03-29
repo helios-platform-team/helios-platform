@@ -10,9 +10,13 @@ export const DatabasePickerExtension: any = scaffolderPlugin.provide(
       // Custom validation: If postgres is selected, dbName MUST be provided
       if (value?.dbType === 'postgres') {
         if (!value?.dbName) {
-          validation.addError('Database Name is required when PostgreSQL is selected');
+          validation.addError(
+            'Database Name is required when PostgreSQL is selected',
+          );
         } else if (!/^[a-zA-Z0-9_-]+$/.test(value.dbName)) {
-          validation.addError('Database Name can only contain letters, numbers, hyphens, and underscores (no spaces or special characters)');
+          validation.addError(
+            'Database Name can only contain letters, numbers, hyphens, and underscores (no spaces or special characters)',
+          );
         }
       }
     },

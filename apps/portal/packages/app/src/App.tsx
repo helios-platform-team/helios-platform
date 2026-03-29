@@ -1,4 +1,4 @@
-import { Navigate, Route } from 'react-router-dom';
+import { Route } from 'react-router-dom';
 import { apiDocsPlugin, ApiExplorerPage } from '@backstage/plugin-api-docs';
 import {
   CatalogEntityPage,
@@ -38,8 +38,6 @@ import { RequirePermission } from '@backstage/plugin-permission-react';
 import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/alpha';
 import { NotificationsPage } from '@backstage/plugin-notifications';
 import { SignalsDisplay } from '@backstage/plugin-signals';
-import { ScaffolderFieldExtensions } from '@backstage/plugin-scaffolder-react';
-import { DatabasePickerExtension } from './scaffolder';
 import { ScaffolderFieldExtensions } from '@backstage/plugin-scaffolder-react';
 import { DatabasePickerExtension } from './scaffolder';
 import { UnifiedThemeProvider } from '@backstage/theme';

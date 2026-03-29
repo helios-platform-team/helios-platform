@@ -10,7 +10,8 @@ export interface RouterOptions {
 }
 
 /** Matches Helm operator: GetDatabaseSecretName / GetDatabaseHost (traits.go). */
-const databaseSecretName = (componentName: string) => `${componentName}-db-secret`;
+const databaseSecretName = (componentName: string) =>
+  `${componentName}-db-secret`;
 const databasePodLabel = (componentName: string) => `app=${componentName}-db`;
 
 function parseTraitProperties(raw: unknown): Record<string, unknown> | null {
@@ -28,7 +29,10 @@ function parseTraitProperties(raw: unknown): Record<string, unknown> | null {
 }
 
 /** Reads dbName from database trait if set; else operator default `${component}-db`. */
-function resolveDbNameFromHeliosApp(body: unknown, componentName: string): string {
+function resolveDbNameFromHeliosApp(
+  body: unknown,
+  componentName: string,
+): string {
   const fallback = `${componentName}-db`;
   const spec = (body as { spec?: { components?: unknown[] } })?.spec;
   const components = spec?.components;
@@ -51,9 +55,7 @@ function resolveDbNameFromHeliosApp(body: unknown, componentName: string): strin
   return fallback;
 }
 
-export async function createRouter(
-  options: RouterOptions,
-): Promise<Router> {
+export async function createRouter(options: RouterOptions): Promise<Router> {
   const { logger } = options;
   const router = expressPromiseRouter();
 
@@ -80,8 +82,7 @@ export async function createRouter(
         plural: 'heliosapps',
         name: componentName,
       });
-      const heliosAppBody =
-        (heliosApp as { body?: unknown }).body ?? heliosApp;
+      const heliosAppBody = (heliosApp as { body?: unknown }).body ?? heliosApp;
       dbName = resolveDbNameFromHeliosApp(heliosAppBody, componentName);
     } catch {
       // HeliosApp CR may be absent; keep default db name.
