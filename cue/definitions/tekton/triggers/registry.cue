@@ -11,7 +11,7 @@ import (
 
 #TriggerRegistry: {
 	// FIX: Remove 'tekton.' prefix. This is a local definition in the same package.
-	"github-push": #GitHubPushTriggerBundle
+	"gitea-push": #GiteaPushTriggerBundle
 }
 
 // =====================================================

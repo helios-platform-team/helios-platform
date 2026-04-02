@@ -5,22 +5,22 @@ import (
 )
 
 // =====================================================
-// GITHUB PUSH TRIGGER BUNDLE
+// GITEA PUSH TRIGGER BUNDLE
 // =====================================================
 
-#GitHubPushTriggerBundle: tekton.#TriggerBundle & {
+#GiteaPushTriggerBundle: tekton.#TriggerBundle & {
     // Alias the parameter field to bundleParams for global access
     bundleParams=parameter: _
 
     // 1. TRIGGER BINDING
     _binding: tekton.#TektonTriggerBinding & {
         parameter: {
-            name:      "\(bundleParams.appName)-github-binding"
+            name:      "\(bundleParams.appName)-gitea-binding"
             namespace: bundleParams.namespace
         }
         config: params: [
             {name: "git-repo-url", value: "$(body.repository.clone_url)"},
-            {name: "git-revision", value: "$(body.head_commit.id)"},
+            {name: "git-revision", value: "$(body.after)"},
         ]
     }
 
@@ -30,7 +30,7 @@ import (
         let _bp = bundleParams
 
         parameter: {
-            name:      "\(_bp.appName)-github-template"
+            name:      "\(_bp.appName)-gitea-template"
             namespace: _bp.namespace
         }
         config: {
@@ -50,7 +50,8 @@ import (
                         "helios.io/managed-by":       "helios-operator"
                         "app.kubernetes.io/part-of":  "helios-platform"
                         "app.kubernetes.io/instance": _bp.pipelineName
-                        "app.kubernetes.io/name":     _bp.pipelineName
+                        "app.kubernetes.io/name":     _bp.appName
+                        "janus-idp.io/tekton":        _bp.appName
                     }
                 }
                 spec: {
@@ -58,18 +59,24 @@ import (
                     serviceAccountName: _bp.serviceAccount
                     
                     params: [
-                        {name: "app-repo-url", value:       "$(tt.params.git-repo-url)"},
+                        // Use operator-provided repo URL (already rewritten to in-cluster URL if needed).
+                        {name: "app-repo-url", value:       _bp.gitRepo},
                         {name: "app-repo-revision", value:  "$(tt.params.git-revision)"},
                         {name: "image-repo", value:         _bp.imageRepo},
                         {name: "GITOPS_REPO_URL", value:    _bp.gitopsRepo},
                         {name: "MANIFEST_PATH", value:      _bp.gitopsPath},
                         {name: "GITOPS_REPO_BRANCH", value: _bp.gitopsBranch},
+                        {name: "GITOPS_SECRET_REF", value:  _bp.gitopsSecret},
+                        {name: "GITOPS_AUTHOR_NAME", value: "Helios Bot"},
+                        {name: "GITOPS_AUTHOR_EMAIL", value: "helios-bot@helios.local"},
                         {name: "CONTEXT_SUBPATH", value:    _bp.contextSubpath},
                         {name: "replicas", value:           "\(_bp.replicas)"},
                         {name: "port", value:               "\(_bp.port)"},
                         {name: "docker-secret", value:      _bp.dockerSecret},
                         {name: "test-command", value:       _bp.testCommand},
                         {name: "test-image", value:         _bp.testImage},
+                        {name: "argocd-namespace", value: _bp.argoCDNamespace},
+                        {name: "argocd-app-name", value:  _bp.argoCDAppName},
                     ]
 
                     workspaces: [
@@ -105,11 +112,11 @@ import (
         }
         config: {
             triggers: [{
-                name: "github-push"
+                name: "gitea-push"
                 bindings: [{ref: _binding.parameter.name}]
                 template: {ref: _template.parameter.name}
                 
-                // Add GitHub Interceptor for security (Validates webhook secret)
+                // Use the cluster Git webhook interceptor for push event validation.
                 interceptors: [{
                     ref: {name: "github", kind: "ClusterInterceptor"}
                     params: [

@@ -12,7 +12,6 @@ spec:
     - title: Component Information
       required:
         - name
-        - owner
         - port
         - dockerOrg
         - repoName
@@ -22,14 +21,6 @@ spec:
           type: string
           description: Unique name of the component
           ui:autofocus: true
-        owner:
-          title: Owner
-          type: string
-          description: Owner of the component
-          ui:field: OwnerPicker
-          ui:options:
-            catalogFilter:
-              kind: [Group, User]
         port:
           title: Port
           type: number
@@ -51,17 +42,12 @@ spec:
         databaseConfig:
           title: Database Settings
           type: object
-          default:
-            dbType: none
-            dbName: ""
           ui:field: DatabasePicker
     # --- END OF NEW STEP ---
 
     - title: Repository & Webhook
       required:
         - repoUrl
-        - webhookUrl
-        - webhookSecret
       properties:
         repoUrl:
           title: Source Repository Location
@@ -69,16 +55,17 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
-              - github.com
-        webhookUrl:
-          title: Webhook URL
-          type: string
-          description: The URL to send the webhook payload to
-        webhookSecret:
-          title: Webhook Secret
-          type: string
-          description: The secret to use for the webhook
-          ui:field: Secret
+              - localhost:3030
+    - title: Optional Extras (Local Convenience)
+      properties:
+        registerToCatalog:
+          title: Register component in catalog
+          type: boolean
+          default: false
+        sendNotification:
+          title: Send Backstage notification
+          type: boolean
+          default: false
 
 
   steps:
@@ -90,35 +77,34 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          name: ${{ parameters.name }}
-          owner: ${{ parameters.owner }}
+          # Use repoName as the app identifier to keep it Kubernetes/URL safe.
+          name: ${{ parameters.repoName }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: "Service for ${{ parameters.name }}"
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
 
     - id: publish-source
       name: Publish Source Code
-      action: publish:github
+      action: publish:gitea
       input:
         description: Source Code for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}
         sourcePath: ./source
-        token: ${{ secrets.GITHUB_TOKEN }}
         repoVisibility: public
-        protectDefaultBranch: false
 
     - id: create-webhook
       name: Create Webhook
-      action: github:webhook
+      action: gitea:create-webhook
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        webhookUrl: ${{ parameters.webhookUrl }}
-        webhookSecret: ${{ parameters.webhookSecret }}
+        # Tekton EventListener address is the service root.
+        webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
+        # Deterministic secret so users don't have to provide one.
+        # Must match the Kubernetes secret value created below.
+        webhookSecret: ${{ parameters.repoName }}
         events:
           - push
-        active: true
-        contentType: json
-        token: ${{ secrets.GITHUB_TOKEN }}
 
     # 2. GitOps Logic
     - id: fetch-gitops
@@ -128,39 +114,39 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.name }}
+          name: ${{ parameters.repoName }}
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
           port: ${{ parameters.port }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
-          webhookUrl: ${{ parameters.webhookUrl }}
           testCommand: "npm install && npm test"
+          dbType: ${{ parameters.databaseConfig.dbType }}
+          dbName: ${{ parameters.databaseConfig.dbName }}
+          dbVersion: ${{ parameters.databaseConfig.dbVersion }}
 
     - id: publish-gitops
       name: Publish GitOps Manifests
-      action: publish:github
+      action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}-gitops
         sourcePath: ./gitops
-        token: ${{ secrets.GITHUB_TOKEN }}
         repoVisibility: public
-        protectDefaultBranch: false
 
     # 2.1 Secret Creation (MUST be before apply-helios so operator can find it)
-    # Uses custom action that reads GITHUB_TOKEN from server environment
     - id: create-secret
-      name: Create GitHub Credentials Secret
-      action: kubernetes:create-github-secret
+      name: Create Git Credentials Secret
+      action: kubernetes:create-git-credentials-secret
       input:
-        name: ${{ parameters.name }}
+        name: ${{ parameters.repoName }}
         namespace: default
         username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-        webhookSecret: ${{ parameters.webhookSecret }}
+        webhookSecret: ${{ parameters.repoName }}
 
     # 2.2 Deploy HeliosApp (after secret exists)
     - id: apply-helios
@@ -174,13 +160,15 @@ spec:
     - id: register
       name: Register Component
       action: catalog:register
+      if: '{{ parameters.registerToCatalog }}'
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
-        catalogInfoPath: '/catalog-info.yaml'
+        catalogInfoPath: 'catalog-info.yaml'
 
     - id: notify
       name: Notify User
       action: notification:send
+      if: '{{ parameters.sendNotification }}'
       input:
         recipients: entity
         entityRefs:

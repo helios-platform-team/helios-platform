@@ -1,3 +1,7 @@
-examples/
-dist-types/
-docs/
+dist
+dist-types
+coverage
+.vscode
+packages/backend
+docs
+examples

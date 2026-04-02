@@ -62,9 +62,9 @@ type HeliosAppSpec struct {
 	// +kubebuilder:default="from-code-to-cluster"
 	PipelineName string `json:"pipelineName,omitempty"`
 
-	// WebhookSecret is the name of the secret containing the GitHub webhook secret token
+	// WebhookSecret is the name of the secret containing the Gitea webhook secret token
 	// +optional
-	// +kubebuilder:default="github-webhook-secret"
+	// +kubebuilder:default="gitea-webhook-secret"
 	WebhookSecret string `json:"webhookSecret,omitempty"`
 
 	// GitOpsBranch is the branch of the GitOps repository

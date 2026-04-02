@@ -1,26 +1,21 @@
 import { scaffolderPlugin } from '@backstage/plugin-scaffolder';
 import { createScaffolderFieldExtension } from '@backstage/plugin-scaffolder-react';
-import { DatabasePicker, type DatabaseConfig } from './DatabasePicker';
+import { DatabasePicker } from './DatabasePicker';
 
-interface ValidationContext {
-  addError: (message: string) => void;
-}
-
-export const DatabasePickerExtension = scaffolderPlugin.provide(
+export const DatabasePickerExtension: any = scaffolderPlugin.provide(
   createScaffolderFieldExtension({
     name: 'DatabasePicker',
     component: DatabasePicker,
-    validation: (
-      value: DatabaseConfig | undefined,
-      validation: ValidationContext,
-    ) => {
+    validation: (value: any, validation: any) => {
       // Custom validation: If postgres is selected, dbName MUST be provided
       if (value?.dbType === 'postgres') {
-        const dbName =
-          typeof value?.dbName === 'string' ? value.dbName.trim() : '';
-        if (!dbName) {
+        if (!value?.dbName) {
           validation.addError(
             'Database Name is required when PostgreSQL is selected',
+          );
+        } else if (!/^[a-zA-Z0-9_-]+$/.test(value.dbName)) {
+          validation.addError(
+            'Database Name can only contain letters, numbers, hyphens, and underscores (no spaces or special characters)',
           );
         }
       }

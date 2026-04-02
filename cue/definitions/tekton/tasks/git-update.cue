@@ -16,7 +16,10 @@ import "helios.io/cue/definitions/tekton"
 			tekton.#CommonParams.gitops.repoUrl,
 			tekton.#CommonParams.gitops.manifestPath,
 			tekton.#CommonParams.gitops.newImageUrl,
-			tekton.#CommonParams.gitops.branch, {
+			tekton.#CommonParams.gitops.branch,
+			tekton.#CommonParams.gitops.secretRef,
+			tekton.#CommonParams.gitops.authorName,
+			tekton.#CommonParams.gitops.authorEmail, {
 			name:    "REPLICAS"
 			default: "2"
 			type:    "string"
@@ -46,11 +49,17 @@ import "helios.io/cue/definitions/tekton"
 				echo "Cloning $(params.GITOPS_REPO_URL) to current dir..."
 				git clone "$(params.GITOPS_REPO_URL)" .
 				git checkout -B "$(params.GITOPS_REPO_BRANCH)"
+
+				# Ensure subsequent steps (possibly running as non-root) can modify files.
+				chmod -R a+rwX "$(workspaces.gitops-repo.path)"
 				"""
 		}, {
 			// Step 2: Update Manifests using YQ image
 			name:  "update-manifests"
 			image: _config.images.yq
+			securityContext: {
+				runAsUser: 0
+			}
 			entrypoint: ["/bin/sh"] // Override default yq entrypoint
 			script: """
 				#!/bin/sh
@@ -107,8 +116,8 @@ import "helios.io/cue/definitions/tekton"
 			image: _config.images.gitClone
 			envFrom: [{
 				secretRef: {
-					name:     "github-credentials"
-					optional: true
+					name:     "helios-gitops-bot"
+					optional: false
 				}
 			}]
 			script: """
@@ -116,12 +125,21 @@ import "helios.io/cue/definitions/tekton"
 				set -e
 				cd "$(workspaces.gitops-repo.path)"
 
-				git config user.email "tekton-pipeline@helios.dev"
-				git config user.name "Tekton Pipeline"
+				git config user.email "$(params.GITOPS_AUTHOR_EMAIL)"
+				git config user.name "$(params.GITOPS_AUTHOR_NAME)"
 
 				if [ -n "${username:-}" ] && [ -n "${password:-}" ]; then
-				  RAW_URL=$(echo "$(params.GITOPS_REPO_URL)" | sed 's|https://.*@|https://|')
-				  REPO_URL_WITH_AUTH="$(echo "$RAW_URL" | sed "s|https://|https://${username}:${password}@|")"
+				  RAW_URL="$(params.GITOPS_REPO_URL)"
+				  # Strip any embedded credentials from http/https URL first.
+				  RAW_URL="$(echo "$RAW_URL" | sed -e 's|^https://[^@]*@|https://|' -e 's|^http://[^@]*@|http://|')"
+				  if echo "$RAW_URL" | grep -q '^https://'; then
+				    REPO_URL_WITH_AUTH="$(echo "$RAW_URL" | sed "s|^https://|https://${username}:${password}@|")"
+				  elif echo "$RAW_URL" | grep -q '^http://'; then
+				    REPO_URL_WITH_AUTH="$(echo "$RAW_URL" | sed "s|^http://|http://${username}:${password}@|")"
+				  else
+				    echo "Unsupported GitOps repo URL scheme: $RAW_URL"
+				    exit 1
+				  fi
 				  git remote set-url origin "${REPO_URL_WITH_AUTH}"
 				else
 				    echo "WARNING: username or password env vars not set. Push might fail."

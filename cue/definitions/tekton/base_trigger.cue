@@ -148,7 +148,7 @@ package tekton
 		gitopsRepo:     string
 		gitopsPath:     string
 		gitopsBranch:   string | *"main"
-		gitopsSecret:   string | *"github-credentials"
+		gitopsSecret:   string | *"helios-gitops-bot"
 		pvcName:        string | *"shared-workspace-pvc"
 		contextSubpath: string | *""
 		
@@ -159,6 +159,10 @@ package tekton
 		testImage:      string | *"node:20"
 		serviceAccount: string | *"default"
 		dockerSecret:   string | *"docker-credentials"
+
+		// Argo CD sync via kubectl patch on Application
+		argoCDNamespace: string | *"argocd"
+		argoCDAppName:   string
 	}
 
 	// === OUTPUTS (multiple resources) ===

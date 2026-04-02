@@ -1,6 +1,6 @@
 module github.com/helios-platform-team/helios-platform/apps/operator
 
-go 1.26
+go 1.26.1
 
 require (
 	cuelang.org/go v0.16.0

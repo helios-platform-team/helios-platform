@@ -12,8 +12,7 @@ spec:
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: ${{ values.name }}
   pipelineName: from-code-to-cluster
-  webhookDomain: ${{ values.webhookUrl }}
-  webhookSecret: github-webhook-secret
+  webhookSecret: git-credentials-${{ values.name }}
   port: ${{ values.port }}
   testCommand: "npm ci && npm test"
   components:
@@ -30,6 +29,6 @@ spec:
         - type: database
           properties:
             dbType: ${{ values.databaseType | default("postgres") }}
-            dbName: ${{ values.databaseName }}
+            dbName: ${{ values.name | replace('-', '_') }}_db
             version: "16"
             storage: "1Gi"

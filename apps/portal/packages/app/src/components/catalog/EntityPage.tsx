@@ -67,6 +67,7 @@ import {
   EntityKubernetesContent,
   isKubernetesAvailable,
 } from '@backstage/plugin-kubernetes';
+import { DatabaseTab } from '../database';
 
 const techdocsContent = (
   <EntityTechdocsContent>
@@ -180,7 +181,7 @@ const serviceEntityPage = (
       title="Kubernetes"
       if={isKubernetesAvailable}
     >
-      <EntityKubernetesContent />
+      <EntityKubernetesContent refreshIntervalMs={30000} />
     </EntityLayout.Route>
 
     <EntityLayout.Route path="/api" title="API">
@@ -203,6 +204,10 @@ const serviceEntityPage = (
           <EntityDependsOnResourcesCard />
         </Grid>
       </Grid>
+    </EntityLayout.Route>
+
+    <EntityLayout.Route path="/database" title="Database">
+      <DatabaseTab />
     </EntityLayout.Route>
 
     <EntityLayout.Route path="/docs" title="Docs">

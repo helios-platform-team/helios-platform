@@ -13,12 +13,14 @@ package tekton
 		kaniko:   "gcr.io/kaniko-project/executor:v1.19.2"
 		alpine:   "alpine:3.19"
 		yq:       "mikefarah/yq:4.40.5"
+		kubectl:  "bitnami/kubectl:1.31.4"
 	}
 
 	// Secret names
 	secrets: {
 		docker: "docker-credentials"
-		github: "github-credentials"
+		gitea:  "gitea-credentials"
+		gitops: "helios-gitops-bot"
 	}
 
 	// Tekton API versions
@@ -89,6 +91,12 @@ package tekton
 			description: "GitOps repository URL"
 			type:        "string"
 		}
+		secretRef: {
+			name:        "GITOPS_SECRET_REF"
+			description: "Kubernetes Secret name containing Git credentials (basic-auth)"
+			type:        "string"
+			default:     #Defaults.secrets.gitops
+		}
 		branch: {
 			name:    "GITOPS_REPO_BRANCH"
 			type:    "string"
@@ -103,6 +111,18 @@ package tekton
 			name:        "NEW_IMAGE_URL"
 			description: "New image URL to update in manifest"
 			type:        "string"
+		}
+		authorName: {
+			name:        "GITOPS_AUTHOR_NAME"
+			description: "Git author name for automated GitOps commits"
+			type:        "string"
+			default:     "Helios Bot"
+		}
+		authorEmail: {
+			name:        "GITOPS_AUTHOR_EMAIL"
+			description: "Git author email for automated GitOps commits"
+			type:        "string"
+			default:     "helios-bot@helios.local"
 		}
 	}
 
@@ -144,6 +164,21 @@ package tekton
 			description: "Image to use for running tests"
 			type:        "string"
 			default:     "node:20"
+		}
+	}
+
+	// Argo CD sync via kubectl patch on Application (see Argo CD "Sync Applications with Kubectl")
+	argocd: {
+		namespace: {
+			name:        "argocd-namespace"
+			description: "Namespace where the Argo CD Application CR lives"
+			type:        "string"
+			default:     "argocd"
+		}
+		appName: {
+			name:        "argocd-app-name"
+			description: "Argo CD Application resource name to sync"
+			type:        "string"
 		}
 	}
 }

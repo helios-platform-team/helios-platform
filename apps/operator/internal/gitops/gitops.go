@@ -78,7 +78,12 @@ func (c *GitOpsClient) SyncManifest(ctx context.Context, filePath, content strin
 		if err != nil {
 			return fmt.Errorf("failed to create temp dir: %w", err)
 		}
-		defer os.RemoveAll(tempDir) // Ensure cleanup
+
+		defer func() {
+			if rmErr := os.RemoveAll(tempDir); rmErr != nil {
+				fmt.Printf("warning: failed to cleanup temp dir %s: %v\n", tempDir, rmErr)
+			}
+		}()
 
 		// 2. Clone Repository
 		fmt.Printf("Cloning %s to %s\n", c.RepoURL, tempDir)
@@ -115,7 +120,7 @@ func (c *GitOpsClient) SyncManifest(ctx context.Context, filePath, content strin
 	if err == nil {
 		// File exists, check content
 		existingContent, readErr := io.ReadAll(existingFile)
-		existingFile.Close()
+		_ = existingFile.Close()
 
 		if readErr == nil && string(existingContent) == content {
 			fmt.Println("Manifest content unchanged. Skipping commit.")
@@ -128,10 +133,12 @@ func (c *GitOpsClient) SyncManifest(ctx context.Context, filePath, content strin
 		return fmt.Errorf("failed to create file: %w", err)
 	}
 	if _, err := f.Write([]byte(content)); err != nil {
-		f.Close()
+		_ = f.Close()
 		return fmt.Errorf("failed to write manifest content: %w", err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("failed to close manifest file: %w", err)
+	}
 
 	// 4. Git Add
 	if _, err := w.Add(filePath); err != nil {

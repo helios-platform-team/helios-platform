@@ -45,7 +45,7 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
-              - github.com
+              - localhost:3030
         webhookUrl:
           title: Webhook URL
           type: string
@@ -75,25 +75,22 @@ spec:
 
     - id: publish-source
       name: Publish Source Code
-      action: publish:github
+      action: publish:gitea
       input:
         description: Source Code for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}
         sourcePath: ./source
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoVisibility: public
 
     - id: create-webhook
       name: Create Webhook
-      action: github:webhook
+      action: gitea:create-webhook
       input:
         repoUrl: ${{ parameters.repoUrl }}
         webhookUrl: ${{ parameters.webhookUrl }}
         webhookSecret: ${{ parameters.webhookSecret }}
         events:
           - push
-        active: true
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
 
     # 2. GitOps Repo
     - id: fetch-gitops
@@ -113,12 +110,11 @@ spec:
 
     - id: publish-gitops
       name: Publish GitOps Manifests
-      action: publish:github
+      action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}-gitops
         sourcePath: ./gitops
-        token: ${{ secrets.USER_OAUTH_TOKEN }}
         repoVisibility: public
 
     # Register Source Component
@@ -127,7 +123,7 @@ spec:
       action: catalog:register
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
-        catalogInfoPath: '/catalog-info.yaml'
+        catalogInfoPath: 'catalog-info.yaml'
 
     - id: notify
       name: Notify

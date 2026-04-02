@@ -16,14 +16,35 @@ kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline
 kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
 kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
 
+# Optional (recommended for local/dev): prune completed runs
+kubectl apply -f https://raw.githubusercontent.com/tektoncd/pruner/main/release.yaml
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tekton-pruner-default-spec
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/part-of: tekton-pruner
+    pruner.tekton.dev/config-type: global
+data:
+  global-config: |
+    enforcedConfigLevel: global
+    ttlSecondsAfterFinished: 3600
+    successfulHistoryLimit: 3
+    failedHistoryLimit: 3
+EOF
+
 # 2. ArgoCD
 kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/core-install.yaml
 
 # 3. Helios Operator Resources
 cd apps/operator
-kubectl apply -f tekton/pvc.yaml
-kubectl apply -f tekton/pvc.yaml
+
+# PipelineRuns now default to per-run PVCs via Tekton volumeClaimTemplate.
+# Only apply tekton/pvc.yaml if you explicitly set spec.pvcName in HeliosApp
+# to force using a pre-created shared PVC.
 
 # Generate & Apply Tasks from CUE
 cue export ../../cue/definitions/tekton/tasks/*.cue --out yaml > tekton/tasks.yaml

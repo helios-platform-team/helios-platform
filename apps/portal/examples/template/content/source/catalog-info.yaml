@@ -3,9 +3,13 @@ kind: Component
 metadata:
   name: ${{ values.name | dump }}
   annotations:
-    argocd/app-name: ${{ values.name }}-service
-    janus-idp.io/tekton: ${{ values.name }}-service
+    backstage.io/kubernetes-id: ${{ values.name }}
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/name=${{ values.name }}
+    backstage.io/kubernetes-namespace: default
+    janus-idp.io/tekton: ${{ values.name }}
+    tekton.dev/ci-cd: "true"
+    argocd/app-name: ${{ values.name }}-argocd
 spec:
   type: service
-  owner: ${{ values.owner }}
+  owner: "${{ values.owner }}"
   lifecycle: experimental

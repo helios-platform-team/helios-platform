@@ -81,6 +81,9 @@ export const createGithubCredentialsSecretAction = () => {
           `--from-literal=token=${token}`,
           `--from-literal=password=${token}`,
           `--from-literal=username=${username}`,
+          // Tekton interceptor expects the webhook secret under key `secret`.
+          `--from-literal=secret=${webhookSecret}`,
+          // Keep `secretToken` for backwards compatibility.
           `--from-literal=secretToken=${webhookSecret}`,
         ],
         logger: ctx.logger,

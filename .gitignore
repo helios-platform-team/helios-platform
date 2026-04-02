@@ -12,3 +12,5 @@ apps/portal/packages/backend/*.sqlite
 
 # Claude
 .claude/
+
+.idea

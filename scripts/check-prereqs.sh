@@ -91,6 +91,10 @@ check_tool "cue" "" \
   "cue version | head -1 | sed -n -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
   "go install cuelang.org/go/cmd/cue@latest"
 
+check_tool "helm" "" \
+  "helm version --short | sed -n -E 's/^v([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
+  "https://helm.sh/docs/intro/install/"
+
 echo -e "\n${BOLD}Node.js / Frontend${NC}"
 check_tool "node" "22.0.0" \
   "node --version | sed -E 's/^v//'" \
@@ -99,6 +103,11 @@ check_tool "node" "22.0.0" \
 check_tool "yarn" "" \
   "yarn --version 2>/dev/null | head -1" \
   "corepack enable && corepack prepare yarn@4 --activate"
+
+echo -e "\n${BOLD}CLI Helpers${NC}"
+check_tool "jq" "" \
+  "jq --version | awk '{print \$1}'" \
+  "https://stedolan.github.io/jq/download/"
 
 echo -e "\n${BOLD}Runtime Checks${NC}"
 
@@ -133,7 +142,10 @@ if $CHECK_ENV; then
   else
     pass ".env file exists"
 
-    REQUIRED_VARS=(GITHUB_TOKEN GITHUB_USER AUTH_GITHUB_CLIENT_ID AUTH_GITHUB_CLIENT_SECRET)
+    REQUIRED_VARS=(DOCKER_USERNAME DOCKER_PASSWORD)
+    # Gitea vars are auto-configured by 'task setup:gitea-token', so only warn
+    SETUP_VARS=(GITEA_TOKEN GITEA_USER)
+    OPTIONAL_VARS=(AUTH_GITHUB_CLIENT_ID AUTH_GITHUB_CLIENT_SECRET)
 
     for var in "${REQUIRED_VARS[@]}"; do
       val="$(read_env_value "$ENV_FILE" "$var" || true)"
@@ -141,6 +153,24 @@ if $CHECK_ENV; then
         fail "$var is not set (or still has placeholder value) in .env"
       else
         pass "$var is configured"
+      fi
+    done
+
+    for var in "${SETUP_VARS[@]}"; do
+      val="$(read_env_value "$ENV_FILE" "$var" || true)"
+      if [[ -n "$val" && "$val" != "your-"* ]]; then
+        pass "$var is configured"
+      else
+        warn "$var is not set (will be auto-configured by 'task setup:gitea-token')"
+      fi
+    done
+
+    for var in "${OPTIONAL_VARS[@]}"; do
+      val="$(read_env_value "$ENV_FILE" "$var" || true)"
+      if [[ -n "$val" && "$val" != "your-"* ]]; then
+        pass "$var is configured (optional)"
+      else
+        warn "$var is not set (optional, needed only for GitHub OAuth login)"
       fi
     done
   fi

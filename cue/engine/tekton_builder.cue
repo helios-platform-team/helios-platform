@@ -33,6 +33,12 @@ let _testCommand = [
 	"",
 ][0]
 
+// Argo CD API URL: explicit override or in-cluster default.
+let _argoCDNamespace = [
+	if tektonInput.argoCDNamespace != _|_ { tektonInput.argoCDNamespace },
+	"argocd",
+][0]
+
 // =====================================================
 // RENDERING
 // =====================================================
@@ -90,6 +96,9 @@ _triggers: (triggers.#RenderTriggers & {
 		testImage:      tekton.#CommonParams.test.image.default 
 		serviceAccount: tektonInput.serviceAccount
 		dockerSecret:   tektonInput.dockerSecret
+
+		argoCDNamespace: _argoCDNamespace
+		argoCDAppName:   "\(tektonInput.appName)-argocd"
 	}
 }).outputs
 

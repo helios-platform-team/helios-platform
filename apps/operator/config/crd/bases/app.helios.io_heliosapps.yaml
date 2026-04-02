@@ -375,9 +375,9 @@ spec:
                   Git webhooks
                 type: string
               webhookSecret:
-                default: github-webhook-secret
+                default: gitea-webhook-secret
                 description: WebhookSecret is the name of the secret containing the
-                  GitHub webhook secret token
+                  Gitea webhook secret token
                 type: string
             required:
             - components

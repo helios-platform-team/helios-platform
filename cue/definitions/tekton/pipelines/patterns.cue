@@ -9,6 +9,7 @@ import "helios.io/cue/definitions/tekton"
 	gitClone:          "git-clone"
 	kanikoBuild:       "kaniko-build"
 	gitUpdateManifest: "git-update-manifest"
+	argocdSync:        "argocd-sync"
 }
 
 // =====================================================
@@ -24,6 +25,9 @@ import "helios.io/cue/definitions/tekton"
 	gitopsRepoUrl: tekton.#CommonParams.gitops.repoUrl
 	manifestPath:  tekton.#CommonParams.gitops.manifestPath
 	gitopsBranch:  tekton.#CommonParams.gitops.branch
+	gitopsSecretRef: tekton.#CommonParams.gitops.secretRef
+	gitopsAuthorName: tekton.#CommonParams.gitops.authorName
+	gitopsAuthorEmail: tekton.#CommonParams.gitops.authorEmail
 
 	// Image params
 	contextSubpath: tekton.#CommonParams.image.contextSubpath
@@ -42,6 +46,10 @@ import "helios.io/cue/definitions/tekton"
 		name:    "port"
 		default: "8080"
 	}
+
+	// Argo CD sync (after GitOps push) — kubectl patch Application
+	argocdNamespace: tekton.#CommonParams.argocd.namespace
+	argocdAppName:   tekton.#CommonParams.argocd.appName
 }
 
 #PipelineParamsList: [
@@ -51,12 +59,17 @@ import "helios.io/cue/definitions/tekton"
 	#PipelineParams.gitopsRepoUrl,
 	#PipelineParams.manifestPath,
 	#PipelineParams.gitopsBranch,
+	#PipelineParams.gitopsSecretRef,
+	#PipelineParams.gitopsAuthorName,
+	#PipelineParams.gitopsAuthorEmail,
 	#PipelineParams.contextSubpath,
 	#PipelineParams.replicas,
 	#PipelineParams.port,
 	#PipelineParams.dockerSecret,
 	#PipelineParams.testCommand,
 	#PipelineParams.testImage,
+	#PipelineParams.argocdNamespace,
+	#PipelineParams.argocdAppName,
 ]
 
 // =====================================================
@@ -186,8 +199,27 @@ import "helios.io/cue/definitions/tekton"
 			{name: tekton.#CommonParams.gitops.manifestPath.name, value: "$(params.\(#PipelineParams.manifestPath.name))"},
 			{name: tekton.#CommonParams.gitops.newImageUrl.name, value:  "$(tasks.\(_imageSourceTask).results.IMAGE_URL)"},
 			{name: tekton.#CommonParams.gitops.branch.name, value:       "$(params.\(#PipelineParams.gitopsBranch.name))"},
+			{name: tekton.#CommonParams.gitops.secretRef.name, value:    "$(params.\(#PipelineParams.gitopsSecretRef.name))"},
+			{name: tekton.#CommonParams.gitops.authorName.name, value:   "$(params.\(#PipelineParams.gitopsAuthorName.name))"},
+			{name: tekton.#CommonParams.gitops.authorEmail.name, value:  "$(params.\(#PipelineParams.gitopsAuthorEmail.name))"},
 			{name: "REPLICAS", value:                             "$(params.\(#PipelineParams.replicas.name))"},
 			{name: "PORT", value:                                 "$(params.\(#PipelineParams.port.name))"},
+		]
+	}
+}
+
+// #ArgoCDSyncPattern — kubectl patch Application.operation (see Argo CD sync-kubectl docs)
+#ArgoCDSyncPattern: {
+	_name:     string | *"argocd-sync"
+	_runAfter: [...string]
+
+	task: {
+		name:     _name
+		taskRef: name: #TaskNames.argocdSync
+		runAfter: _runAfter
+		params: [
+			{name: tekton.#CommonParams.argocd.namespace.name, value: "$(params.\(#PipelineParams.argocdNamespace.name))"},
+			{name: tekton.#CommonParams.argocd.appName.name, value:  "$(params.\(#PipelineParams.argocdAppName.name))"},
 		]
 	}
 }
