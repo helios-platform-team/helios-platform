@@ -25,7 +25,9 @@ func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
 		WebhookDomain:   app.Spec.WebhookDomain,
 		WebhookSecret:   app.Spec.WebhookSecret,
 		PipelineName:    app.Spec.PipelineName,
-		PipelineType:    app.Spec.PipelineName,
+		// PipelineType is intentionally derived from PipelineName because 
+        // the HeliosApp CRD does not have a separate PipelineType field.
+        PipelineType:    app.Spec.PipelineName,
 		TriggerType:     "gitea-push",
 		ServiceAccount:  app.Spec.ServiceAccount,
 		PVCName:         app.Spec.PVCName,
@@ -50,7 +52,7 @@ func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
 	if input.Replicas <= 0 {
 		input.Replicas = 1
 	}
-	if input.Port <= 0 {
+	if input.Port <= 0 || input.Port > 65535 {
 		input.Port = 8080
 	}
 	input.ArgoCDNamespace = cmp.Or(input.ArgoCDNamespace, "argocd")

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
@@ -15,7 +16,7 @@ import (
 // PipelineRuns are ephemeral (unique timestamp per run), unlike the static
 // resources that CUE handles.
 func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) (*unstructured.Unstructured, error) {
-	timestamp := time.Now().Format("20060102-150405")
+	timestamp := time.Now().Format("20060102-150405.000")
 	prName := fmt.Sprintf("%s-manifest-%s", heliosApp.Name, timestamp)
 
 	contextSubpath := cmp.Or(heliosApp.Spec.ContextSubpath, "")
@@ -46,12 +47,14 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 
 	envJSON, err := json.Marshal(heliosApp.Spec.Env)
 	if err != nil {
+		log.Printf("Warning: failed to marshal Env: %v", err)
 		envJSON = []byte("[]")
 	}
 	params = append(params, map[string]any{"name": "env-vars", "value": string(envJSON)})
 
 	resourcesJSON, err := json.Marshal(heliosApp.Spec.Resources)
 	if err != nil {
+		log.Printf("Warning: failed to marshal Resources: %v", err)
 		resourcesJSON = []byte("{}")
 	}
 	params = append(params, map[string]any{"name": "resources", "value": string(resourcesJSON)})
@@ -82,10 +85,12 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 			map[string]any{
 				"name":                  "source-workspace",
 				"persistentVolumeClaim": map[string]any{"claimName": heliosApp.Spec.PVCName},
+				"subPath":               "source",
 			},
 			map[string]any{
 				"name":                  "gitops-workspace",
 				"persistentVolumeClaim": map[string]any{"claimName": heliosApp.Spec.PVCName},
+				"subPath":               "gitops",
 			},
 		}
 	}

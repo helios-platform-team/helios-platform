@@ -157,6 +157,9 @@ func (r *Reconciler) ReconcileInstances(ctx context.Context, app *appv1alpha1.He
 		if port <= 0 {
 			port = DefaultPostgresPort
 		}
+		if port > 65535 {
+			return fmt.Errorf("invalid port %d for component %s: port must be <= 65535", port, dbTrait.ComponentName)
+		}
 
 		storage := dbTrait.Properties.Storage
 		if storage == "" {

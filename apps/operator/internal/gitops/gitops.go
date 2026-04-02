@@ -78,7 +78,12 @@ func (c *GitOpsClient) SyncManifest(ctx context.Context, filePath, content strin
 		if err != nil {
 			return fmt.Errorf("failed to create temp dir: %w", err)
 		}
-		defer func() { _ = os.RemoveAll(tempDir) }()
+
+		defer func() {
+			if rmErr := os.RemoveAll(tempDir); rmErr != nil {
+				fmt.Printf("warning: failed to cleanup temp dir %s: %v\n", tempDir, rmErr)
+			}
+		}()
 
 		// 2. Clone Repository
 		fmt.Printf("Cloning %s to %s\n", c.RepoURL, tempDir)

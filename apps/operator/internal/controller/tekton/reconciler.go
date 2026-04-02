@@ -44,7 +44,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp) 
 		if obj.GetNamespace() != "" {
 			if err := ctrl.SetControllerReference(app, obj, r.Scheme); err != nil {
 				log.Error(err, "Failed to set owner reference", "kind", obj.GetKind(), "name", obj.GetName())
-				continue
+				return fmt.Errorf("failed to set owner reference for %s %s: %w", obj.GetKind(), obj.GetName(), err)
 			}
 		}
 
@@ -56,14 +56,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp) 
 				log.Info("Creating resource", "kind", obj.GetKind(), "name", obj.GetName())
 				if err := r.Client.Create(ctx, obj); err != nil {
 					log.Error(err, "Failed to create resource", "kind", obj.GetKind(), "name", obj.GetName())
+					return fmt.Errorf("failed to create resource %s %s: %w", obj.GetKind(), obj.GetName(), err)
 				}
 			} else {
 				log.Error(err, "Failed to get resource", "kind", obj.GetKind(), "name", obj.GetName())
+				return fmt.Errorf("failed to get resource %s %s: %w", obj.GetKind(), obj.GetName(), err)
 			}
 		} else {
 			found.Object["spec"] = obj.Object["spec"]
 			if err := r.Client.Update(ctx, found); err != nil {
 				log.Error(err, "Failed to update resource", "kind", obj.GetKind(), "name", obj.GetName())
+				return fmt.Errorf("failed to update resource %s %s: %w", obj.GetKind(), obj.GetName(), err)
 			}
 		}
 	}
@@ -100,7 +103,7 @@ func (r *Reconciler) ReconcileInitialPipelineRun(ctx context.Context, app *appv1
 
 	if err := r.Client.Create(ctx, pr); err != nil {
 		if !errors.IsAlreadyExists(err) {
-			log.Error(err, "Failed to create initial PipelineRun")
+			return fmt.Errorf("failed to create initial PipelineRun: %w", err)
 		}
 	} else {
 		log.Info("Created initial PipelineRun", "name", pr.GetName())

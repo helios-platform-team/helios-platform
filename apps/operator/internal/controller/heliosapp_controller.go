@@ -171,6 +171,7 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	if err := r.Tekton.ReconcileInitialPipelineRun(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile initial PipelineRun")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Initial PipelineRun failed: %v", err))
 		return ctrl.Result{}, err
 	}
 
@@ -180,11 +181,13 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	if err := r.GitOps.Reconcile(ctx, &heliosApp, manifestBytes); err != nil {
 		log.Error(err, "GitOps sync failed")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("GitOps sync failed: %v", err))
 		return ctrl.Result{}, err
 	}
 
 	if err := r.ArgoCD.Reconcile(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile ArgoCD Application")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("ArgoCD reconciliation failed: %v", err))
 		return ctrl.Result{}, err
 	}
 

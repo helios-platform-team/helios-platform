@@ -12,6 +12,11 @@ import (
 func RewriteGiteaURL(repoURL string) string {
 	externalURL := os.Getenv("GITEA_URL")
 	internalURL := os.Getenv("GITEA_INTERNAL_URL")
+	
+	// Normalize: remove trailing slashes
+	externalURL = strings.TrimSuffix(externalURL, "/")
+	internalURL = strings.TrimSuffix(internalURL, "/")
+
 	if externalURL != "" && internalURL != "" {
 		rewritten := strings.Replace(repoURL, externalURL, internalURL, 1)
 		if rewritten != repoURL {

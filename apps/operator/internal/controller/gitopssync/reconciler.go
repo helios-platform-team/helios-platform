@@ -51,7 +51,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, 
 		return nil
 	}
 
-	currentHash := computeHash(manifestBytes)
+	currentHash := computeHash([]byte(app.Spec.GitOpsRepo + "\x00" + app.Spec.GitOpsPath + "\x00" + string(manifestBytes)))
 	if app.Status.LastAppliedHash == currentHash {
 		log.Info("Manifest hash unchanged, skipping GitOps sync", "hash", currentHash)
 

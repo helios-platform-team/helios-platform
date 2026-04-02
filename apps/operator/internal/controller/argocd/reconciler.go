@@ -3,6 +3,7 @@ package argocd
 import (
 	"cmp"
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -32,7 +33,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp) 
 	argoApp, err := GenerateArgoApplication(app)
 	if err != nil {
 		log.Error(err, "Failed to generate ArgoCD Application manifest")
-		return nil
+		return fmt.Errorf("failed to generate ArgoCD Application: %w", err)
 	}
 
 	argoApp.SetGroupVersionKind(argoApp.GroupVersionKind())
@@ -58,7 +59,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp) 
 		log.Info("ArgoCD Application already exists", "name", argoApp.GetName())
 	}
 
-	r.ensureSyncRBAC(ctx, app)
+	if err := r.ensureSyncRBAC(ctx, app); err != nil {
+		return fmt.Errorf("failed to ensure sync RBAC: %w", err)
+	}
 
 	return nil
 }
@@ -66,19 +69,23 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp) 
 // ensureSyncRBAC grants the pipeline ServiceAccount permission to patch
 // the Argo CD Application so the argocd-sync Tekton task can use kubectl
 // (in-cluster) without an Argo CD API token.
-func (r *Reconciler) ensureSyncRBAC(ctx context.Context, app *appv1alpha1.HeliosApp) {
+func (r *Reconciler) ensureSyncRBAC(ctx context.Context, app *appv1alpha1.HeliosApp) error {
 	log := logf.FromContext(ctx)
 	argoNS := cmp.Or(app.Spec.ArgoCDNamespace, "argocd")
 
 	role := GenerateSyncRole(app)
 	if err := r.applyUnstructured(ctx, role); err != nil {
 		log.Error(err, "Failed to reconcile Argo CD sync Role", "namespace", argoNS)
+		return fmt.Errorf("failed to apply sync Role: %w", err)
 	}
 
 	rb := GenerateSyncRoleBinding(app)
 	if err := r.applyUnstructured(ctx, rb); err != nil {
 		log.Error(err, "Failed to reconcile Argo CD sync RoleBinding", "namespace", argoNS)
+		return fmt.Errorf("failed to apply sync RoleBinding: %w", err)
 	}
+
+	return nil
 }
 
 func (r *Reconciler) applyUnstructured(ctx context.Context, obj *unstructured.Unstructured) error {
