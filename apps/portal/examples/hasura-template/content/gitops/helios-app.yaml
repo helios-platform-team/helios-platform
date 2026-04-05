@@ -1,0 +1,37 @@
+apiVersion: app.helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.name }}
+  namespace: default
+spec:
+  owner: ${{ values.owner }}
+  description: "Hasura GraphQL API: ${{ values.name }}"
+  
+  # Since there's no source code, we only need the GitOps repo info for ArgoCD
+  gitopsRepo: ${{ values.gitopsRepo }}
+  gitopsPath: ""
+  port: ${{ values.port }}
+  
+  components:
+    - name: ${{ values.name }}
+      type: web-service
+      properties:
+        image: hasura/graphql-engine:v2.33.0
+        port: ${{ values.port }}
+        replicas: 1
+        env:
+          # This maps the Operator's injected URL to Hasura's required variable
+          - name: HASURA_GRAPHQL_DATABASE_URL
+            value: $(DATABASE_URL)
+          - name: HASURA_GRAPHQL_ENABLE_CONSOLE
+            value: "true"
+      traits:
+        - type: service
+          properties:
+            port: ${{ values.port }}
+        - type: database
+          properties:
+            dbType: ${{ values.databaseType | default("postgres") }}
+            dbName: ${{ values.databaseName | default(values.name) | replace('-', '_') }}
+            version: "16"
+            storage: "1Gi"

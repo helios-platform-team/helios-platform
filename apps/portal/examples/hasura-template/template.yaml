@@ -1,0 +1,99 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: hasura-graphql-template
+  title: Hasura GraphQL API Template
+  description: >-
+    Scaffolds a Hasura GraphQL Engine instance connected to a
+    dynamically provisioned PostgreSQL database.
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Component Information
+      required:
+        - name
+        - port
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Unique name of the Hasura instance
+          ui:autofocus: true
+        port:
+          title: Port
+          type: number
+          description: The port Hasura listens on (default is 8080)
+          default: 8080
+
+    - title: Database Configuration
+      properties:
+        databaseConfig:
+          title: Database Settings
+          type: object
+          ui:field: DatabasePicker
+
+    - title: GitOps Repository
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: GitOps Repository Location
+          type: string
+          description: Where to store the Kubernetes manifests
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - localhost:3030
+
+  steps:
+    # 1. Fetch GitOps Manifests
+    - id: fetch-gitops
+      name: Fetch GitOps Manifests
+      action: fetch:template
+      input:
+        url: ./content/gitops
+        targetPath: ./gitops
+        values:
+          name: ${{ parameters.name }}
+          port: ${{ parameters.port }}
+          databaseType: ${{ parameters.databaseConfig.dbType }}
+          databaseName: ${{ parameters.databaseConfig.dbName }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
+          # We store everything directly in the GitOps repo since there is no source repo
+          gitopsRepo: "http://${{ (parameters.repoUrl | parseRepoUrl).host }}/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ (parameters.repoUrl | parseRepoUrl).repo }}.git"
+
+    # 2. Publish GitOps Repo
+    - id: publish-gitops
+      name: Publish GitOps Manifests
+      action: publish:gitea
+      input:
+        description: GitOps Manifests and Catalog Info for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}
+        sourcePath: ./gitops
+        repoVisibility: public
+
+    # 3. Deploy to Kubernetes
+    - id: apply-helios
+      name: Deploy to Kubernetes
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/helios-app.yaml
+        namespaced: true
+
+    # 4. Register Component in Backstage
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-gitops'].output.repoContentsUrl }}
+        catalogInfoPath: 'catalog-info.yaml'
+
+  output:
+    links:
+      - title: GitOps Repository
+        url: ${{ steps['publish-gitops'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
