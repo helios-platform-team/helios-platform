@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: ${{ values.name }}
+  namespace: default
+
+resources:
+  - helios-app.yaml
+  - argocd-app.yaml
+  - pipeline.yaml
+  - triggers.yaml
+
+commonLabels:
+  app: ${{ values.name }}
+  managed-by: helios
+  team: ${{ values.owner }}
+
+commonAnnotations:
+  description: "PostgREST instant REST API"
+  version: "1.0.0"

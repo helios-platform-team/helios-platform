@@ -1,0 +1,40 @@
+apiVersion: helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.name }}
+  namespace: default
+spec:
+  git:
+    repo: ${{ values.sourceRepo }}
+    path: ./
+    ref: main
+
+  components:
+    - name: api
+      type: web-service
+      source:
+        image: ${{ values.image }}:latest
+      container:
+        port: ${{ values.port }}
+      traits:
+        - type: database
+          properties:
+            dbType: postgres
+            dbName: ${{ values.databaseName or values.name }}-db
+            port: 5432
+        - type: service
+          properties:
+            port: ${{ values.port }}
+            protocol: HTTP
+            ingress:
+              enabled: true
+              host: ${{ values.name }}.local
+              path: /
+
+  # ArgoCD will sync the deployment
+  argocd:
+    enabled: true
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true

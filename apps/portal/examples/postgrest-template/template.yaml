@@ -1,0 +1,209 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: postgrest-template
+  title: PostgREST API Template
+  description: >-
+    Scaffolds a PostgREST instant REST API over a PostgreSQL database.
+    PostgREST automatically generates CRUD endpoints from your database schema.
+    The Helios Operator automatically provisions the database and injects
+    the connection string (PGRST_DB_URI) into the PostgREST pod.
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Component Information
+      required:
+        - name
+        - port
+        - dockerOrg
+        - repoName
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Unique name of the PostgREST API service
+          ui:autofocus: true
+        port:
+          title: API Port
+          type: number
+          description: The port PostgREST listens on
+          default: 3000
+        dockerOrg:
+          title: Docker Registry Org/User
+          type: string
+          description: Your Docker Hub username or Organization
+        repoName:
+          title: Docker Repository Name
+          type: string
+          description: The name of the Docker repository (e.g. my-api)
+
+    - title: PostgREST Configuration
+      properties:
+        apiSchema:
+          title: API Schema
+          type: string
+          description: PostgreSQL schema to expose as REST API (e.g. public, api)
+          default: public
+        jwtSecret:
+          title: JWT Secret
+          type: string
+          description: Secret for signing JWT tokens (at least 32 chars recommended)
+        jwtRole:
+          title: JWT Role
+          type: string
+          description: Default role claim in JWT tokens
+          default: authenticated
+        anonRole:
+          title: Anonymous Role
+          type: string
+          description: Role for unauthenticated requests (or leave empty to disable)
+          default: anon
+
+    - title: Database Configuration
+      properties:
+        databaseConfig:
+          title: Database Settings
+          type: object
+          ui:field: DatabasePicker
+
+    - title: Repository & Webhook
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Source Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - localhost:3030
+
+    - title: Optional Extras (Local Convenience)
+      properties:
+        registerToCatalog:
+          title: Register component in catalog
+          type: boolean
+          default: false
+        sendNotification:
+          title: Send Backstage notification
+          type: boolean
+          default: false
+
+  steps:
+    # 1. Source Code (config files + Dockerfile)
+    - id: fetch-source
+      name: Fetch Source Code
+      action: fetch:template
+      input:
+        url: ./content/source
+        targetPath: ./source
+        values:
+          name: ${{ parameters.repoName }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
+          port: ${{ parameters.port }}
+          description: "PostgREST API: ${{ parameters.name }}"
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          apiSchema: ${{ parameters.apiSchema }}
+          jwtSecret: ${{ parameters.jwtSecret }}
+          jwtRole: ${{ parameters.jwtRole }}
+          anonRole: ${{ parameters.anonRole }}
+
+    - id: publish-source
+      name: Publish Source Code
+      action: publish:gitea
+      input:
+        description: PostgREST Configuration for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}
+        sourcePath: ./source
+        repoVisibility: public
+
+    - id: create-webhook
+      name: Create Webhook
+      action: gitea:create-webhook
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
+        webhookSecret: ${{ parameters.repoName }}
+        events:
+          - push
+
+    # 2. GitOps
+    - id: fetch-gitops
+      name: Fetch GitOps Manifests
+      action: fetch:template
+      input:
+        url: ./content/gitops
+        targetPath: ./gitops
+        values:
+          name: ${{ parameters.repoName }}
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          dockerOrg: ${{ parameters.dockerOrg }}
+          repoName: ${{ parameters.repoName }}
+          port: ${{ parameters.port }}
+          databaseType: ${{ parameters.databaseConfig.dbType }}
+          databaseName: ${{ parameters.databaseConfig.dbName }}
+          apiSchema: ${{ parameters.apiSchema }}
+          jwtSecret: ${{ parameters.jwtSecret }}
+          jwtRole: ${{ parameters.jwtRole }}
+          anonRole: ${{ parameters.anonRole }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
+          sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
+          gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
+
+    - id: publish-gitops
+      name: Publish GitOps Manifests
+      action: publish:gitea
+      input:
+        description: GitOps Manifests for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}-gitops
+        sourcePath: ./gitops
+        repoVisibility: public
+
+    # 3. Secret + Deploy
+    - id: create-secret
+      name: Create Git Credentials Secret
+      action: kubernetes:create-git-credentials-secret
+      input:
+        name: ${{ parameters.repoName }}
+        namespace: default
+        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+        webhookSecret: ${{ parameters.repoName }}
+
+    - id: apply-helios
+      name: Deploy to Kubernetes
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/helios-app.yaml
+        namespaced: true
+
+    # 4. Registration
+    - id: register
+      name: Register Component
+      action: catalog:register
+      if: '{{ parameters.registerToCatalog }}'
+      input:
+        repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
+        catalogInfoPath: 'catalog-info.yaml'
+
+    - id: notify
+      name: Notify User
+      action: notification:send
+      if: '{{ parameters.sendNotification }}'
+      input:
+        recipients: entity
+        entityRefs:
+          - user:default/guest
+        title: 'PostgREST API Template Executed'
+        info: 'Your PostgREST instant REST API has been scaffolded with automatic CRUD endpoints!'
+
+  output:
+    links:
+      - title: Source Repository
+        url: ${{ steps['publish-source'].output.remoteUrl }}
+      - title: GitOps Repository
+        url: ${{ steps['publish-gitops'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}

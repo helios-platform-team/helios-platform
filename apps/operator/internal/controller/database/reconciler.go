@@ -90,7 +90,18 @@ func (r *Reconciler) ReconcileSecrets(ctx context.Context, app *appv1alpha1.Heli
 			return fmt.Errorf("failed to generate credentials for %s: %w", dbTrait.ComponentName, err)
 		}
 
-		secret := GenerateDatabaseSecret(app.Namespace, secretName, dbTrait.ComponentName, creds, dbHost)
+		// Compute effective database name and port
+		effectiveDBName := dbTrait.Properties.DBName
+		if effectiveDBName == "" {
+			effectiveDBName = fmt.Sprintf("%s-db", dbTrait.ComponentName)
+		}
+
+		effectivePort := dbTrait.Properties.Port
+		if effectivePort <= 0 {
+			effectivePort = DefaultPostgresPort
+		}
+
+		secret := GenerateDatabaseSecret(app.Namespace, secretName, dbTrait.ComponentName, creds, dbHost, effectiveDBName, int32(effectivePort))
 
 		if err := ctrl.SetControllerReference(app, secret, r.Scheme); err != nil {
 			log.Error(err, "Failed to set owner reference for database secret",
@@ -115,7 +126,9 @@ func (r *Reconciler) ReconcileSecrets(ctx context.Context, app *appv1alpha1.Heli
 		log.Info("Successfully created database secret",
 			"component", dbTrait.ComponentName,
 			"secret", secretName,
-			"dbHost", dbHost)
+			"dbHost", dbHost,
+			"effectiveDBName", effectiveDBName,
+			"effectivePort", effectivePort)
 	}
 
 	return nil
