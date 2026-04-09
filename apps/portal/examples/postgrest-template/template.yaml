@@ -17,8 +17,6 @@ spec:
       required:
         - name
         - port
-        - dockerOrg
-        - repoName
       properties:
         name:
           title: Name
@@ -30,14 +28,6 @@ spec:
           type: number
           description: The port PostgREST listens on
           default: 3000
-        dockerOrg:
-          title: Docker Registry Org/User
-          type: string
-          description: Your Docker Hub username or Organization
-        repoName:
-          title: Docker Repository Name
-          type: string
-          description: The name of the Docker repository (e.g. my-api)
 
     - title: PostgREST Configuration
       properties:
@@ -105,11 +95,11 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: "PostgREST API: ${{ parameters.name }}"
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          image: postgrest/postgrest
           apiSchema: ${{ parameters.apiSchema }}
           jwtSecret: ${{ parameters.jwtSecret }}
           jwtRole: ${{ parameters.jwtRole }}
@@ -142,10 +132,8 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
-          dockerOrg: ${{ parameters.dockerOrg }}
-          repoName: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
+          image: postgrest/postgrest
           port: ${{ parameters.port }}
           namespace: ${{ parameters.namespace }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
