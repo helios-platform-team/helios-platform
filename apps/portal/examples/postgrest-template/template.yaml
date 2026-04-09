@@ -69,6 +69,11 @@ spec:
           ui:options:
             allowedHosts:
               - localhost:3030
+        namespace:
+          title: Kubernetes Namespace
+          type: string
+          description: Namespace where the service will be deployed
+          default: default
 
     - title: Optional Extras (Local Convenience)
       properties:
@@ -130,6 +135,7 @@ spec:
           name: ${{ parameters.name }}
           image: postgrest/postgrest
           port: ${{ parameters.port }}
+          namespace: ${{ parameters.namespace }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
           apiSchema: ${{ parameters.apiSchema }}

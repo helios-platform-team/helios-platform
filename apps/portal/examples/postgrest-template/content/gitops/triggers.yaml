@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: tekton-${{ values.name }}
-  namespace: default
+  namespace: ${{ values.namespace }}
 
 ---
 # Role for triggering PipelineRuns
@@ -12,7 +12,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: tekton-trigger-role-${{ values.name }}
-  namespace: default
+  namespace: ${{ values.namespace }}
 rules:
   - apiGroups: ["tekton.dev"]
     resources: ["pipelineruns"]
@@ -27,7 +27,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: tekton-trigger-binding-${{ values.name }}
-  namespace: default
+  namespace: ${{ values.namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -35,7 +35,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: tekton-${{ values.name }}
-    namespace: default
+    namespace: ${{ values.namespace }}
 
 ---
 # TriggerBinding
@@ -43,7 +43,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerBinding
 metadata:
   name: ${{ values.name }}-trigger-binding
-  namespace: default
+  namespace: ${{ values.namespace }}
 spec:
   params:
     - name: git-commit-sha
@@ -61,7 +61,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:
   name: ${{ values.name }}-trigger-template
-  namespace: default
+  namespace: ${{ values.namespace }}
 spec:
   params:
     - name: git-repository-url
@@ -77,7 +77,7 @@ spec:
       kind: PipelineRun
       metadata:
         name: ${{ values.name }}-pipeline-run
-        namespace: default
+        namespace: ${{ values.namespace }}
       spec:
         pipelineRef:
           name: kaniko-build-push-pipeline
@@ -112,7 +112,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
   name: el-${{ values.name }}-listener
-  namespace: default
+  namespace: ${{ values.namespace }}
 spec:
   serviceAccountName: tekton-${{ values.name }}
   triggers:
@@ -128,7 +128,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: el-${{ values.name }}-listener
-  namespace: default
+  namespace: ${{ values.namespace }}
 spec:
   type: ClusterIP
   selector:
