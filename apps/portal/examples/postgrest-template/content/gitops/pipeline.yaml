@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: ${{ values.name }}-build-${{ now() | date('YYYYMMDDHHmmss') }}
+  name: ${{ values.name }}-build-run
   namespace: default
 spec:
   pipelineRef:

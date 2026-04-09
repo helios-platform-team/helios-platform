@@ -76,7 +76,7 @@ spec:
     - apiVersion: tekton.dev/v1
       kind: PipelineRun
       metadata:
-        name: ${{ values.name }}-pipeline-${{ now() | date('YYYYMMDDHHmmss') }}
+        name: ${{ values.name }}-pipeline-run
         namespace: default
       spec:
         pipelineRef:
