@@ -11,7 +11,8 @@ import (
 
 #TriggerRegistry: {
 	// FIX: Remove 'tekton.' prefix. This is a local definition in the same package.
-	"gitea-push": #GiteaPushTriggerBundle
+	"gitea-push":  #GiteaPushTriggerBundle
+	"db-migrate":  #DatabaseMigrationTriggerBundle
 }
 
 // =====================================================

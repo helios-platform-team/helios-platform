@@ -67,9 +67,9 @@ func TestRenderTektonResources_AllResources(t *testing.T) {
 		t.Fatalf("RenderTektonResources failed: %v", err)
 	}
 
-	// With webhookDomain set, we expect 9 objects:
-	// 4 Tasks + 1 Pipeline + 1 TriggerBinding + 1 TriggerTemplate + 1 EventListener + 1 Ingress
-	expectedCount := 9
+	// With webhookDomain set, we expect 11 objects:
+	// 6 Tasks (git-clone, kaniko-build, git-update-manifest, argocd-sync, db-migrate, postgrest-reload) + 1 Pipeline + 1 TriggerBinding + 1 TriggerTemplate + 1 EventListener + 1 Ingress
+	expectedCount := 11
 	if len(objects) != expectedCount {
 		t.Errorf("Expected %d objects, got %d", expectedCount, len(objects))
 		for i, obj := range objects {
@@ -79,7 +79,7 @@ func TestRenderTektonResources_AllResources(t *testing.T) {
 
 	// Verify each expected kind is present
 	expectedKinds := map[string]int{
-		"Task":            4,
+		"Task":            6,
 		"Pipeline":        1,
 		"TriggerBinding":  1,
 		"TriggerTemplate": 1,
@@ -115,8 +115,8 @@ func TestRenderTektonResources_WithoutWebhook(t *testing.T) {
 		t.Fatalf("RenderTektonResources failed: %v", err)
 	}
 
-	// Without webhookDomain: 8 objects (no Ingress)
-	expectedCount := 8
+	// Without webhookDomain: 10 objects (no Ingress)
+	expectedCount := 10
 	if len(objects) != expectedCount {
 		t.Errorf("Expected %d objects (no webhook), got %d", expectedCount, len(objects))
 		for i, obj := range objects {
@@ -174,6 +174,8 @@ func TestRenderTektonResources_CorrectTaskNames(t *testing.T) {
 		"kaniko-build":        false,
 		"git-update-manifest": false,
 		"argocd-sync":         false,
+		"db-migrate":          false,
+		"postgrest-reload":    false,
 	}
 
 	for _, obj := range objects {

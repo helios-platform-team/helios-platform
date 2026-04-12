@@ -135,6 +135,11 @@ catalog:
     # Spring Boot Template
     - type: file
       target: ../../examples/spring-boot-template/template.yaml
+
+    # PostgREST Template - Instant REST API over PostgreSQL
+    - type: file
+      target: ../../examples/postgrest-template/template.yaml
+
       rules:
         - allow: [Template]
 

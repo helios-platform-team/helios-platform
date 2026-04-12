@@ -7,6 +7,8 @@ package tasks
 	"kaniko-build":        #KanikoBuild
 	"git-update-manifest": #GitUpdateManifest
 	"argocd-sync":         #ArgoCDSync
+	"db-migrate":          #DBMigrate
+	"postgrest-reload":    #PostgRESTReload
 }
 
 // Helper to render a specific task with optional context injection

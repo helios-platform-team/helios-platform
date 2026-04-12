@@ -1,0 +1,65 @@
+apiVersion: helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.name }}
+  namespace: ${{ values.namespace }}
+spec:
+  # Database migrations trigger: automatically triggers db-migrate pipeline
+  # when changes are made to db/migrations/ directory
+  triggerType: db-migrate
+
+  git:
+    repo: ${{ values.sourceRepo }}
+    path: ./
+    ref: main
+
+  components:
+    - name: api
+      type: web-service
+      source:
+        image: ${{ values.image }}:latest
+      container:
+        port: ${{ values.port }}
+        env:
+          # PostgREST Configuration
+          # PGRST_DB_URI format: postgres://user:password@host:port/database
+          # Operator injects DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME from database trait
+          - name: PGRST_DB_URI
+            valueFrom:
+              secretKeyRef:
+                name: ${{ values.name }}-db
+                key: PGRST_DB_URI
+          - name: PGRST_DB_SCHEMA
+            value: "${{ values.apiSchema }}"
+          - name: PGRST_DB_ANON_ROLE
+            value: "${{ values.anonRole }}"
+          - name: PGRST_JWT_AUDIENCE
+            value: "${{ values.jwtRole }}"
+          - name: PGRST_JWT_SECRET
+            value: "${{ values.jwtSecret }}"
+          - name: PGRST_MAX_ROWS
+            value: "1000"
+          - name: PGRST_LOG_LEVEL
+            value: notice
+      traits:
+        - type: database
+          properties:
+            dbType: postgres
+            dbName: ${{ values.databaseName or values.name }}-db
+            port: 5432
+        - type: service
+          properties:
+            port: ${{ values.port }}
+            protocol: HTTP
+            ingress:
+              enabled: true
+              host: ${{ values.name }}.local
+              path: /
+
+  # ArgoCD will sync the deployment
+  argocd:
+    enabled: true
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true

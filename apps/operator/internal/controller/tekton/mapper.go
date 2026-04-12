@@ -28,7 +28,7 @@ func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
 		// PipelineType is intentionally derived from PipelineName because
 		// the HeliosApp CRD does not have a separate PipelineType field.
 		PipelineType:    app.Spec.PipelineName,
-		TriggerType:     "gitea-push",
+		TriggerType:     app.Spec.TriggerType,
 		ServiceAccount:  app.Spec.ServiceAccount,
 		PVCName:         app.Spec.PVCName,
 		ContextSubpath:  app.Spec.ContextSubpath,
@@ -44,6 +44,7 @@ func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
 	input.GitOpsBranch = cmp.Or(input.GitOpsBranch, "main")
 	input.GitOpsSecretRef = cmp.Or(input.GitOpsSecretRef, "helios-gitops-bot")
 	input.WebhookSecret = cmp.Or(input.WebhookSecret, "gitea-webhook-secret")
+	input.TriggerType = cmp.Or(input.TriggerType, "gitea-push")
 	if input.PipelineName == "" {
 		input.PipelineName = defaultPipelineName
 		input.PipelineType = defaultPipelineName

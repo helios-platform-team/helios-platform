@@ -7,6 +7,37 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+func TestConnectionURLTemplateForDBType(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		dbType string
+		ok     bool
+	}{
+		{"postgres", true},
+		{"POSTGRES", true},
+		{"postgresql", true},
+		{" PostgreSQL ", true},
+		{"mysql", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		name := tt.dbType
+		if name == "" {
+			name = "empty"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := connectionURLTemplateForDBType(tt.dbType)
+			if ok != tt.ok {
+				t.Fatalf("ok: got %v, want %v (template %q)", ok, tt.ok, got)
+			}
+			if tt.ok && got != postgresDatabaseURLTemplate {
+				t.Fatalf("template: got %q, want %q", got, postgresDatabaseURLTemplate)
+			}
+		})
+	}
+}
+
 func TestInjectDatabaseEnvVars(t *testing.T) {
 	t.Run("InjectsAllEnvVars", func(t *testing.T) {
 		deploy := &appsv1.Deployment{
@@ -27,20 +58,21 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			},
 		}
 
-		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret")
+		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret", "api-server-db", "postgres")
 		if !changed {
 			t.Fatal("Expected InjectDatabaseEnvVars to return true (changed)")
 		}
 
 		container := deploy.Spec.Template.Spec.Containers[0]
-		if len(container.Env) != 5 {
-			t.Fatalf("Expected 5 env vars, got %d", len(container.Env))
+		if len(container.Env) != 8 {
+			t.Fatalf("Expected 8 env vars, got %d", len(container.Env))
 		}
 
 		expectedEnvs := map[string]string{
-			"DB_HOST": "DB_HOST",
-			"DB_USER": "DB_USER",
-			"DB_PASS": "DB_PASS",
+			"DB_HOST":      "DB_HOST",
+			"DB_USER":      "DB_USER",
+			"DB_PASS":      "DB_PASS",
+			"PGRST_DB_URI": "PGRST_DB_URI",
 		}
 		foundDBPort := false
 		for _, env := range container.Env {
@@ -68,12 +100,60 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 				}
 				foundDBPort = true
 			}
+			if env.Name == "DB_NAME" {
+				if env.Value != "api-server-db" || env.ValueFrom != nil {
+					t.Errorf("Expected DB_NAME literal api-server-db, got %+v", env)
+				}
+			}
+			if env.Name == "DATABASE_URL" {
+				if env.Value != postgresDatabaseURLTemplate || env.ValueFrom != nil {
+					t.Errorf("Expected DATABASE_URL from template, got %+v", env)
+				}
+			}
 		}
 		if len(expectedEnvs) > 0 {
 			t.Errorf("Missing expected env vars: %v", expectedEnvs)
 		}
 		if !foundDBPort {
 			t.Error("Missing DB_PORT env var")
+		}
+	})
+
+	t.Run("OmitsDatabaseURLWhenDBTypeUnsupported", func(t *testing.T) {
+		deploy := &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "api-server",
+								Image: "myregistry/api:v1",
+								Env: []corev1.EnvVar{
+									{Name: "PORT", Value: "3000"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret", "api-server-db", "mysql")
+		if !changed {
+			t.Fatal("Expected InjectDatabaseEnvVars to return true (changed)")
+		}
+
+		container := deploy.Spec.Template.Spec.Containers[0]
+		if len(container.Env) != 7 {
+			t.Fatalf("Expected 7 env vars (no DATABASE_URL), got %d", len(container.Env))
+		}
+		for _, env := range container.Env {
+			if env.Name == "DATABASE_URL" {
+				t.Fatalf("unexpected DATABASE_URL for dbType mysql: %+v", env)
+			}
+			if env.Name == "DB_NAME" && env.Value != "api-server-db" {
+				t.Errorf("DB_NAME: expected api-server-db, got %q", env.Value)
+			}
 		}
 	})
 
@@ -90,13 +170,13 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			},
 		}
 
-		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret")
+		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret", "api-server-db", "postgres")
 		if !changed {
 			t.Fatal("Expected first injection to report changes")
 		}
 		firstCount := len(deploy.Spec.Template.Spec.Containers[0].Env)
 
-		changed = InjectDatabaseEnvVars(deploy, "api-server-db-secret")
+		changed = InjectDatabaseEnvVars(deploy, "api-server-db-secret", "api-server-db", "postgres")
 		if changed {
 			t.Error("Expected second injection to report no changes (idempotent)")
 		}
@@ -132,14 +212,14 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			},
 		}
 
-		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret")
+		changed := InjectDatabaseEnvVars(deploy, "api-server-db-secret", "api-server-db", "postgres")
 		if !changed {
 			t.Fatal("Expected InjectDatabaseEnvVars to return true when existing env vars have wrong source")
 		}
 
 		container := deploy.Spec.Template.Spec.Containers[0]
-		if len(container.Env) != 5 {
-			t.Fatalf("Expected 5 env vars, got %d", len(container.Env))
+		if len(container.Env) != 8 {
+			t.Fatalf("Expected 8 env vars, got %d", len(container.Env))
 		}
 
 		for _, env := range container.Env {
@@ -176,7 +256,7 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			},
 		}
 
-		changed := InjectDatabaseEnvVars(deploy, "test-secret")
+		changed := InjectDatabaseEnvVars(deploy, "test-secret", "", "")
 		if changed {
 			t.Error("Expected no changes for Deployment with no containers")
 		}
@@ -196,7 +276,7 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			},
 		}
 
-		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "api-server-db-secret", "api-server", 5433)
+		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "api-server-db-secret", "api-server", 5433, "api-server-db", "postgres")
 		if !changed {
 			t.Fatal("Expected env injection changes")
 		}
@@ -210,12 +290,21 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		}
 
 		appContainer := deploy.Spec.Template.Spec.Containers[1]
-		expected := map[string]bool{"DB_HOST": false, "DB_USER": false, "DB_PASS": false, "DB_PORT": false}
+		expected := map[string]bool{
+			"DB_HOST": false, "DB_USER": false, "DB_PASS": false, "PGRST_DB_URI": false, "DB_PORT": false,
+			"DB_NAME": false, "DATABASE_URL": false,
+		}
 		for _, env := range appContainer.Env {
 			if _, ok := expected[env.Name]; ok {
 				expected[env.Name] = true
 				if env.Name == "DB_PORT" && env.Value != "5433" {
 					t.Errorf("Expected DB_PORT=5433, got %q", env.Value)
+				}
+				if env.Name == "DB_NAME" && env.Value != "api-server-db" {
+					t.Errorf("Expected DB_NAME=api-server-db, got %q", env.Value)
+				}
+				if env.Name == "DATABASE_URL" && env.Value != postgresDatabaseURLTemplate {
+					t.Errorf("Expected DATABASE_URL template, got %q", env.Value)
 				}
 			}
 		}
@@ -239,15 +328,15 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			},
 		}
 
-		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "app-db-secret", "missing-app", 5432)
+		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "app-db-secret", "missing-app", 5432, "only-container-db", "postgres")
 		if !changed {
 			t.Fatal("Expected env injection changes")
 		}
 		if exactMatch {
 			t.Fatal("Expected fallback because preferred container does not exist")
 		}
-		if len(deploy.Spec.Template.Spec.Containers[0].Env) != 4 {
-			t.Fatalf("Expected 4 injected DB env vars, got %d", len(deploy.Spec.Template.Spec.Containers[0].Env))
+		if len(deploy.Spec.Template.Spec.Containers[0].Env) != 7 {
+			t.Fatalf("Expected 7 injected DB env vars, got %d", len(deploy.Spec.Template.Spec.Containers[0].Env))
 		}
 	})
 
@@ -264,7 +353,7 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 			},
 		}
 
-		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "app-db-secret", "", 5432)
+		changed, exactMatch := InjectDatabaseEnvVarsForContainer(deploy, "app-db-secret", "", 5432, "app-db", "postgres")
 		if !changed {
 			t.Fatal("Expected env injection changes")
 		}
