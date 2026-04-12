@@ -64,14 +64,15 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		}
 
 		container := deploy.Spec.Template.Spec.Containers[0]
-		if len(container.Env) != 7 {
-			t.Fatalf("Expected 7 env vars, got %d", len(container.Env))
+		if len(container.Env) != 8 {
+			t.Fatalf("Expected 8 env vars, got %d", len(container.Env))
 		}
 
 		expectedEnvs := map[string]string{
 			"DB_HOST": "DB_HOST",
 			"DB_USER": "DB_USER",
 			"DB_PASS": "DB_PASS",
+			"PGRST_DB_URI": "PGRST_DB_URI",
 		}
 		foundDBPort := false
 		for _, env := range container.Env {
@@ -143,8 +144,8 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		}
 
 		container := deploy.Spec.Template.Spec.Containers[0]
-		if len(container.Env) != 6 {
-			t.Fatalf("Expected 6 env vars (no DATABASE_URL), got %d", len(container.Env))
+		if len(container.Env) != 7 {
+			t.Fatalf("Expected 7 env vars (no DATABASE_URL), got %d", len(container.Env))
 		}
 		for _, env := range container.Env {
 			if env.Name == "DATABASE_URL" {
@@ -217,8 +218,8 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		}
 
 		container := deploy.Spec.Template.Spec.Containers[0]
-		if len(container.Env) != 7 {
-			t.Fatalf("Expected 7 env vars, got %d", len(container.Env))
+		if len(container.Env) != 8 {
+			t.Fatalf("Expected 8 env vars, got %d", len(container.Env))
 		}
 
 		for _, env := range container.Env {
@@ -290,7 +291,7 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 
 		appContainer := deploy.Spec.Template.Spec.Containers[1]
 		expected := map[string]bool{
-			"DB_HOST": false, "DB_USER": false, "DB_PASS": false, "DB_PORT": false,
+			"DB_HOST": false, "DB_USER": false, "DB_PASS": false, "PGRST_DB_URI": false, "DB_PORT": false,
 			"DB_NAME": false, "DATABASE_URL": false,
 		}
 		for _, env := range appContainer.Env {
@@ -334,8 +335,8 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		if exactMatch {
 			t.Fatal("Expected fallback because preferred container does not exist")
 		}
-		if len(deploy.Spec.Template.Spec.Containers[0].Env) != 6 {
-			t.Fatalf("Expected 6 injected DB env vars, got %d", len(deploy.Spec.Template.Spec.Containers[0].Env))
+		if len(deploy.Spec.Template.Spec.Containers[0].Env) != 7 {
+			t.Fatalf("Expected 7 injected DB env vars, got %d", len(deploy.Spec.Template.Spec.Containers[0].Env))
 		}
 	})
 
