@@ -7,11 +7,17 @@
 DROP TABLE IF EXISTS api.items CASCADE;
 
 -- =====================================================
--- Drop roles
+-- Drop roles (only if they exist and no other tables depend on them)
 -- =====================================================
 
-DROP ROLE IF EXISTS {{ values.anonRole }};
-DROP ROLE IF EXISTS {{ values.jwtRole }};
+-- Note: In production, be careful dropping roles - they may have permissions
+-- on other objects. This is safe for the example template.
+DO $$ BEGIN
+  DROP ROLE IF EXISTS anon;
+  DROP ROLE IF EXISTS authenticated;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Roles may still be in use: %', SQLERRM;
+END $$;
 
 -- =====================================================
 -- Drop schema
