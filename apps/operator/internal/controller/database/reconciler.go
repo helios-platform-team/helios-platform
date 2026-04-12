@@ -143,10 +143,7 @@ func (r *Reconciler) ReconcileInstances(ctx context.Context, app *appv1alpha1.He
 		dbHost := GetDatabaseHost(dbTrait.ComponentName)
 		secretName := GetDatabaseSecretName(dbTrait.ComponentName)
 
-		effectiveDBName := dbTrait.Properties.DBName
-		if effectiveDBName == "" {
-			effectiveDBName = fmt.Sprintf("%s-db", dbTrait.ComponentName)
-		}
+		effectiveDBName := EffectiveDatabaseName(dbTrait)
 
 		version := dbTrait.Properties.Version
 		if version == "" {
@@ -329,7 +326,8 @@ func (r *Reconciler) ReconcileInjection(ctx context.Context, app *appv1alpha1.He
 			port = DefaultPostgresPort
 		}
 
-		changed, exactContainerMatch := InjectDatabaseEnvVarsForContainer(deploy, secretName, dbTrait.ComponentName, int32(port))
+		dbName := EffectiveDatabaseName(dbTrait)
+		changed, exactContainerMatch := InjectDatabaseEnvVarsForContainer(deploy, secretName, dbTrait.ComponentName, int32(port), dbName, dbTrait.Properties.DBType)
 		if !exactContainerMatch {
 			fallbackContainer := "<no-containers>"
 			if len(deploy.Spec.Template.Spec.Containers) > 0 {
