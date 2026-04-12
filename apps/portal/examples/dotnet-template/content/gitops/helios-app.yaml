@@ -1,0 +1,41 @@
+apiVersion: app.helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.name }}
+  namespace: default
+spec:
+
+  description: "Managed by Helios Operator"
+  owner: ${{ values.owner }}
+
+  imageRepo: ${{ values.dockerOrg }}/${{ values.repoName }}
+  gitRepo: "${{ values.sourceRepo }}"
+  gitopsRepo: ${{ values.gitopsRepo }}
+  gitopsPath: "apps/${{ values.name }}"
+  port: ${{ values.port }}
+  replicas: 1
+  testCommand: ${{ values.testCommand }}
+
+  webhookSecret: "git-credentials-${{ values.name }}"
+  gitopsSecretRef: "git-credentials-${{ values.name }}"
+
+  components:
+    - name: ${{ values.name }}-backend
+      type: web-service
+      properties:
+        image: ${{ values.dockerOrg }}/${{ values.repoName }}:latest
+        port: ${{ values.port }}
+        replicas: 1
+        env:
+          - name: ASPNETCORE_ENVIRONMENT
+            value: "Production"
+      traits:
+        - type: service
+          properties:
+            port: ${{ values.port }}
+            targetPort: ${{ values.port }}
+        - type: database
+          properties:
+            dbType: ${{ values.dbType | dump }}
+            dbName: ${{ values.dbName | dump }}
+            version: ${{ values.dbVersion | dump }}
