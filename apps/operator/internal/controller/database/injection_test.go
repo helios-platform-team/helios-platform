@@ -69,9 +69,9 @@ func TestInjectDatabaseEnvVars(t *testing.T) {
 		}
 
 		expectedEnvs := map[string]string{
-			"DB_HOST": "DB_HOST",
-			"DB_USER": "DB_USER",
-			"DB_PASS": "DB_PASS",
+			"DB_HOST":      "DB_HOST",
+			"DB_USER":      "DB_USER",
+			"DB_PASS":      "DB_PASS",
 			"PGRST_DB_URI": "PGRST_DB_URI",
 		}
 		foundDBPort := false
