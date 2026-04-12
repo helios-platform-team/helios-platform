@@ -28,7 +28,8 @@ func connectionURLTemplateForDBType(dbType string) (template string, ok bool) {
 }
 
 // databaseSecretEnvVarNames lists env vars resolved from Secret keys.
-var databaseSecretEnvVarNames = []string{"DB_HOST", "DB_USER", "DB_PASS"}
+// These are injected as environment variable references into application containers.
+var databaseSecretEnvVarNames = []string{"DB_HOST", "DB_USER", "DB_PASS", "PGRST_DB_URI"}
 
 // InjectDatabaseEnvVars patches a Deployment's first container to include
 // DB_HOST, DB_USER, DB_PASS env vars referencing the given K8s Secret.

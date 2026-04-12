@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -13,8 +14,29 @@ import (
 
 var requiredDatabaseSecretKeys = []string{"DB_USER", "DB_PASS", "DB_HOST"}
 
+// formatPostgresURI constructs a PostgreSQL connection URI from components.
+// It properly escapes the username and password for use in URLs.
+// Format: postgres://username:password@host:port/dbname
+func formatPostgresURI(username, password, host, dbName string, port int32) string {
+	// Escape username and password for use in URL
+	enscodedUser := url.QueryEscape(username)
+	enscodedPassword := url.QueryEscape(password)
+
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
+		enscodedUser,
+		enscodedPassword,
+		host,
+		port,
+		dbName,
+	)
+}
+
 // GenerateDatabaseSecret creates a Kubernetes Secret containing database credentials.
-func GenerateDatabaseSecret(namespace, secretName, componentName string, creds *DatabaseCredentials, dbHost string) *corev1.Secret {
+// Parameters: namespace, secretName, componentName, credentials, dbHost, dbName, port.
+func GenerateDatabaseSecret(namespace, secretName, componentName string, creds *DatabaseCredentials, dbHost, dbName string, port int32) *corev1.Secret {
+	// Compute the PostgreSQL connection URI
+	pgrstURI := formatPostgresURI(creds.Username, creds.Password, dbHost, dbName, port)
+
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
@@ -27,9 +49,10 @@ func GenerateDatabaseSecret(namespace, secretName, componentName string, creds *
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"DB_USER": []byte(creds.Username),
-			"DB_PASS": []byte(creds.Password),
-			"DB_HOST": []byte(dbHost),
+			"DB_USER":      []byte(creds.Username),
+			"DB_PASS":      []byte(creds.Password),
+			"DB_HOST":      []byte(dbHost),
+			"PGRST_DB_URI": []byte(pgrstURI),
 		},
 	}
 }
