@@ -203,6 +203,76 @@ The Helios Operator automatically sets these for PostgREST:
 4. **Commit & Push**: Changes automatically trigger deployment
 5. **Test Your API**: Use the REST endpoints exposed by PostgREST
 
+## Database Migrations
+
+For production environments, instead of rebuilding Docker images for every schema change, use the **Database Migration Pipeline**.
+
+### What is the Migration Pipeline?
+
+The dedicated Tekton `db-migrate` pipeline enables:
+- **Schema changes without rebuilding images** - No Docker rebuild needed
+- **Zero-downtime updates** - Uses PostgREST `NOTIFY` to reload schema cache
+- **Safe versioning** - golang-migrate tracks applied migrations
+- **Controlled deployment** - Trigger manually or on changes to `db/migrations/`
+
+### Creating Migrations
+
+1. Create migration files in the `db/migrations/` directory:
+   ```bash
+   db/migrations/
+   ├── 000001_initial_schema.up.sql
+   ├── 000001_initial_schema.down.sql
+   ├── 000002_add_users_table.up.sql
+   └── 000002_add_users_table.down.sql
+   ```
+
+2. Write your SQL:
+   ```sql
+   -- db/migrations/000002_add_users_table.up.sql
+   CREATE TABLE api.users (
+     id SERIAL PRIMARY KEY,
+     email TEXT UNIQUE NOT NULL,
+     created_at TIMESTAMP DEFAULT NOW()
+   );
+   
+   GRANT SELECT, INSERT ON api.users TO authenticated_role;
+   NOTIFY pgrst, 'reload schema';
+   ```
+
+3. Trigger the migration pipeline:
+   ```bash
+   # Manually trigger via kubectl
+   kubectl create -f - <<EOF
+   apiVersion: tekton.dev/v1beta1
+   kind: PipelineRun
+   metadata:
+     name: migrate-$(date +%s)
+     namespace: ${{ values.namespace }}
+   spec:
+     pipelineRef:
+       name: db-migrate
+     params:
+       - name: app-repo-url
+         value: <your-source-repo-url>
+       - name: app-repo-revision
+         value: main
+       - name: database-url
+         value: <injected-from-database-secret>
+       - name: migration-source
+         value: db/migrations
+     workspaces:
+       - name: source
+         volumeClaimTemplate:
+           spec:
+             accessModes: [ReadWriteOnce]
+             resources:
+               requests:
+                 storage: 1Gi
+   EOF
+   ```
+
+For detailed migration guide, see [MIGRATIONS.md](MIGRATIONS.md).
+
 ## Troubleshooting
 
 ### API not responding?

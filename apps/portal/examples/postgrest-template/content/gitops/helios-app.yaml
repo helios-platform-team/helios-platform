@@ -4,6 +4,10 @@ metadata:
   name: ${{ values.name }}
   namespace: ${{ values.namespace }}
 spec:
+  # Database migrations trigger: automatically triggers db-migrate pipeline
+  # when changes are made to db/migrations/ directory
+  triggerType: db-migrate
+
   git:
     repo: ${{ values.sourceRepo }}
     path: ./

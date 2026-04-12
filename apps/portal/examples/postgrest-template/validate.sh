@@ -125,9 +125,31 @@ check_field "content/source/postgrestrc.conf" "db-anon-role" "PostgREST anonymou
 check_field "content/source/postgrestrc.conf" "server-port" "PostgREST server port config"
 check_field "content/source/Dockerfile" "postgrest/postgrest" "Official PostgREST image"
 
+# Check database migrations structure
+echo ""
+echo "Test 6: Verifying database migration structure..."
+if [ -d "$TEMPLATE_DIR/content/source/db/migrations" ]; then
+    echo "  ✓ db/migrations directory exists"
+    if [ -f "$TEMPLATE_DIR/content/source/db/migrations/000001_initial_schema.up.sql" ]; then
+        echo "  ✓ Sample migration file present"
+    else
+        echo "  ⚠ No sample migrations found (this is OK, but users should add them)"
+    fi
+else
+    echo "  ✗ db/migrations directory missing"
+    exit 1
+fi
+
+# Check migration documentation
+if [ -f "$TEMPLATE_DIR/content/source/MIGRATIONS.md" ]; then
+    echo "  ✓ Migration documentation present"
+else
+    echo "  ⚠ MIGRATIONS.md not found"
+fi
+
 # Check that PGRST_DB_URI is referenced
 echo ""
-echo "Test 6: Verifying PGRST_DB_URI integration..."
+echo "Test 7: Verifying PGRST_DB_URI integration..."
 check_field "content/source/README.md" "PGRST_DB_URI" "PGRST_DB_URI documentation"
 check_field "content/gitops/helios-app.yaml" "database" "Database trait for credential injection"
 
@@ -138,6 +160,7 @@ echo "✓ Template structure is valid"
 echo "✓ YAML syntax is correct"
 echo "✓ HeliosApp CRD correctly configured"
 echo "✓ PostgREST configuration present"
+echo "✓ Database migrations configured"
 echo "✓ PGRST_DB_URI integration configured"
 echo ""
 echo "✓ PostgREST template is ready for deployment!"
@@ -146,5 +169,6 @@ echo "Next steps:"
 echo "1. Deploy to Helios Platform cluster"
 echo "2. Register template in Backstage"
 echo "3. Users can scaffold PostgREST services via UI"
+echo "4. Users can create database migrations in db/migrations/"
 echo ""
 

@@ -10,7 +10,7 @@ spec:
   type: service
   lifecycle: production
   owner: ${{ values.owner }}
-  providesApis:
+  provides:
     - name: REST API
       type: openapi
       uri: /

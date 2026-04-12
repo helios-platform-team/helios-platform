@@ -62,6 +62,12 @@ type HeliosAppSpec struct {
 	// +kubebuilder:default="from-code-to-cluster"
 	PipelineName string `json:"pipelineName,omitempty"`
 
+	// TriggerType is the type of trigger to use for the pipeline
+	// +optional
+	// +kubebuilder:validation:Enum=gitea-push;db-migrate
+	// +kubebuilder:default="gitea-push"
+	TriggerType string `json:"triggerType,omitempty"`
+
 	// WebhookSecret is the name of the secret containing the Gitea webhook secret token
 	// +optional
 	// +kubebuilder:default="gitea-webhook-secret"
