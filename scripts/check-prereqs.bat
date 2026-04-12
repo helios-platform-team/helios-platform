@@ -35,8 +35,8 @@ call :check_tool "docker" "docker --version"
 call :check_tool "kubectl" "kubectl version --client"
 call :check_tool "k3d" "k3d version"
 call :check_tool "cue" "cue version"
-call :check_tool "helm" "helm version"
-call :check_tool "jq" "jq --version"
+call :check_optional_tool "helm" "helm version"
+call :check_optional_tool "jq" "jq --version"
 
 echo.
 echo [Node.js / Frontend]
@@ -151,5 +151,16 @@ if "!val!"=="" (
     set /a ERRORS+=1
 ) else (
     echo   [OK]   %~1 is configured
+)
+goto :eof
+
+:check_optional_tool
+REM %~1 = tool name, %~2 = version command
+where %~1 >nul 2>&1
+if %errorlevel% equ 0 (
+    echo   [OK]   %~1 found ^(Optional^)
+) else (
+    echo   [WARN] %~1 not found. ^(Optional, but recommended for Gitea setup^)
+    set /a WARNINGS+=1
 )
 goto :eof
