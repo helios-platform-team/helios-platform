@@ -88,11 +88,13 @@ if %CHECK_ENV% equ 1 (
             )
         )
 
-        REM Check required variables
-        call :check_env_var "GITHUB_TOKEN"
-        call :check_env_var "GITHUB_USER"
-        call :check_env_var "AUTH_GITHUB_CLIENT_ID"
-        call :check_env_var "AUTH_GITHUB_CLIENT_SECRET"
+        REM Check required Docker registry variables
+        call :check_env_var "DOCKER_USERNAME"
+        call :check_env_var "DOCKER_TOKEN"
+
+        REM Optional GitHub OAuth variables
+        call :check_env_var_optional "AUTH_GITHUB_CLIENT_ID"
+        call :check_env_var_optional "AUTH_GITHUB_CLIENT_SECRET"
     )
 )
 
@@ -151,5 +153,27 @@ if "!val!"=="" (
     set /a ERRORS+=1
 ) else (
     echo   [OK]   %~1 is configured
+)
+goto :eof
+
+:check_env_var_optional
+REM %~1 = variable name
+if not defined %~1 (
+    echo   [WARN] %~1 is not set in .env ^(optional^)
+    set /a WARNINGS+=1
+    goto :eof
+)
+set "val=!%~1!"
+if "!val!"=="" (
+    echo   [WARN] %~1 is empty in .env ^(optional^)
+    set /a WARNINGS+=1
+) else if "!val:~0,8!"=="ghp_xxxx" (
+    echo   [WARN] %~1 still has placeholder value in .env ^(optional^)
+    set /a WARNINGS+=1
+) else if "!val:~0,5!"=="your-" (
+    echo   [WARN] %~1 still has placeholder value in .env ^(optional^)
+    set /a WARNINGS+=1
+) else (
+    echo   [OK]   %~1 is configured ^(optional^)
 )
 goto :eof

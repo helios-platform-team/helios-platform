@@ -391,24 +391,23 @@ tasks:
     desc: Create Docker registry secret and link to pipeline SA
     cmds:
       - cmd: |
-          if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_PASSWORD" ]; then
-            echo "DOCKER_USERNAME and DOCKER_PASSWORD must be set in .env" >&2
+          if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_TOKEN" ]; then
+            echo "DOCKER_USERNAME and DOCKER_TOKEN must be set in .env" >&2
             exit 1
           fi
         platforms: [linux, darwin]
       - cmd: |
-          powershell -Command "if ([string]::IsNullOrEmpty($env:DOCKER_USERNAME) -or [string]::IsNullOrEmpty($env:DOCKER_PASSWORD)) { Write-Error 'DOCKER_USERNAME and DOCKER_PASSWORD must be set in .env'; exit 1 }"
+          powershell -Command "if ([string]::IsNullOrEmpty($env:DOCKER_USERNAME) -or [string]::IsNullOrEmpty($env:DOCKER_TOKEN)) { Write-Error 'DOCKER_USERNAME and DOCKER_TOKEN must be set in .env'; exit 1 }"
         platforms: [windows]
       - cmd: |
           kubectl create secret docker-registry docker-credentials \
             --docker-server=${DOCKER_SERVER:-https://index.docker.io/v1/} \
             --docker-username=$DOCKER_USERNAME \
-            --docker-password=$DOCKER_PASSWORD \
-            --docker-email=${DOCKER_EMAIL:-dev@helios.io} \
+            --docker-password=$DOCKER_TOKEN \
             --dry-run=client -o yaml | kubectl apply -f -
         platforms: [linux, darwin]
       - cmd: |
-          powershell -Command "$server = if ([string]::IsNullOrEmpty($env:DOCKER_SERVER)) { 'https://index.docker.io/v1/' } else { $env:DOCKER_SERVER }; $email = if ([string]::IsNullOrEmpty($env:DOCKER_EMAIL)) { 'dev@helios.io' } else { $env:DOCKER_EMAIL }; kubectl create secret docker-registry docker-credentials --docker-server=$server --docker-username=$env:DOCKER_USERNAME --docker-password=$env:DOCKER_PASSWORD --docker-email=$email --dry-run=client -o yaml | kubectl apply -f -"
+          powershell -Command "$server = if ([string]::IsNullOrEmpty($env:DOCKER_SERVER)) { 'https://index.docker.io/v1/' } else { $env:DOCKER_SERVER }; kubectl create secret docker-registry docker-credentials --docker-server=$server --docker-username=$env:DOCKER_USERNAME --docker-password=$env:DOCKER_TOKEN --dry-run=client -o yaml | kubectl apply -f -"
         platforms: [windows]
       - cmd: |
           if kubectl get sa pipeline >/dev/null 2>&1; then

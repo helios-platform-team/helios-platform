@@ -208,8 +208,8 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 	}
 
 	container := containers[0]
-	if container.Image != "postgres:16" {
-		t.Errorf("Expected image %q, got %q", "postgres:16", container.Image)
+	if container.Image != "postgres:18" {
+		t.Errorf("Expected image %q, got %q", "postgres:18", container.Image)
 	}
 
 	if len(container.Ports) != 1 || container.Ports[0].ContainerPort != 5432 {
