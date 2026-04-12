@@ -227,15 +227,15 @@ tasks:
           --set persistence.size=1Gi
           --set resources.requests.memory=128Mi
           --set resources.limits.memory=256Mi
-        platforms: [linux, darwin]
       - echo "Waiting for Gitea deployment..."
       - kubectl rollout status deployment/gitea -n gitea --timeout=300s
 
   setup:gitea-token:
     desc: Create Gitea API token, default org, and write to .env
     cmds:
-      - echo "Port-forwarding Gitea for setup..."
+      - echo "Configuring Gitea (Cross-platform)..."
       - cmd: |
+          echo "Port-forwarding Gitea for setup..."
           kubectl port-forward -n gitea svc/gitea-http {{.GITEA_PORT}}:3000 &
           PF_PID=$!
           sleep 3
@@ -294,6 +294,8 @@ tasks:
 
           kill $PF_PID 2>/dev/null || true
         platforms: [linux, darwin]
+      - cmd: powershell -ExecutionPolicy Bypass -File scripts/config-gitea.ps1 -GiteaPort {{.GITEA_PORT}}
+        platforms: [windows]
 
   setup:argocd-gitea:
     desc: Register Gitea repository credentials with ArgoCD
@@ -318,6 +320,8 @@ tasks:
             password: "$GITEA_ADMIN_PASS"
           EOF
         platforms: [linux, darwin]
+      - cmd: powershell -ExecutionPolicy Bypass -File scripts/setup-argocd-creds.ps1 -GiteaInternalHost {{.GITEA_INTERNAL_HOST}}
+        platforms: [windows]
       - echo "ArgoCD can now access Gitea repositories."
 
   setup:gitea-gitops-secret:
@@ -353,9 +357,10 @@ tasks:
           for f in "$ENV_FILE" "$PORTAL_ENV"; do
             update_env_var "$f" "GITOPS_SECRET_REF" "$GITOPS_SECRET_NAME"
           done
-
-          echo "Created secret '$GITOPS_SECRET_NAME' and wrote GITOPS_SECRET_REF to .env files."
         platforms: [linux, darwin]
+      - cmd: powershell -ExecutionPolicy Bypass -File scripts/setup-gitops-creds.ps1 -GiteaInternalHost {{.GITEA_INTERNAL_HOST}} -SecretName {{.GITOPS_SECRET_NAME}}
+        platforms: [windows]
+      - echo "Created secret '{{.GITOPS_SECRET_NAME}}' and wrote GITOPS_SECRET_REF to .env files."
 
   setup:crds:
     desc: Install Helios CRDs into the cluster
@@ -396,29 +401,7 @@ tasks:
             exit 1
           fi
         platforms: [linux, darwin]
-      - cmd: |
-          powershell -Command "if ([string]::IsNullOrEmpty($env:DOCKER_USERNAME) -or [string]::IsNullOrEmpty($env:DOCKER_PASSWORD)) { Write-Error 'DOCKER_USERNAME and DOCKER_PASSWORD must be set in .env'; exit 1 }"
-        platforms: [windows]
-      - cmd: |
-          kubectl create secret docker-registry docker-credentials \
-            --docker-server=${DOCKER_SERVER:-https://index.docker.io/v1/} \
-            --docker-username=$DOCKER_USERNAME \
-            --docker-password=$DOCKER_PASSWORD \
-            --docker-email=${DOCKER_EMAIL:-dev@helios.io} \
-            --dry-run=client -o yaml | kubectl apply -f -
-        platforms: [linux, darwin]
-      - cmd: |
-          powershell -Command "$server = if ([string]::IsNullOrEmpty($env:DOCKER_SERVER)) { 'https://index.docker.io/v1/' } else { $env:DOCKER_SERVER }; $email = if ([string]::IsNullOrEmpty($env:DOCKER_EMAIL)) { 'dev@helios.io' } else { $env:DOCKER_EMAIL }; kubectl create secret docker-registry docker-credentials --docker-server=$server --docker-username=$env:DOCKER_USERNAME --docker-password=$env:DOCKER_PASSWORD --docker-email=$email --dry-run=client -o yaml | kubectl apply -f -"
-        platforms: [windows]
-      - cmd: |
-          if kubectl get sa pipeline >/dev/null 2>&1; then
-            kubectl patch sa pipeline -p '{"secrets": [{"name": "docker-credentials"}]}'
-          else
-            echo "pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)"
-          fi
-        platforms: [linux, darwin]
-      - cmd: |
-          powershell -Command "kubectl get sa pipeline *> $null; if ($LASTEXITCODE -eq 0) { kubectl patch sa pipeline -p '{\"secrets\": [{\"name\": \"docker-credentials\"}]}' } else { Write-Host 'pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)' }"
+      - cmd: powershell -ExecutionPolicy Bypass -File scripts/setup-credentials.ps1
         platforms: [windows]
 
   setup:portal-deps:
@@ -457,8 +440,9 @@ tasks:
 
   dev:portal:
     desc: Run the Backstage portal with ArgoCD + kubectl proxy
+    dir: apps/portal
     cmds:
-      - cmd: cd apps/portal && ./start-dev.sh
+      - cmd: ./start-dev.sh
         platforms: [linux, darwin]
       - cmd: powershell -ExecutionPolicy Bypass -File ../../scripts/start-portal.ps1 -ArgocdPort {{.ARGOCD_PORT}}
         platforms: [windows]

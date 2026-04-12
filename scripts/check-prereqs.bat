@@ -35,6 +35,8 @@ call :check_tool "docker" "docker --version"
 call :check_tool "kubectl" "kubectl version --client"
 call :check_tool "k3d" "k3d version"
 call :check_tool "cue" "cue version"
+call :check_tool "helm" "helm version"
+call :check_tool "jq" "jq --version"
 
 echo.
 echo [Node.js / Frontend]
@@ -88,11 +90,9 @@ if %CHECK_ENV% equ 1 (
             )
         )
 
-        REM Check required variables
-        call :check_env_var "GITHUB_TOKEN"
-        call :check_env_var "GITHUB_USER"
-        call :check_env_var "AUTH_GITHUB_CLIENT_ID"
-        call :check_env_var "AUTH_GITHUB_CLIENT_SECRET"
+        REM Check required variables (Gitea-based workflow)
+        call :check_env_var "DOCKER_USERNAME"
+        call :check_env_var "DOCKER_PASSWORD"
     )
 )
 
