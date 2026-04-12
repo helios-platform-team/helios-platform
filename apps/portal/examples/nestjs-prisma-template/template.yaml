@@ -3,10 +3,7 @@ kind: Template
 metadata:
   name: nestjs-prisma-template
   title: NestJS + Prisma Template (Database-backed)
-  description: >-
-    Scaffolds a NestJS service with Prisma ORM and a PostgreSQL database.
-    The Helios Operator automatically provisions the database and injects
-    credentials (DB_HOST, DB_USER, DB_PASS) into the backend pod.
+  description: Scaffolds a NestJS service with Prisma and PostgreSQL-ready GitOps manifests.
 spec:
   owner: user:guest
   type: service

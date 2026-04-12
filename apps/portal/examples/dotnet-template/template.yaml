@@ -3,10 +3,7 @@ kind: Template
 metadata:
   name: dotnet-webapi-template
   title: .NET Web API Template (Database-backed)
-  description: >-
-    Scaffolds an ASP.NET Core Web API service with a PostgreSQL-ready
-    configuration. Database credentials are loaded from environment variables
-    (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME) and can be deployed via Helios GitOps.
+  description: Scaffolds an ASP.NET Core Web API service with PostgreSQL-ready GitOps manifests.
 spec:
   owner: user:guest
   type: service
