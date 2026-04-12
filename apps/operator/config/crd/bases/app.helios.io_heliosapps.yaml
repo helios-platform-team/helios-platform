@@ -370,6 +370,13 @@ spec:
               testCommand:
                 description: TestCommand is the command to run tests (e.g. "npm test")
                 type: string
+              triggerType:
+                default: gitea-push
+                description: TriggerType is the type of trigger to use for the pipeline
+                enum:
+                - gitea-push
+                - db-migrate
+                type: string
               webhookDomain:
                 description: WebhookDomain is the external domain (e.g., ngrok) for
                   Git webhooks
