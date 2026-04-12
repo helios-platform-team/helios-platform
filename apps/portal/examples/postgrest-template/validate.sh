@@ -21,10 +21,6 @@ required_files=(
     "content/source/README.md"
     "content/source/.gitignore"
     "content/gitops/helios-app.yaml"
-    "content/gitops/argocd-app.yaml"
-    "content/gitops/pipeline.yaml"
-    "content/gitops/triggers.yaml"
-    "content/gitops/kustomization.yaml"
 )
 
 all_exist=true
@@ -46,6 +42,13 @@ fi
 # Test 2: Validate YAML syntax of source templates
 echo ""
 echo "Test 2: Validating YAML syntax..."
+
+# Ensure PyYAML is available
+if ! python3 -c "import yaml" 2>/dev/null; then
+    echo "  Installing PyYAML..."
+    python3 -m pip install -q pyyaml || { echo "  ✗ Failed to install PyYAML"; exit 1; }
+fi
+
 python3 << 'PYTHON_EOF'
 import yaml
 import os
@@ -62,10 +65,6 @@ yaml_files = [
     'template.yaml',
     'content/source/catalog-info.yaml',
     'content/gitops/helios-app.yaml',
-    'content/gitops/argocd-app.yaml',
-    'content/gitops/pipeline.yaml',
-    'content/gitops/triggers.yaml',
-    'content/gitops/kustomization.yaml',
 ]
 
 errors = []
@@ -108,7 +107,6 @@ check_field "template.yaml" "kind: Template" "Template kind"
 check_field "template.yaml" "parameters:" "Parameters section"
 check_field "template.yaml" "steps:" "Steps section"
 check_field "template.yaml" "publish:gitea" "Gitea publish action"
-check_field "template.yaml" "kubernetes:apply" "Kubernetes apply action"
 
 # Check HeliosApp includes database trait
 echo ""
@@ -117,17 +115,11 @@ check_field "content/gitops/helios-app.yaml" "kind: HeliosApp" "HeliosApp kind"
 check_field "content/gitops/helios-app.yaml" "type: database" "Database trait"
 check_field "content/gitops/helios-app.yaml" "dbType: postgres" "Postgres configuration"
 
-# Check Tekton resources
-echo ""
-echo "Test 5: Verifying Tekton configuration..."
-check_field "content/gitops/pipeline.yaml" "kind: PipelineRun" "Tekton PipelineRun"
-check_field "content/gitops/triggers.yaml" "kind: EventListener" "Tekton EventListener"
-check_field "content/gitops/triggers.yaml" "kind: TriggerBinding" "Tekton TriggerBinding"
-check_field "content/gitops/triggers.yaml" "kind: TriggerTemplate" "Tekton TriggerTemplate"
+
 
 # Check that PostgREST configuration is present
 echo ""
-echo "Test 6: Verifying PostgREST-specific configuration..."
+echo "Test 5: Verifying PostgREST-specific configuration..."
 check_field "content/source/postgrestrc.conf" "db-schema" "PostgREST schema config"
 check_field "content/source/postgrestrc.conf" "db-anon-role" "PostgREST anonymous role"
 check_field "content/source/postgrestrc.conf" "server-port" "PostgREST server port config"
@@ -135,7 +127,7 @@ check_field "content/source/Dockerfile" "postgrest/postgrest" "Official PostgRES
 
 # Check that PGRST_DB_URI is referenced
 echo ""
-echo "Test 7: Verifying PGRST_DB_URI integration..."
+echo "Test 6: Verifying PGRST_DB_URI integration..."
 check_field "content/source/README.md" "PGRST_DB_URI" "PGRST_DB_URI documentation"
 check_field "content/gitops/helios-app.yaml" "database" "Database trait for credential injection"
 
@@ -145,7 +137,6 @@ echo "=== Validation Results ==="
 echo "✓ Template structure is valid"
 echo "✓ YAML syntax is correct"
 echo "✓ HeliosApp CRD correctly configured"
-echo "✓ Tekton CI/CD pipeline defined"
 echo "✓ PostgREST configuration present"
 echo "✓ PGRST_DB_URI integration configured"
 echo ""

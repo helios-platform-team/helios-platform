@@ -105,7 +105,12 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          name: ${{ parameters.repoName }}\n          owner: ${{ user.entity.metadata.name or 'guest' }}\n          port: ${{ parameters.port }}\n          description: \"PostgREST API: ${{ parameters.name }}\"\n          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}\n          apiSchema: ${{ parameters.apiSchema }}
+          name: ${{ parameters.repoName }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
+          port: ${{ parameters.port }}
+          description: "PostgREST API: ${{ parameters.name }}"
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          apiSchema: ${{ parameters.apiSchema }}
           jwtSecret: ${{ parameters.jwtSecret }}
           jwtRole: ${{ parameters.jwtRole }}
           anonRole: ${{ parameters.anonRole }}
@@ -124,7 +129,7 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.repoName }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
         webhookSecret: ${{ parameters.repoName }}
         events:
           - push

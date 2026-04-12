@@ -23,8 +23,8 @@ spec:
           - name: PGRST_DB_URI
             valueFrom:
               secretKeyRef:
-                name: ${{ values.name }}-db-uri
-                key: connection-string
+                name: ${{ values.name }}-db
+                key: PGRST_DB_URI
           - name: PGRST_DB_SCHEMA
             value: "${{ values.apiSchema }}"
           - name: PGRST_DB_ANON_ROLE
