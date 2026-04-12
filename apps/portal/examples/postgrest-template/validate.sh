@@ -149,7 +149,7 @@ fi
 
 # Check that PGRST_DB_URI is referenced
 echo ""
-echo "Test 6: Verifying PGRST_DB_URI integration..."
+echo "Test 7: Verifying PGRST_DB_URI integration..."
 check_field "content/source/README.md" "PGRST_DB_URI" "PGRST_DB_URI documentation"
 check_field "content/gitops/helios-app.yaml" "database" "Database trait for credential injection"
 
