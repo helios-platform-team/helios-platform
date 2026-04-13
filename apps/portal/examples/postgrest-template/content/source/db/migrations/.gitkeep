@@ -1,0 +1,14 @@
+# Database migrations directory
+# 
+# Place your golang-migrate migration files here following this naming convention:
+# 
+#   {VERSION}_{NAME}.up.sql    - Apply migration
+#   {VERSION}_{NAME}.down.sql  - Rollback migration
+#
+# Example:
+#   000001_initial_schema.up.sql
+#   000001_initial_schema.down.sql
+#   000002_add_users_table.up.sql
+#   000002_add_users_table.down.sql
+#
+# See ../MIGRATIONS.md for detailed guide.

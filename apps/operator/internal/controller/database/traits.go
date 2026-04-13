@@ -2,6 +2,7 @@ package database
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
@@ -82,6 +83,15 @@ func GetDatabaseSecretName(componentName string) string {
 // GetDatabaseHost returns the conventional database host for a component.
 func GetDatabaseHost(componentName string) string {
 	return componentName + "-db"
+}
+
+// EffectiveDatabaseName returns the logical Postgres database name for a trait,
+// matching ReconcileInstances (POSTGRES_DB / connection string).
+func EffectiveDatabaseName(tr DatabaseTrait) string {
+	if tr.Properties.DBName != "" {
+		return tr.Properties.DBName
+	}
+	return fmt.Sprintf("%s-db", tr.ComponentName)
 }
 
 func truncateForLog(raw []byte, maxLen int) string {

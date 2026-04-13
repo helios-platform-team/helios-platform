@@ -150,7 +150,7 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// ------------------------------------------------------------------
 	// PHASE 0.9: Inject Database Credentials into Backend Deployment
 	// Patches the live Deployment (deployed by ArgoCD) to add DB_HOST,
-	// DB_USER, DB_PASS env vars referencing the operator-managed Secret.
+	// DB_USER, DB_PASS, DB_PORT, DB_NAME, and DATABASE_URL (via $(VAR) expansion).
 	// Runs AFTER secrets and instances so the Secret already exists.
 	// ------------------------------------------------------------------
 	dbInjectionPending, err := r.Database.ReconcileInjection(ctx, &heliosApp)
