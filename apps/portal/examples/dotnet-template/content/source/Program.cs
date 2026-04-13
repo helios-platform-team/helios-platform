@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
@@ -28,19 +26,19 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    app.MapGet("/database/config", () =>
+        Results.Ok(new
+        {
+            Host = dbHost,
+            User = dbUser,
+            Database = dbName,
+        }));
 }
 
 app.UseHttpsRedirection();
 app.MapControllers();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-app.MapGet("/database/config", ([FromServices] IConfiguration config) =>
-    Results.Ok(new
-    {
-        Host = dbHost,
-        User = dbUser,
-        Database = dbName,
-        ConnectionString = config.GetConnectionString("DefaultConnection")
-    }));
 
 app.Run();
