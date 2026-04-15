@@ -5,12 +5,14 @@ metadata:
   namespace: default
 spec:
   owner: ${{ values.owner }}
-  description: "Hasura GraphQL API: ${{ values.name }}"
-  
-  # Since there's no source code, we only need the GitOps repo info for ArgoCD
+  # Mandatory fields for CRD validation
+  gitRepo: ${{ values.gitopsRepo }}
+  gitBranch: main
+  imageRepo: hasura/graphql-engine
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: ""
-  port: ${{ values.port }}
+  
+  pipelineName: "" # SKIP BUILD to save RAM
   
   components:
     - name: ${{ values.name }}
@@ -18,17 +20,18 @@ spec:
       properties:
         image: hasura/graphql-engine:v2.33.0
         port: ${{ values.port }}
-        replicas: 1
+        # TINY RESOURCES for 8GB system
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "384Mi"
+            cpu: "200m"
         env:
-          # This maps the Operator's injected URL to Hasura's required variable
           - name: HASURA_GRAPHQL_DATABASE_URL
-            value: $(DATABASE_URL)
-          - name: HASURA_GRAPHQL_ENABLE_CONSOLE
-            value: "true"
+            value: "postgres://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/${{ values.databaseName | default(values.name) | replace('-', '_') }}"
       traits:
-        - type: service
-          properties:
-            port: ${{ values.port }}
         - type: database
           properties:
             dbType: ${{ values.databaseType | default("postgres") }}

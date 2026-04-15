@@ -12,9 +12,7 @@ spec:
 
   parameters:
     - title: Component Information
-      required:
-        - name
-        - port
+      required: [name, port]
       properties:
         name:
           title: Name
@@ -35,8 +33,7 @@ spec:
           ui:field: DatabasePicker
 
     - title: GitOps Repository
-      required:
-        - repoUrl
+      required: [repoUrl]
       properties:
         repoUrl:
           title: GitOps Repository Location
@@ -44,11 +41,20 @@ spec:
           description: Where to store the Kubernetes manifests
           ui:field: RepoUrlPicker
           ui:options:
-            allowedHosts:
-              - localhost:3030
+            allowedHosts: [localhost:3030]
+
+    - title: Optional Extras
+      properties:
+        registerToCatalog:
+          title: Register component in catalog
+          type: boolean
+          default: true
+        sendNotification:
+          title: Send Backstage notification
+          type: boolean
+          default: false
 
   steps:
-    # 1. Fetch GitOps Manifests
     - id: fetch-gitops
       name: Fetch GitOps Manifests
       action: fetch:template
@@ -61,20 +67,28 @@ spec:
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
-          # We store everything directly in the GitOps repo since there is no source repo
-          gitopsRepo: "http://${{ (parameters.repoUrl | parseRepoUrl).host }}/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ (parameters.repoUrl | parseRepoUrl).repo }}.git"
+          # Networking Fix: Use shorter DNS name
+          gitopsRepo: http://gitea-http.gitea:3000/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ (parameters.repoUrl | parseRepoUrl).repo }}.git
 
-    # 2. Publish GitOps Repo
     - id: publish-gitops
       name: Publish GitOps Manifests
       action: publish:gitea
       input:
-        description: GitOps Manifests and Catalog Info for ${{ parameters.name }}
+        description: GitOps Manifests for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}
         sourcePath: ./gitops
         repoVisibility: public
 
-    # 3. Deploy to Kubernetes
+    # Workflow Fix: Create the secret so the Operator has permission to clone the repo
+    - id: create-secret
+      name: Create Git Credentials Secret
+      action: kubernetes:create-git-credentials-secret
+      input:
+        name: ${{ parameters.name }}
+        namespace: default
+        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+        webhookSecret: gitea-webhook-secret
+
     - id: apply-helios
       name: Deploy to Kubernetes
       action: kubernetes:apply
@@ -82,13 +96,25 @@ spec:
         manifestPath: ./gitops/helios-app.yaml
         namespaced: true
 
-    # 4. Register Component in Backstage
     - id: register
       name: Register Component
       action: catalog:register
+      if: '{{ parameters.registerToCatalog }}'
       input:
+        # Use the URL from the publish step (usually localhost:3030)
+        # The Portal can reach this more reliably than the internal DNS.
         repoContentsUrl: ${{ steps['publish-gitops'].output.repoContentsUrl }}
         catalogInfoPath: 'catalog-info.yaml'
+
+    - id: notify
+      name: Notify User
+      action: notification:send
+      if: '{{ parameters.sendNotification }}'
+      input:
+        recipients: entity
+        entityRefs: ["user:default/guest"]
+        title: 'Hasura Template Executed'
+        info: 'Your Hasura instance is being deployed!'
 
   output:
     links:
