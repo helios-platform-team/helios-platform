@@ -1,0 +1,35 @@
+# ──────────────────────────────────────────────────────────
+# docker-compose.yml — Local Development Environment
+# ──────────────────────────────────────────────────────────
+# Usage:
+#   docker compose up -d          # Start PostgreSQL
+#   ./gradlew bootRun             # Start the Spring Boot app
+#   docker compose down -v        # Tear down (remove volumes)
+#
+# This file starts ONLY the database.  The Spring Boot app is
+# expected to run on the host (via IDE or Gradle) so that hot
+# reload and debugging work seamlessly.
+# ──────────────────────────────────────────────────────────
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${{ values.name }}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${{ values.name | replace('-', '_') }}_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+    driver: local

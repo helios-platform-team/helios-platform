@@ -35,6 +35,8 @@ call :check_tool "docker" "docker --version"
 call :check_tool "kubectl" "kubectl version --client"
 call :check_tool "k3d" "k3d version"
 call :check_tool "cue" "cue version"
+call :check_optional_tool "helm" "helm version"
+call :check_optional_tool "jq" "jq --version"
 
 echo.
 echo [Node.js / Frontend]
@@ -88,13 +90,13 @@ if %CHECK_ENV% equ 1 (
             )
         )
 
-        REM Check required Docker registry variables
-        call :check_env_var "DOCKER_USERNAME"
-        call :check_env_var "DOCKER_TOKEN"
+    REM Check required Docker registry variables
+    call :check_env_var "DOCKER_USERNAME"
+    call :check_env_var_one_of "DOCKER_TOKEN" "DOCKER_PASSWORD"
 
-        REM Optional GitHub OAuth variables
-        call :check_env_var_optional "AUTH_GITHUB_CLIENT_ID"
-        call :check_env_var_optional "AUTH_GITHUB_CLIENT_SECRET"
+    REM Optional GitHub OAuth variables
+    call :check_env_var_optional "AUTH_GITHUB_CLIENT_ID"
+    call :check_env_var_optional "AUTH_GITHUB_CLIENT_SECRET"
     )
 )
 
@@ -176,4 +178,48 @@ if "!val!"=="" (
 ) else (
     echo   [OK]   %~1 is configured ^(optional^)
 )
+goto :eof
+
+:check_optional_tool
+REM %~1 = tool name, %~2 = version command
+where %~1 >nul 2>&1
+if %errorlevel% equ 0 (
+    echo   [OK]   %~1 found ^(Optional^)
+) else (
+    echo   [WARN] %~1 not found. ^(Optional, but recommended for setup^)
+    set /a WARNINGS+=1
+)
+goto :eof
+
+:check_env_var_one_of
+REM %~1/%~2 = variable names, pass if either is configured
+set "key1=%~1"
+set "key2=%~2"
+set "val1=!%~1!"
+set "val2=!%~2!"
+
+if defined %~1 (
+    if not "!val1!"=="" (
+        if not "!val1:~0,8!"=="ghp_xxxx" (
+            if not "!val1:~0,5!"=="your-" (
+                echo   [OK]   %~1 is configured
+                goto :eof
+            )
+        )
+    )
+)
+
+if defined %~2 (
+    if not "!val2!"=="" (
+        if not "!val2:~0,8!"=="ghp_xxxx" (
+            if not "!val2:~0,5!"=="your-" (
+                echo   [OK]   %~2 is configured
+                goto :eof
+            )
+        )
+    )
+)
+
+echo   [FAIL] Either %key1% or %key2% must be set in .env
+set /a ERRORS+=1
 goto :eof
