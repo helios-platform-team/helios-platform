@@ -74,7 +74,7 @@ spec:
         targetPath: ./source
         values:
           name: ${{ parameters.repoName }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: user:default/${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: ".NET Web API service for ${{ parameters.name }}"
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
@@ -112,10 +112,11 @@ spec:
           port: ${{ parameters.port }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: user:default/${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "dotnet test"
+          testImage: "mcr.microsoft.com/dotnet/sdk:10.0.202"
           dbType: ${{ parameters.databaseConfig.dbType }}
           dbName: ${{ parameters.databaseConfig.dbName }}
           dbVersion: ${{ parameters.databaseConfig.dbVersion }}

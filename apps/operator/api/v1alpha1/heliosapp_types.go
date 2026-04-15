@@ -106,6 +106,10 @@ type HeliosAppSpec struct {
 	// +optional
 	TestCommand string `json:"testCommand,omitempty"`
 
+	// TestImage is the container image used to execute testCommand (e.g. "node:24")
+	// +optional
+	TestImage string `json:"testImage,omitempty"`
+
 	// Env variables for the application
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`

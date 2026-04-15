@@ -60,7 +60,6 @@ import "helios.io/cue/definitions/tekton"
 			securityContext: {
 				runAsUser: 0
 			}
-			entrypoint: ["/bin/sh"] // Override default yq entrypoint
 			script: """
 				#!/bin/sh
 				set -e

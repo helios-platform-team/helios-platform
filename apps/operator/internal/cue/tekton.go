@@ -58,6 +58,7 @@ type TektonInput struct {
 
 	// === TESTING ===
 	TestCommand string `json:"testCommand,omitempty"`
+	TestImage   string `json:"testImage,omitempty"`
 
 	// === SECRETS ===
 	DockerSecret string `json:"dockerSecret,omitempty"`

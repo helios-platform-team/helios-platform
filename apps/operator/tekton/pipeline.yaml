@@ -22,7 +22,7 @@ spec:
     - name: test-command
       default: ""          # Empty => no tests (no-op)
     - name: test-image
-      default: "node:20"   # Default image for tests; can be overridden per app
+      default: "node:24"   # Default image for tests; can be overridden per app
     - name: argocd-namespace
       default: "argocd"
     - name: argocd-app-name

@@ -33,6 +33,12 @@ let _testCommand = [
 	"",
 ][0]
 
+// Resolve Test Image safely.
+let _testImage = [
+	if tektonInput.testImage != _|_ { tektonInput.testImage },
+	tekton.#CommonParams.test.image.default,
+][0]
+
 // Argo CD API URL: explicit override or in-cluster default.
 let _argoCDNamespace = [
 	if tektonInput.argoCDNamespace != _|_ { tektonInput.argoCDNamespace },
@@ -92,8 +98,8 @@ _triggers: (triggers.#RenderTriggers & {
 		// Use the pre-calculated concrete string
 		testCommand:    _testCommand
 
-		// Updated per Code Review: Use default from CommonParams
-		testImage:      tekton.#CommonParams.test.image.default 
+		// Use explicit test image when provided, else common default.
+		testImage:      _testImage
 		serviceAccount: tektonInput.serviceAccount
 		dockerSecret:   tektonInput.dockerSecret
 

@@ -25,8 +25,9 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 	serviceAccountName := cmp.Or(heliosApp.Spec.ServiceAccount, "default")
 	gitOpsSecretRef := cmp.Or(heliosApp.Spec.GitOpsSecretRef, "helios-gitops-bot")
 	argoNS := cmp.Or(heliosApp.Spec.ArgoCDNamespace, "argocd")
+	testImage := cmp.Or(heliosApp.Spec.TestImage, "node:24")
 
-	params := make([]any, 0, 17)
+	params := make([]any, 0, 18)
 	params = append(params,
 		map[string]any{"name": "app-repo-url", "value": shared.RewriteGiteaURL(heliosApp.Spec.GitRepo)},
 		map[string]any{"name": "app-repo-revision", "value": appRepoRevision},
@@ -41,6 +42,7 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 		map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", heliosApp.Spec.Replicas)},
 		map[string]any{"name": "port", "value": fmt.Sprintf("%d", heliosApp.Spec.Port)},
 		map[string]any{"name": "test-command", "value": heliosApp.Spec.TestCommand},
+		map[string]any{"name": "test-image", "value": testImage},
 		map[string]any{"name": "argocd-namespace", "value": argoNS},
 		map[string]any{"name": "argocd-app-name", "value": heliosApp.Name + "-argocd"},
 	)

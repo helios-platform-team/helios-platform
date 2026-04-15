@@ -156,7 +156,7 @@ package tekton
 		replicas:       int | *1
 		port:           int | *8080
 		testCommand:    string | *""
-		testImage:      string | *"node:20"
+		testImage:      string | *"node:24"
 		serviceAccount: string | *"default"
 		dockerSecret:   string | *"docker-credentials"
 

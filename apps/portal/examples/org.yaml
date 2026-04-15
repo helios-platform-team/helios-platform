@@ -16,6 +16,15 @@ spec:
   type: team
   children: []
 ---
+# Compatibility alias for templates/components that set owner as plain 'guest'
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: guest
+spec:
+  type: team
+  children: []
+---
 # https://backstage.io/docs/features/software-catalog/descriptor-format#kind-group
 apiVersion: backstage.io/v1alpha1
 kind: Group
