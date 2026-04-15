@@ -21,7 +21,10 @@ function isNotFoundError(err: unknown): boolean {
   }
 
   const msg = String(err).toLowerCase();
-  return msg.includes('not found') || msg.includes('status code') && msg.includes('404');
+  return (
+    msg.includes('not found') ||
+    (msg.includes('status code') && msg.includes('404'))
+  );
 }
 
 /** Matches Helm operator: GetDatabaseSecretName / GetDatabaseHost (traits.go). */
@@ -134,7 +137,9 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
 
     if (!secret) {
       return res.status(404).json({
-        error: `No database secret found in namespace ${namespace}. Tried: ${secretCandidates.join(', ')}`,
+        error: `No database secret found in namespace ${namespace}. Tried: ${secretCandidates.join(
+          ', ',
+        )}`,
       });
     }
 
