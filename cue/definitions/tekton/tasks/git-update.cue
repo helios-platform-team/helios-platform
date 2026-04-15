@@ -69,23 +69,38 @@ import "helios.io/cue/definitions/tekton"
 				export IMAGE_URL="$(params.NEW_IMAGE_URL)"
 				export REPLICAS="$(params.REPLICAS)"
 				export PORT="$(params.PORT)"
+
+				# Defensive defaults: avoid generating invalid manifests when inputs are empty/0
+				if [ -z "${REPLICAS}" ] || [ "${REPLICAS}" = "0" ]; then
+				  export REPLICAS="1"
+				fi
+				if [ -z "${PORT}" ] || [ "${PORT}" = "0" ]; then
+				  export PORT="8080"
+				fi
 				MANIFEST_PATH="$(params.MANIFEST_PATH)"
 
 				# Logic tạo file tự động
 				if echo "$MANIFEST_PATH" | grep -qvE '\\.ya?ml$'; then
 				    echo "Path '$MANIFEST_PATH' treated as DIRECTORY."
 				    mkdir -p "$MANIFEST_PATH"
-				    
-				    DEP_FILE="$MANIFEST_PATH/deployment.yaml"
-				    SVC_FILE="$MANIFEST_PATH/service.yaml"
-				    MANIFEST_FILES="$DEP_FILE $SVC_FILE"
-				    APP_NAME=$(basename "$MANIFEST_PATH")
-				
-				    if [ ! -f "$DEP_FILE" ]; then
-				        echo "Creating default manifests..."
-				        printf "apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  replicas: ${REPLICAS}\\n  selector:\\n    matchLabels:\\n      app: ${APP_NAME}\\n  template:\\n    metadata:\\n      labels:\\n        app: ${APP_NAME}\\n    spec:\\n      containers:\\n        - name: app\\n          image: ${IMAGE_URL}\\n          ports:\\n            - containerPort: ${PORT}\\n" > "$DEP_FILE"
-				
-				        printf "apiVersion: v1\\nkind: Service\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  selector:\\n    app: ${APP_NAME}\\n  ports:\\n    - protocol: TCP\\n      port: ${PORT}\\n      targetPort: ${PORT}\\n  type: ClusterIP\\n" > "$SVC_FILE"
+
+				    # If the operator already renders a combined manifest.yaml in this directory,
+				    # prefer updating that file rather than creating separate default manifests.
+				    COMBINED_FILE="$MANIFEST_PATH/manifest.yaml"
+				    if [ -f "$COMBINED_FILE" ]; then
+				        MANIFEST_FILES="$COMBINED_FILE"
+				    else
+				        DEP_FILE="$MANIFEST_PATH/deployment.yaml"
+				        SVC_FILE="$MANIFEST_PATH/service.yaml"
+				        MANIFEST_FILES="$DEP_FILE $SVC_FILE"
+				        APP_NAME=$(basename "$MANIFEST_PATH")
+
+				        if [ ! -f "$DEP_FILE" ]; then
+				            echo "Creating default manifests..."
+				            printf "apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  replicas: ${REPLICAS}\\n  selector:\\n    matchLabels:\\n      app: ${APP_NAME}\\n  template:\\n    metadata:\\n      labels:\\n        app: ${APP_NAME}\\n    spec:\\n      containers:\\n        - name: app\\n          image: ${IMAGE_URL}\\n          ports:\\n            - containerPort: ${PORT}\\n" > "$DEP_FILE"
+
+				            printf "apiVersion: v1\\nkind: Service\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  selector:\\n    app: ${APP_NAME}\\n  ports:\\n    - protocol: TCP\\n      port: ${PORT}\\n      targetPort: ${PORT}\\n  type: ClusterIP\\n" > "$SVC_FILE"
+				        fi
 				    fi
 				else
 				    echo "Path '$MANIFEST_PATH' treated as FILE."
@@ -106,6 +121,7 @@ import "helios.io/cue/definitions/tekton"
 				      yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].image = env(IMAGE_URL)' "$FILE"
 				      yq -i 'select(.kind == "Deployment") .spec.replicas = env(REPLICAS)' "$FILE"
 				      yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].ports[0].containerPort = env(PORT)' "$FILE"
+				      yq -i 'select(.kind == "Service") .spec.ports[0].port = env(PORT)' "$FILE"
 				      yq -i 'select(.kind == "Service") .spec.ports[0].targetPort = env(PORT)' "$FILE"
 				  fi
 				done

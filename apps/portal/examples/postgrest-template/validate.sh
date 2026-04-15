@@ -49,17 +49,14 @@ if ! python3 -c "import yaml" 2>/dev/null; then
     python3 -m pip install -q pyyaml || { echo "  ✗ Failed to install PyYAML"; exit 1; }
 fi
 
-python3 << 'PYTHON_EOF'
+TEMPLATE_DIR="$TEMPLATE_DIR" python3 << 'PYTHON_EOF'
 import yaml
 import os
 import sys
 
-# Use the directory from which this script is run
-template_dir = os.getcwd()
-if not os.path.exists(os.path.join(template_dir, 'template.yaml')):
-    # If not in template dir, try to find it
-    script_dir = os.path.dirname(os.path.realpath(__file__))
-    template_dir = script_dir
+template_dir = os.environ.get('TEMPLATE_DIR')
+if not template_dir:
+    template_dir = os.getcwd()
 
 yaml_files = [
     'template.yaml',
