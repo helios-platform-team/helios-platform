@@ -53,13 +53,26 @@ _tasks: [
 	}
 ]
 
-// 2. RENDER PIPELINE
-_pipeline: [
+// 2. RENDER PIPELINES
+// Render primary pipeline always
+_primaryPipeline: [
 	(pipelines.#RenderPipeline & {
 		pipelineType: tektonInput.pipelineType
 		namespace:    tektonInput.namespace
 	}).output
 ]
+
+// Also render db-migrate pipeline if it's available and needed by triggers
+_dbMigratePipeline: [
+	if tektonInput.triggerType == "gitea-push" || tektonInput.triggerType == "db-migrate" {
+		(pipelines.#RenderPipeline & {
+			pipelineType: "db-migrate"
+			namespace:    tektonInput.namespace
+		}).output
+	}
+]
+
+_pipeline: list.Concat([_primaryPipeline, _dbMigratePipeline])
 
 // 3. RENDER TRIGGERS
 _triggers: (triggers.#RenderTriggers & {

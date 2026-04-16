@@ -22,9 +22,10 @@ _dbMigrateParams: [
 		default:     "main"
 	},
 	{
-		name:        "database-url"
-		description: "Database connection URL (postgres://user:pass@host:port/dbname)"
+		name:        "db-secret-name"
+		description: "Kubernetes Secret name containing database credentials (expects key PGRST_DB_URI)"
 		type:        "string"
+		default:     "api-db-secret"
 	},
 	{
 		name:        "migration-source"
@@ -79,7 +80,7 @@ _dbMigrateConfig: {
 				workspace: "source"
 			}]
 			params: [
-				{name: "database-url", value:      "$(params.database-url)"},
+				{name: "db-secret-name", value:   "$(params.db-secret-name)"},
 				{name: "migration-source", value: "$(params.migration-source)"},
 			]
 		},
@@ -90,7 +91,7 @@ _dbMigrateConfig: {
 			taskRef:  {name: "postgrest-reload"}
 			runAfter: ["run-migrations"]
 			params: [
-				{name: "database-url", value: "$(params.database-url)"},
+				{name: "db-secret-name", value: "$(params.db-secret-name)"},
 			]
 		},
 	]
