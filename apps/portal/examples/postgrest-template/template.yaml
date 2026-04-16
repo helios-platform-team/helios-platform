@@ -125,11 +125,11 @@ spec:
         repoVisibility: public
 
     - id: create-webhook
-      name: Create Webhook
+      name: Create Webhook for DB Migration Trigger
       action: gitea:create-webhook
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        webhookUrl: http://el-${{ parameters.repoName }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.repoName }}-db-migrate-listener.${{ parameters.namespace }}.svc.cluster.local:8080
         webhookSecret: ${{ parameters.repoName }}
         events:
           - push
@@ -168,7 +168,14 @@ spec:
         sourcePath: ./gitops
         repoVisibility: public
 
-    # 3. Create webhook secret in cluster
+    # 3. Apply namespace to cluster
+    - id: apply-namespace
+      name: Create Kubernetes Namespace
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/namespace.yaml
+
+    # 4. Create webhook secret in cluster
     - id: create-webhook-secret
       name: Create Kubernetes Webhook Secret
       action: kubernetes:create-secret
@@ -181,14 +188,14 @@ spec:
           # Keep `secretToken` for compatibility with any legacy consumers.
           secretToken: ${{ parameters.repoName }}
 
-    # 4. Deploy HeliosApp to cluster
+    # 5. Deploy HeliosApp to cluster
     - id: apply-heliosapp
       name: Apply HeliosApp to Cluster
       action: kubernetes:apply
       input:
         manifestPath: ./gitops/helios-app.yaml
 
-    # 5. Registration
+    # 6. Registration
     - id: register
       name: Register Component
       action: catalog:register

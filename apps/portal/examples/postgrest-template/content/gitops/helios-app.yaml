@@ -14,6 +14,7 @@ spec:
   webhookSecret: ${{ values.name }}-webhook-secret
   port: ${{ values.port }}
   replicas: 1
+  triggerType: db-migrate
 
   components:
     - name: api
@@ -38,7 +39,7 @@ spec:
           - name: PGRST_MAX_ROWS
             value: "1000"
           - name: PGRST_LOG_LEVEL
-            value: info
+            value: "info"
       traits:
         - type: database
           properties:

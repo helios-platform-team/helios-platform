@@ -16,13 +16,13 @@ var requiredDatabaseSecretKeys = []string{"DB_USER", "DB_PASS", "DB_HOST"}
 
 // formatPostgresURI constructs a PostgreSQL connection URI from components.
 // It properly escapes the username and password for use in URLs.
-// Format: postgres://username:password@host:port/dbname
+// Format: postgres://username:password@host:port/dbname?sslmode=disable
 func formatPostgresURI(username, password, host, dbName string, port int32) string {
 	// Escape username and password for use in URL
 	enscodedUser := url.QueryEscape(username)
 	enscodedPassword := url.QueryEscape(password)
 
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		enscodedUser,
 		enscodedPassword,
 		host,
