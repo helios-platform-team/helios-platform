@@ -109,6 +109,7 @@ _triggers: (triggers.#RenderTriggers & {
 		testImage:      tekton.#CommonParams.test.image.default 
 		serviceAccount: tektonInput.serviceAccount
 		dockerSecret:   tektonInput.dockerSecret
+		databaseSecretRef: tektonInput.databaseSecretRef
 
 		argoCDNamespace: _argoCDNamespace
 		argoCDAppName:   "\(tektonInput.appName)-argocd"

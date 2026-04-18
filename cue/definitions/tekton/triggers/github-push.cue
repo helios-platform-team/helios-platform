@@ -138,8 +138,8 @@ import (
                     params: [
                         {name: "app-repo-url", value: _bp.gitRepo},
                         {name: "app-repo-revision", value: "$(tt.params.git-revision)"},
-                        {name: "db-secret-name", value: "api-db-secret"},
-                        {name: "migration-source", value: "db/migration"},
+                        {name: "db-secret-name", value: _bp.databaseSecretRef},
+                        {name: "migration-source", value: "db/migrations"},
                         {name: "namespace", value: _bp.namespace},
                     ]
 

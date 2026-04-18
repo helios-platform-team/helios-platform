@@ -52,9 +52,9 @@ import "helios.io/cue/definitions/tekton"
 				MIGRATIONS_DIR="$(workspaces.source.path)/$(params.migration-source)"
 
 				if [ ! -d "$MIGRATIONS_DIR" ]; then
-				  echo "WARNING: No migrations directory found at $MIGRATIONS_DIR"
-				  echo "Skipping migrations..."
-				  exit 0
+				  echo "ERROR: Migrations directory not found at $MIGRATIONS_DIR"
+				  echo "Expected directory path: $MIGRATIONS_DIR"
+				  exit 1
 				fi
 
 				echo "Running database migrations from $MIGRATIONS_DIR"
