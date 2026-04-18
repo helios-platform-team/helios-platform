@@ -1,9 +1,9 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: nestjs-prisma-template
-  title: NestJS + Prisma Template (Database-backed)
-  description: Scaffolds a NestJS service with Prisma and PostgreSQL-ready GitOps manifests.
+  name: dotnet-webapi-template
+  title: .NET Web API Template (Database-backed)
+  description: Scaffolds an ASP.NET Core Web API service with PostgreSQL-ready GitOps manifests.
 spec:
   owner: user:guest
   type: service
@@ -24,8 +24,8 @@ spec:
         port:
           title: Port
           type: number
-          description: The port the NestJS app listens on
-          default: 3000
+          description: The port the .NET API listens on
+          default: 8080
         dockerOrg:
           title: Docker Registry Org/User
           type: string
@@ -33,7 +33,7 @@ spec:
         repoName:
           title: Docker Repository Name
           type: string
-          description: The name of the Docker repository (e.g. my-service)
+          description: The name of the Docker repository (e.g. my-dotnet-api)
 
     - title: Database Configuration
       properties:
@@ -53,6 +53,7 @@ spec:
           ui:options:
             allowedHosts:
               - localhost:3030
+
     - title: Optional Extras (Local Convenience)
       properties:
         registerToCatalog:
@@ -65,7 +66,6 @@ spec:
           default: false
 
   steps:
-    # 1. Source Code
     - id: fetch-source
       name: Fetch Source Code
       action: fetch:template
@@ -73,11 +73,10 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          # Use repoName as the app identifier to keep it Kubernetes/URL safe.
           name: ${{ parameters.repoName }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: user:default/${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
-          description: "NestJS service: ${{ parameters.name }}"
+          description: ".NET Web API service for ${{ parameters.name }}"
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
 
     - id: publish-source
@@ -94,15 +93,11 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        # Tekton EventListener address is the service root.
         webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
-        # Deterministic secret so users don't have to provide one.
-        # Must match the Kubernetes secret value created below.
         webhookSecret: ${{ parameters.repoName }}
         events:
           - push
 
-    # 2. GitOps
     - id: fetch-gitops
       name: Fetch GitOps Manifests
       action: fetch:template
@@ -117,10 +112,14 @@ spec:
           port: ${{ parameters.port }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: user:default/${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
-          testCommand: "npm ci && npm test"
+          testCommand: "dotnet test"
+          testImage: "mcr.microsoft.com/dotnet/sdk:10.0.202"
+          dbType: ${{ parameters.databaseConfig.dbType }}
+          dbName: ${{ parameters.databaseConfig.dbName }}
+          dbVersion: ${{ parameters.databaseConfig.dbVersion }}
 
     - id: publish-gitops
       name: Publish GitOps Manifests
@@ -131,7 +130,6 @@ spec:
         sourcePath: ./gitops
         repoVisibility: public
 
-    # 3. Secret + Deploy
     - id: create-secret
       name: Create Git Credentials Secret
       action: kubernetes:create-git-credentials-secret
@@ -148,7 +146,6 @@ spec:
         manifestPath: ./gitops/helios-app.yaml
         namespaced: true
 
-    # 4. Registration
     - id: register
       name: Register Component
       action: catalog:register
@@ -165,8 +162,8 @@ spec:
         recipients: entity
         entityRefs:
           - user:default/guest
-        title: 'NestJS + Prisma Template Executed'
-        info: 'Your NestJS + Prisma service has been scaffolded with a PostgreSQL database!'
+        title: '.NET Template Executed'
+        info: 'Your .NET Web API service has been scaffolded and deployed via GitOps.'
 
   output:
     links:

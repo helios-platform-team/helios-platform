@@ -35,6 +35,7 @@ func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
 		Replicas:        int(app.Spec.Replicas),
 		Port:            int(app.Spec.Port),
 		TestCommand:     app.Spec.TestCommand,
+		TestImage:       app.Spec.TestImage,
 		DockerSecret:    "docker-credentials",
 		ArgoCDNamespace: app.Spec.ArgoCDNamespace,
 		ArgoCDProject:   app.Spec.ArgoCDProject,

@@ -152,7 +152,7 @@ if $CHECK_ENV; then
   else
     pass ".env file exists"
 
-    REQUIRED_VARS=(DOCKER_USERNAME DOCKER_PASSWORD)
+    REQUIRED_VARS=(DOCKER_USERNAME DOCKER_TOKEN)
     # Gitea vars are auto-configured by 'task setup:gitea-token', so only warn
     SETUP_VARS=(GITEA_TOKEN GITEA_USER)
     OPTIONAL_VARS=(AUTH_GITHUB_CLIENT_ID AUTH_GITHUB_CLIENT_SECRET)

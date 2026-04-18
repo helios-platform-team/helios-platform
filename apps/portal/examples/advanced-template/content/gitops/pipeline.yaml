@@ -31,7 +31,7 @@ spec:
     value: ${{ values.name }}-argocd
   # (Optional override – can be omitted to use the pipeline default)
   # - name: test-image
-  #   value: node:20
+  #   value: node:24
   workspaces:
   - name: source-workspace
     volumeClaimTemplate:

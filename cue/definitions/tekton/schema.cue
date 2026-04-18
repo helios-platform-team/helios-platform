@@ -41,6 +41,7 @@ package tekton
 
 	// === TESTING ===
 	testCommand?: string // e.g. "npm test"
+	testImage?:   string // e.g. "node:24"
 
 	// === SECRETS ===
 	dockerSecret: string | *"docker-credentials"

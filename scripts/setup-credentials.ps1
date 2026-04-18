@@ -1,10 +1,11 @@
 $dockerUser = $env:DOCKER_USERNAME
 $dockerPass = $env:DOCKER_PASSWORD
+if ([string]::IsNullOrEmpty($dockerPass)) { $dockerPass = $env:DOCKER_TOKEN }
 $dockerServer = $env:DOCKER_SERVER
 $dockerEmail = $env:DOCKER_EMAIL
 
 if ([string]::IsNullOrEmpty($dockerUser) -or [string]::IsNullOrEmpty($dockerPass)) {
-    Write-Error "DOCKER_USERNAME and DOCKER_PASSWORD must be set in .env"
+    Write-Error "DOCKER_USERNAME and either DOCKER_PASSWORD or DOCKER_TOKEN must be set in .env"
     exit 1
 }
 

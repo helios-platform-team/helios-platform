@@ -370,6 +370,10 @@ spec:
               testCommand:
                 description: TestCommand is the command to run tests (e.g. "npm test")
                 type: string
+              testImage:
+                description: TestImage is the container image used to execute testCommand
+                  (e.g. "node:24")
+                type: string
               triggerType:
                 default: gitea-push
                 description: TriggerType is the type of trigger to use for the pipeline
