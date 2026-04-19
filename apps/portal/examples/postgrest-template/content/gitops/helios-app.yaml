@@ -1,34 +1,33 @@
-apiVersion: helios.io/v1alpha1
+apiVersion: app.helios.io/v1alpha1
 kind: HeliosApp
 metadata:
   name: ${{ values.name }}
   namespace: ${{ values.namespace }}
 spec:
-  # Database migrations trigger: automatically triggers db-migrate pipeline
-  # when changes are made to db/migrations/ directory
+  # Owner and Git Configuration
+  owner: ${{ values.owner }}
+  gitRepo: ${{ values.sourceRepo }}
+  gitBranch: main
+  imageRepo: ${{ values.image }}
+  gitopsRepo: ${{ values.gitopsRepo }}
+  gitopsPath: ${{ values.name }}
+  webhookSecret: ${{ values.name }}-webhook-secret
+  port: ${{ values.port }}
+  replicas: 1
   triggerType: db-migrate
-
-  git:
-    repo: ${{ values.sourceRepo }}
-    path: ./
-    ref: main
 
   components:
     - name: api
       type: web-service
-      source:
-        image: ${{ values.image }}:latest
-      container:
+      properties:
+        # Use official PostgREST image from Docker Hub
+        image: index.docker.io/postgrest/postgrest:latest
         port: ${{ values.port }}
         env:
           # PostgREST Configuration
           # PGRST_DB_URI format: postgres://user:password@host:port/database
-          # Operator injects DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME from database trait
-          - name: PGRST_DB_URI
-            valueFrom:
-              secretKeyRef:
-                name: ${{ values.name }}-db
-                key: PGRST_DB_URI
+          # The Operator automatically injects DB_HOST, DB_USER, DB_PASS, DB_PORT, DB_NAME from the database trait
+          # The native operator Phase 0.9 reconciliation builds the PGRST_DB_URI from these and injects it
           - name: PGRST_DB_SCHEMA
             value: "${{ values.apiSchema }}"
           - name: PGRST_DB_ANON_ROLE
@@ -40,13 +39,15 @@ spec:
           - name: PGRST_MAX_ROWS
             value: "1000"
           - name: PGRST_LOG_LEVEL
-            value: notice
+            value: "info"
       traits:
         - type: database
           properties:
             dbType: postgres
             dbName: ${{ values.databaseName or values.name }}-db
             port: 5432
+            version: "${{ values.databaseVersion or '16' }}"
+            storage: "1Gi"
         - type: service
           properties:
             port: ${{ values.port }}
@@ -55,11 +56,3 @@ spec:
               enabled: true
               host: ${{ values.name }}.local
               path: /
-
-  # ArgoCD will sync the deployment
-  argocd:
-    enabled: true
-    syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true

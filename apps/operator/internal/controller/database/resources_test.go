@@ -126,7 +126,7 @@ func TestGenerateDatabaseSecret(t *testing.T) {
 	}
 
 	// Check that PGRST_DB_URI is generated and properly escaped
-	expectedURI := "postgres://testuser:testpassword123@my-app-db:5432/my-app-db"
+	expectedURI := "postgres://testuser:testpassword123@my-app-db:5432/my-app-db?sslmode=disable"
 	if string(secret.Data["PGRST_DB_URI"]) != expectedURI {
 		t.Errorf("Expected PGRST_DB_URI %q, got %q", expectedURI, string(secret.Data["PGRST_DB_URI"]))
 	}

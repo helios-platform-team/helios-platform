@@ -37,6 +37,7 @@ func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
 		TestCommand:     app.Spec.TestCommand,
 		TestImage:       app.Spec.TestImage,
 		DockerSecret:    "docker-credentials",
+		DatabaseSecretRef: app.Spec.DatabaseSecretRef,
 		ArgoCDNamespace: app.Spec.ArgoCDNamespace,
 		ArgoCDProject:   app.Spec.ArgoCDProject,
 	}
@@ -45,6 +46,7 @@ func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
 	input.GitOpsBranch = cmp.Or(input.GitOpsBranch, "main")
 	input.GitOpsSecretRef = cmp.Or(input.GitOpsSecretRef, "helios-gitops-bot")
 	input.WebhookSecret = cmp.Or(input.WebhookSecret, "gitea-webhook-secret")
+	input.DatabaseSecretRef = cmp.Or(input.DatabaseSecretRef, "api-db-secret")
 	input.TriggerType = cmp.Or(input.TriggerType, "gitea-push")
 	if input.PipelineName == "" {
 		input.PipelineName = defaultPipelineName

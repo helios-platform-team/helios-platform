@@ -6,7 +6,7 @@ import (
 
 // =====================================================
 // DATABASE MIGRATION TRIGGER BUNDLE
-// Triggers db-migrate pipeline only on changes to db/** path
+// Triggers db-migrate pipeline only on changes to db/migration path
 // =====================================================
 
 #DatabaseMigrationTriggerBundle: tekton.#TriggerBundle & {
@@ -23,7 +23,6 @@ import (
 		config: params: [
 			{name: "git-repo-url", value: "$(body.repository.clone_url)"},
 			{name: "git-revision", value: "$(body.after)"},
-			{name: "database-url", value: "$(body.database_url)"},
 		]
 	}
 
@@ -40,7 +39,6 @@ import (
 			params: [
 				{name: "git-repo-url", description: "Repository URL from webhook"},
 				{name: "git-revision", description: "Git commit SHA from webhook"},
-				{name: "database-url", description: "Database URL (injected from secret or webhook)"},
 			]
 
 			// PipelineRun for db-migrate pipeline
@@ -53,7 +51,7 @@ import (
 					labels: {
 						"helios.io/managed-by":       "helios-operator"
 						"app.kubernetes.io/part-of":  "helios-platform"
-						"app.kubernetes.io/instance": _bp.pipelineName
+						"app.kubernetes.io/instance": "db-migrate"
 						"app.kubernetes.io/name":     _bp.appName
 						"janus-idp.io/tekton":        _bp.appName
 						"tekton.dev/pipeline":        "db-migrate"
@@ -64,12 +62,12 @@ import (
 						name: "db-migrate"
 					}
 					serviceAccountName: _bp.serviceAccount
-					
+
 					params: [
 						{name: "app-repo-url", value: "$(tt.params.git-repo-url)"},
 						{name: "app-repo-revision", value: "$(tt.params.git-revision)"},
-						{name: "database-url", value: "$(tt.params.database-url)"},
-						{name: "migration-source", value: "db/migrations"},
+						{name: "db-secret-name", value: "api-db-secret"},
+						{name: "migration-source", value: "db/migration"},
 						{name: "namespace", value: _bp.namespace},
 					]
 
@@ -88,7 +86,7 @@ import (
 	}
 
 	// 3. EVENT LISTENER
-	// Listens for push events and filters by db/** path using CEL
+	// Listens for push events and filters by db/migration path using CEL
 	_listener: tekton.#TektonEventListener & {
 		parameter: {
 			name:      "\(bundleParams.appName)-db-migrate-listener"
@@ -99,8 +97,8 @@ import (
 				name: "db-migrate-push"
 				bindings: [{ref: _binding.parameter.name}]
 				template: {ref: _template.parameter.name}
-				
-				// CEL interceptor to filter only db/** changes
+
+				// CEL interceptor to filter only db/migration** changes
 				// This ensures migration pipeline only runs when migrations directory is modified
 				interceptors: [
 					{
@@ -115,12 +113,26 @@ import (
 						]
 					},
 					{
-						// CEL filter to only trigger if db/** path changed
-						// Handles both single and multiple commits
+						// CEL interceptor to transform URLs for in-cluster access
+						// Replaces localhost:3030 with in-cluster Gitea address
+						ref: {name: "cel", kind: "ClusterInterceptor"}
+						params: [{
+							name:  "overlays"
+							value: [
+								{
+									key:        "repository.clone_url"
+									expression: "body.repository.clone_url.replace('http://localhost:3030/', 'http://gitea-http.gitea.svc.cluster.local:3000/')"
+								},
+							]
+						}]
+					},
+					{
+						// CEL filter to only trigger if migrations path changed
+						// Includes both added + modified files, matches db/migration or db/migrations
 						ref: {name: "cel", kind: "ClusterInterceptor"}
 						params: [{
 							name:  "filter"
-							value: "has(body.commits) && body.commits.filter(c, has(c.modified) && c.modified.exists(m, m.startsWith('db/'))).size() > 0"
+							value: "has(body.commits) && body.commits.exists(c, (has(c.added) && c.added.exists(f, f.startsWith('db/migration/') || f.startsWith('db/migrations/'))) || (has(c.modified) && c.modified.exists(f, f.startsWith('db/migration/') || f.startsWith('db/migrations/'))))"
 						}]
 					},
 				]
