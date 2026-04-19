@@ -263,11 +263,13 @@ func (r *HeliosAppReconciler) findObjectsForSecret(ctx context.Context, obj clie
 
 // validateSecretReferences checks if all referenced secrets exist in the cluster.
 // This is a pre-flight validation to catch configuration errors early.
+// Note: Database secrets are NOT validated here because they are auto-created
+// by the operator in Phase 0.5 if database traits are present.
 func (r *HeliosAppReconciler) validateSecretReferences(ctx context.Context, app *appv1alpha1.HeliosApp) error {
 	secretsToValidate := map[string]string{
-		"webhook secret":  app.Spec.WebhookSecret,
-		"GitOps secret":   app.Spec.GitOpsSecretRef,
-		"database secret": app.Spec.DatabaseSecretRef,
+		"webhook secret": app.Spec.WebhookSecret,
+		"GitOps secret":  app.Spec.GitOpsSecretRef,
+		// Note: database secret is NOT validated here - it's auto-created in Phase 0.5
 	}
 
 	for secretType, secretName := range secretsToValidate {
