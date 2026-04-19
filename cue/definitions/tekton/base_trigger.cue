@@ -159,6 +159,7 @@ package tekton
 		testImage:      string | *"node:20"
 		serviceAccount: string | *"default"
 		dockerSecret:   string | *"docker-credentials"
+		databaseSecretRef: string | *"api-db-secret"
 
 		// Argo CD sync via kubectl patch on Application
 		argoCDNamespace: string | *"argocd"
