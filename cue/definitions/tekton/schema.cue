@@ -43,7 +43,8 @@ package tekton
 	testCommand?: string // e.g. "npm test"
 
 	// === SECRETS ===
-	dockerSecret: string | *"docker-credentials"
+	dockerSecret:      string | *"docker-credentials"
+	databaseSecretRef: string | *"api-db-secret"
 
 	// === ARGOCD ===
 	argoCDNamespace: string | *"argocd"
