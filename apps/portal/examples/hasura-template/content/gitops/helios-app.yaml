@@ -12,6 +12,9 @@ spec:
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: ""
   
+  # FIX: Explicitly reference the secret created in template.yaml
+  webhookSecret: gitea-webhook-secret
+  triggerType: gitea-push
   pipelineName: "" # SKIP BUILD to save RAM
   
   components:
@@ -20,7 +23,6 @@ spec:
       properties:
         image: hasura/graphql-engine:v2.33.0
         port: ${{ values.port }}
-        # TINY RESOURCES for 8GB system
         resources:
           requests:
             memory: "128Mi"

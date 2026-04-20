@@ -68,7 +68,7 @@ spec:
           databaseName: ${{ parameters.databaseConfig.dbName }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           # Networking Fix: Use shorter DNS name
-          gitopsRepo: http://gitea-http.gitea:3000/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ (parameters.repoUrl | parseRepoUrl).repo }}.git
+          gitopsRepo: http://gitea-http.gitea.svc.cluster.local:3000/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ (parameters.repoUrl | parseRepoUrl).repo }}.git
 
     - id: publish-gitops
       name: Publish GitOps Manifests
@@ -79,15 +79,17 @@ spec:
         sourcePath: ./gitops
         repoVisibility: public
 
-    # Workflow Fix: Create the secret so the Operator has permission to clone the repo
-    - id: create-secret
-      name: Create Git Credentials Secret
-      action: kubernetes:create-git-credentials-secret
+    # In hasura-template/template.yaml
+    - id: create-webhook-secret
+      name: Create Kubernetes Webhook Secret
+      action: kubernetes:create-secret
       input:
-        name: ${{ parameters.name }}
         namespace: default
-        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-        webhookSecret: gitea-webhook-secret
+        # This MUST match the webhookSecret field in your helios-app.yaml
+        secretName: gitea-webhook-secret
+        data:
+          # The Helios Operator/Tekton expects the secret value under the key 'secret'
+          secret: gitea-webhook-secret
 
     - id: apply-helios
       name: Deploy to Kubernetes
@@ -101,8 +103,6 @@ spec:
       action: catalog:register
       if: '{{ parameters.registerToCatalog }}'
       input:
-        # Use the URL from the publish step (usually localhost:3030)
-        # The Portal can reach this more reliably than the internal DNS.
         repoContentsUrl: ${{ steps['publish-gitops'].output.repoContentsUrl }}
         catalogInfoPath: 'catalog-info.yaml'
 
