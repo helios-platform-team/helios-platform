@@ -55,6 +55,26 @@ spec:
           default: false
 
   steps:
+    # 1. Fetch minimal source content (for consistency with PostgREST)
+    - id: fetch-source
+      name: Fetch Source Content
+      action: fetch:template
+      input:
+        url: ./content/source
+        targetPath: ./source
+        values:
+          name: ${{ parameters.name }}
+
+    # 2. Publish source repo (this gives us real Git URLs)
+    - id: publish-source
+      name: Publish Source Repo
+      action: publish:gitea
+      input:
+        description: Hasura Configuration for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}
+        sourcePath: ./source
+        repoVisibility: public
+
     - id: fetch-gitops
       name: Fetch GitOps Manifests
       action: fetch:template
@@ -67,29 +87,31 @@ spec:
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
-          # Networking Fix: Use shorter DNS name
-          gitopsRepo: http://gitea-http.gitea.svc.cluster.local:3000/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ (parameters.repoUrl | parseRepoUrl).repo }}.git
+          # Use actual published Git URLs (not Backstage internal references)
+          sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
+          # Separate GitOps repo for manifests
+          gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
 
     - id: publish-gitops
       name: Publish GitOps Manifests
       action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}
+        repoUrl: ${{ parameters.repoUrl }}-gitops
         sourcePath: ./gitops
         repoVisibility: public
 
-    # In hasura-template/template.yaml
+    # Create webhook secret in cluster
     - id: create-webhook-secret
       name: Create Kubernetes Webhook Secret
       action: kubernetes:create-secret
       input:
         namespace: default
-        # This MUST match the webhookSecret field in your helios-app.yaml
-        secretName: gitea-webhook-secret
+        # Dynamic secret name matching the app name
+        secretName: ${{ parameters.name }}-webhook-secret
         data:
           # The Helios Operator/Tekton expects the secret value under the key 'secret'
-          secret: gitea-webhook-secret
+          secret: ${{ parameters.name }}-webhook-secret
 
     - id: apply-helios
       name: Deploy to Kubernetes

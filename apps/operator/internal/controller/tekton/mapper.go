@@ -27,19 +27,19 @@ func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
 		PipelineName:    app.Spec.PipelineName,
 		// PipelineType is intentionally derived from PipelineName because
 		// the HeliosApp CRD does not have a separate PipelineType field.
-		PipelineType:    app.Spec.PipelineName,
-		TriggerType:     app.Spec.TriggerType,
-		ServiceAccount:  app.Spec.ServiceAccount,
-		PVCName:         app.Spec.PVCName,
-		ContextSubpath:  app.Spec.ContextSubpath,
-		Replicas:        int(app.Spec.Replicas),
-		Port:            int(app.Spec.Port),
-		TestCommand:     app.Spec.TestCommand,
-		TestImage:       app.Spec.TestImage,
-		DockerSecret:    "docker-credentials",
+		PipelineType:      app.Spec.PipelineName,
+		TriggerType:       app.Spec.TriggerType,
+		ServiceAccount:    app.Spec.ServiceAccount,
+		PVCName:           app.Spec.PVCName,
+		ContextSubpath:    app.Spec.ContextSubpath,
+		Replicas:          int(app.Spec.Replicas),
+		Port:              int(app.Spec.Port),
+		TestCommand:       app.Spec.TestCommand,
+		TestImage:         app.Spec.TestImage,
+		DockerSecret:      "docker-credentials",
 		DatabaseSecretRef: app.Spec.DatabaseSecretRef,
-		ArgoCDNamespace: app.Spec.ArgoCDNamespace,
-		ArgoCDProject:   app.Spec.ArgoCDProject,
+		ArgoCDNamespace:   app.Spec.ArgoCDNamespace,
+		ArgoCDProject:     app.Spec.ArgoCDProject,
 	}
 
 	input.GitBranch = cmp.Or(input.GitBranch, "main")

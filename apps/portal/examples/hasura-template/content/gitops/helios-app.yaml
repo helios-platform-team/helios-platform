@@ -5,17 +5,18 @@ metadata:
   namespace: default
 spec:
   owner: ${{ values.owner }}
-  # Mandatory fields for CRD validation
-  gitRepo: ${{ values.gitopsRepo }}
+  # Source repo for any custom code (though Hasura uses pre-built image)
+  gitRepo: ${{ values.sourceRepo }}
   gitBranch: main
+  # Pre-built Hasura image from Docker Hub
   imageRepo: hasura/graphql-engine
+  # Separate GitOps repo for Kubernetes manifests
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: ""
   
-  # FIX: Explicitly reference the secret created in template.yaml
-  webhookSecret: gitea-webhook-secret
+  # Webhook configuration (matches secret name from template.yaml)
+  webhookSecret: ${{ values.name }}-webhook-secret
   triggerType: gitea-push
-  pipelineName: "" # SKIP BUILD to save RAM
   
   components:
     - name: ${{ values.name }}
