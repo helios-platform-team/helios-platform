@@ -12,7 +12,7 @@ spec:
 
   parameters:
     - title: Component Information
-      required: [name, port]
+      required: [name, port, dockerOrg, repoName]
       properties:
         name:
           title: Name
@@ -24,6 +24,14 @@ spec:
           type: number
           description: The port Hasura listens on (default is 8080)
           default: 8080
+        dockerOrg:
+          title: Docker Registry Org/User
+          type: string
+          description: Your Docker Hub username or Organization
+        repoName:
+          title: Docker Repository Name
+          type: string
+          description: The name of the Docker repository (e.g. my-hasura)
 
     - title: Database Configuration
       properties:
@@ -84,12 +92,12 @@ spec:
         values:
           name: ${{ parameters.name }}
           port: ${{ parameters.port }}
-          databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
+          databaseType: ${{ parameters.databaseConfig.dbType }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
-          # Use actual published Git URLs (not Backstage internal references)
+          # Pass the Docker image path to the gitops template
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
-          # Separate GitOps repo for manifests
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
 
     - id: publish-gitops

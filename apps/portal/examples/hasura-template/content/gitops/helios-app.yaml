@@ -5,24 +5,27 @@ metadata:
   namespace: default
 spec:
   owner: ${{ values.owner }}
-  # Source repo for any custom code (though Hasura uses pre-built image)
   gitRepo: ${{ values.sourceRepo }}
   gitBranch: main
-  # Pre-built Hasura image from Docker Hub
-  imageRepo: hasura/graphql-engine
-  # Separate GitOps repo for Kubernetes manifests
+  
+  # FIX: Tell Tekton where to push the newly built custom image
+  imageRepo: ${{ values.image }}
+  
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: ""
+  gitopsBranch: main
   
-  # Webhook configuration (matches secret name from template.yaml)
   webhookSecret: ${{ values.name }}-webhook-secret
   triggerType: gitea-push
+  
+  # FIX: Removed pipelineName: "" to re-enable the build pipeline!
   
   components:
     - name: ${{ values.name }}
       type: web-service
       properties:
-        image: hasura/graphql-engine:v2.33.0
+        # FIX: Point the deployment to your newly built custom image
+        image: ${{ values.image }}:latest
         port: ${{ values.port }}
         resources:
           requests:
@@ -34,6 +37,8 @@ spec:
         env:
           - name: HASURA_GRAPHQL_DATABASE_URL
             value: "postgres://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/${{ values.databaseName | default(values.name) | replace('-', '_') }}"
+          - name: HASURA_GRAPHQL_ENABLE_CONSOLE
+            value: "true"
       traits:
         - type: database
           properties:
