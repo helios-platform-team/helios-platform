@@ -49,7 +49,9 @@ spec:
         jwtSecret:
           title: JWT Secret
           type: string
-          description: Secret for signing JWT tokens (at least 32 chars recommended)
+          description: Secret for signing JWT tokens (32-64 characters required for PostgREST)
+          minLength: 32
+          maxLength: 64
           ui:field: Secret
         jwtRole:
           title: JWT Role
