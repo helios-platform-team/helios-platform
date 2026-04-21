@@ -65,6 +65,7 @@ tasks:
     deps: [check:env]
     cmds:
       - task: setup:cluster
+      - task: setup:coredns
       - task: setup:tekton
       - task: setup:tekton-pruner
       - task: setup:argocd
@@ -92,6 +93,21 @@ tasks:
       - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 127.0.0.1:6550 --k3s-arg "--disable=traefik@server:0"
       - kubectl config set-cluster k3d-{{.CLUSTER_NAME}} --server=https://localhost:6550
       - kubectl cluster-info
+
+  setup:coredns:
+    desc: Patch CoreDNS to use robust external DNS servers instead of k3d node's resolv.conf
+    cmds:
+      - echo "Patching CoreDNS to use 8.8.8.8 and 1.1.1.1..."
+      - cmd: |
+          kubectl get configmap coredns -n kube-system -o yaml > coredns.yaml
+          sed 's/forward . \/etc\/resolv.conf/forward . 8.8.8.8 1.1.1.1/' coredns.yaml > coredns-patched.yaml
+          kubectl apply -f coredns-patched.yaml
+          rm coredns.yaml coredns-patched.yaml
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -ExecutionPolicy Bypass -Command "$coredns = kubectl get configmap coredns -n kube-system -o yaml; $coredns = $coredns -replace 'forward \. /etc/resolv\.conf', 'forward . 8.8.8.8 1.1.1.1'; $coredns | Out-File -Encoding utf8 coredns.yaml; kubectl apply -f coredns.yaml; Remove-Item coredns.yaml"
+        platforms: [windows]
+      - kubectl rollout restart -n kube-system deployment/coredns
 
   setup:tekton:
     desc: Install Tekton Pipeline, Triggers, and Interceptors
@@ -217,6 +233,8 @@ tasks:
           --set postgresql-ha.enabled=false
           --set redis-cluster.enabled=false
           --set redis.enabled=false
+          --set valkey-cluster.enabled=false
+          --set valkey.enabled=false
           --set gitea.config.database.DB_TYPE=sqlite3
           --set gitea.config.session.PROVIDER=memory
           --set gitea.config.cache.ADAPTER=memory
