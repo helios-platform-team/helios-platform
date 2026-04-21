@@ -12,7 +12,7 @@ spec:
   imageRepo: ${{ values.image }}
   
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: ""
+  gitopsPath: ${{ values.name }}
   gitopsBranch: main
   
   webhookSecret: ${{ values.name }}-webhook-secret
@@ -36,7 +36,7 @@ spec:
             cpu: "200m"
         env:
           - name: HASURA_GRAPHQL_DATABASE_URL
-            value: "postgres://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/${{ values.databaseName | default(values.name) | replace('-', '_') }}"
+            value: "$(DATABASE_URL)"
           - name: HASURA_GRAPHQL_ENABLE_CONSOLE
             value: "true"
       traits:
