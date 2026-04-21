@@ -29,7 +29,7 @@ func TestFormatPostgresURI(t *testing.T) {
 			host:     "localhost",
 			dbName:   "mydb",
 			port:     5432,
-			expected: "postgres://user:pass@localhost:5432/mydb",
+			expected: "postgres://user:pass@localhost:5432/mydb?sslmode=disable",
 		},
 		{
 			name:     "special chars in password",
@@ -38,7 +38,7 @@ func TestFormatPostgresURI(t *testing.T) {
 			host:     "db.example.com",
 			dbName:   "app_db",
 			port:     5432,
-			expected: "postgres://user:p%40ss%3Aword%2F@db.example.com:5432/app_db",
+			expected: "postgres://user:p%40ss%3Aword%2F@db.example.com:5432/app_db?sslmode=disable",
 		},
 		{
 			name:     "special chars in username",
@@ -47,7 +47,7 @@ func TestFormatPostgresURI(t *testing.T) {
 			host:     "postgres-host",
 			dbName:   "database",
 			port:     5432,
-			expected: "postgres://user%2Badmin:password@postgres-host:5432/database",
+			expected: "postgres://user%2Badmin:password@postgres-host:5432/database?sslmode=disable",
 		},
 		{
 			name:     "custom port",
@@ -56,7 +56,7 @@ func TestFormatPostgresURI(t *testing.T) {
 			host:     "db-instance",
 			dbName:   "prod_db",
 			port:     5433,
-			expected: "postgres://admin:secret123@db-instance:5433/prod_db",
+			expected: "postgres://admin:secret123@db-instance:5433/prod_db?sslmode=disable",
 		},
 		{
 			name:     "IPv6 host",
@@ -65,7 +65,7 @@ func TestFormatPostgresURI(t *testing.T) {
 			host:     "::1",
 			dbName:   "testdb",
 			port:     5432,
-			expected: "postgres://user:pass@::1:5432/testdb",
+			expected: "postgres://user:pass@::1:5432/testdb?sslmode=disable",
 		},
 	}
 
