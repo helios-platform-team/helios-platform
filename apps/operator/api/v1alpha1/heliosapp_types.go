@@ -130,9 +130,9 @@ type HeliosAppSpec struct {
 	// +optional
 	ContextSubpath string `json:"contextSubpath,omitempty"`
 
-	// DatabaseSecretRef is the name of the secret containing database credentials for migrations
+	// DatabaseSecretRef is the name of the secret containing database credentials for migrations.
+	// Defaults to {appName}-db-secret if not set.
 	// +optional
-	// +kubebuilder:default="api-db-secret"
 	DatabaseSecretRef string `json:"databaseSecretRef,omitempty"`
 
 	// Components define the workloads of the application
