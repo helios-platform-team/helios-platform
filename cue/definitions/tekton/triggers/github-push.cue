@@ -44,7 +44,9 @@ import (
                 apiVersion: "tekton.dev/v1beta1"
                 kind:       "PipelineRun"
                 metadata: {
-                    name:      "\(_bp.appName)-run-$(uid)"
+                    // Truncate to at most 46 chars: "{prefix}-run-$(uid)" stays ≤63.
+                    let _namePrefix = [if len(_bp.appName) > 46 {_bp.appName[:46]}, _bp.appName][0]
+                    name:      "\(_namePrefix)-run-$(uid)"
                     namespace: _bp.namespace
                     labels: {
                         "helios.io/managed-by":       "helios-operator"
@@ -120,7 +122,9 @@ import (
                 apiVersion: "tekton.dev/v1beta1"
                 kind:       "PipelineRun"
                 metadata: {
-                    name:      "\(_bp.appName)-migrate-$(uid)"
+                    // Truncate to at most 32 chars: "{prefix}-migrate-$(uid)" stays ≤63.
+                    let _namePrefix = [if len(_bp.appName) > 32 {_bp.appName[:32]}, _bp.appName][0]
+                    name:      "\(_namePrefix)-migrate-$(uid)"
                     namespace: _bp.namespace
                     labels: {
                         "helios.io/managed-by":       "helios-operator"
