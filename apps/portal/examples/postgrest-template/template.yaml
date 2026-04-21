@@ -50,6 +50,7 @@ spec:
           title: JWT Secret
           type: string
           description: Secret for signing JWT tokens (at least 32 chars recommended)
+          ui:widget: password
         jwtRole:
           title: JWT Role
           type: string

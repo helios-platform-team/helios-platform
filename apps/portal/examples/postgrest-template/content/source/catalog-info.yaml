@@ -3,8 +3,12 @@ kind: Component
 metadata:
   name: ${{ values.name }}
   annotations:
+    backstage.io/techdocs-ref: dir:.
     backstage.io/kubernetes-id: ${{ values.name }}
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/name=${{ values.name }}
+    backstage.io/kubernetes-namespace: default
     janus-idp.io/tekton: ${{ values.name }}
+    tekton.dev/ci-cd: "true"
     argocd/app-name: ${{ values.name }}-argocd
 spec:
   type: service
