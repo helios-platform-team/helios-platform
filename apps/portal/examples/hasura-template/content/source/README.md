@@ -6,7 +6,7 @@ This is the source repository for a Hasura GraphQL Engine instance, scaffolded b
 
 
 
-Hasura provides an instant, real-time GraphQL API over a PostgreSQL database. This repository contains the build instructions and configuration for your custom Hasura image.
+Hasura provides an instant, real-time GraphQL API over a PostgreSQL database. This repository contains the build instructions, database migrations, and metadata configuration for your custom Hasura image.
 
 
 
@@ -18,13 +18,13 @@ Hasura provides an instant, real-time GraphQL API over a PostgreSQL database. Th
 
 
 
-This project uses a fully automated **GitOps and CI/CD** workflow managed by the Helios Platform. 
+This project uses a fully automated **GitOps and CI/CD** workflow managed by the Helios Platform. By utilizing the official Hasura `cli-migrations-v3` image, your database schema and GraphQL API remain perfectly synchronized with your Git repository.
 
 
 
 ```text
 
-1. You commit code/metadata to THIS Source Repository
+1. You commit SQL migrations/metadata to THIS Source Repository
 
                 ↓
 
@@ -48,9 +48,10 @@ This project uses a fully automated **GitOps and CI/CD** workflow managed by the
 
                 ↓
 
-7. Hasura container rolls out, automatically connected to the database!
+7. Hasura container rolls out, automatically applying your SQL migrations on startup!
 
 ```
+
 
 
 📂 Generated Repositories
@@ -67,11 +68,19 @@ This template generated **two** repositories for your application:
 
 
 
-Contains your application build instructions:
+Contains your application build instructions and database state:
 
 
 
-*   Dockerfile: Builds your custom Hasura image. You can modify this to bake in Hasura migrations or metadata.
+*   Dockerfile: Builds your custom Hasura image. It is pre-configured to copy your migrations into the container.
+
+    
+
+*   migrations/: Contains your raw SQL files. A base migration (init) is already provided.
+
+    
+
+*   metadata/: Tracks your Hasura API configuration (table tracking, relationships, permissions).
 
     
 
@@ -89,7 +98,7 @@ Contains your Kubernetes infrastructure declarations:
 
 
 
-*   helios-app.yaml: The Custom Resource that tells the Helios Operator how to deploy Hasura and provision the database.
+*   helios-app.yaml: The Custom Resource that tells the Helios Operator how to deploy Hasura and natively wire up the PostgreSQL database connection.
 
     
 
@@ -109,37 +118,97 @@ Contains your Kubernetes infrastructure declarations:
 
 
 
-The Helios Operator automatically deploys your Hasura instance with the console enabled.Once your deployment is synced via ArgoCD, you can access the Hasura UI:
+The Helios Operator automatically deploys your Hasura instance with the console enabled. To access it locally during development:
 
 
 
-1.  Find your ingress URL: kubectl get ingress -n default (or your target namespace).
-
-    
-
-2.  Navigate to the URL in your browser to access the Hasura Console.
+1.  Run kubectl port-forward svc/${{ values.name }} 8085:8080 -n default (update the namespace if needed).
 
     
 
-3.  From the console, you can track tables, set up relationships, and test GraphQL queries.
+2.  Open your browser and navigate to http://localhost:8085/console.
 
     
 
 
 
-### 2\. Database Connection (Zero Configuration)
+### 2\. The Initial Database State
 
 
 
-You **do not** need to manually configure the database connection!The Helios Operator automatically provisions a PostgreSQL database and natively injects the formatted connection string into your Hasura container using the HASURA\_GRAPHQL\_DATABASE\_URL environment variable.
+We have pre-populated your database with a base migration!
 
 
 
-### 3\. Customizing Your Hasura Image
+1.  In the Hasura Console, click the **DATA** tab.
+
+    
+
+2.  Expand the default database and click the public schema.
+
+    
+
+3.  Under **Untracked tables or views**, you will see a users table.
+
+    
+
+4.  Click **Track** to expose this table to your GraphQL API.
+
+    
 
 
 
-If you want to track your database migrations and Hasura metadata in version control (recommended for production):
+🛠️ The GitOps Migration Workflow
+
+---------------------------------
+
+
+
+To manage your database schema, you do not need external tools. You just write SQL and push!
+
+
+
+### Adding a New Table
+
+
+
+1.  mkdir -p migrations/default/1700000000001\_create\_posts/
+
+    
+
+2.  SQLCREATE TABLE public.posts ( id SERIAL PRIMARY KEY, title TEXT NOT NULL, content TEXT);
+
+    
+
+3.  Commit and push the code.
+
+    
+
+4.  The Tekton pipeline will automatically build the new Docker image, ArgoCD will roll it out, and Hasura will automatically execute your new SQL file against the database!
+
+    
+
+5.  Open the Hasura Console to track your new table.
+
+    
+
+
+
+⚙️ Managing Metadata (Crucial Step)
+
+-----------------------------------
+
+
+
+"Metadata" is how Hasura remembers which tables are exposed to the GraphQL API, your relationships, and your security permissions.
+
+
+
+**Currently, metadata copying is DISABLED in your Dockerfile so the initial deployment doesn't crash on an empty configuration.**
+
+
+
+Once you track your first tables in the Hasura UI, you need to save that configuration back to this Git repository:
 
 
 
@@ -147,35 +216,39 @@ If you want to track your database migrations and Hasura metadata in version con
 
     
 
-2.  Initialize a Hasura project locally and track your changes.
+2.  Initialize a Hasura project locally or connect to your running instance.
 
     
 
-3.  Update the Dockerfile in this repository to copy your migrations/ and metadata/ directories into the image.
+3.  Run hasura metadata export to generate the .yaml files in your metadata/ directory.
 
     
 
-4.  Commit and push! Tekton will automatically build the new image and roll it out.
+4.  DockerfileRUN mkdir -p /hasura-metadataCOPY metadata/ /hasura-metadata/
+
+    
+
+5.  Commit and push. From now on, your API configuration is strictly version-controlled!
 
     
 
 
 
-🛠️ Troubleshooting
+🚑 Troubleshooting
 
--------------------
-
-
-
-**1\. The pipeline failed during the build phase:**Ensure your Docker Hub credentials are correct. The cluster requires a valid docker-credentials secret in the deployment namespace. The Helios Operator handles this automatically if configured with the right environment variables.
+------------------
 
 
 
-**2\. Hasura cannot connect to the database:**Check the logs of the Helios Operator to ensure the PostgreSQL instance was provisioned successfully. Verify that the HASURA\_GRAPHQL\_DATABASE\_URL is set to $(DATABASE\_URL) in your helios-app.yaml GitOps manifest.
+**1\. The pipeline didn't trigger when I pushed code:**Ensure the Gitea Webhook is configured correctly in your repository settings to point to the Tekton EventListener.
 
 
 
-**3\. Changes are not deploying:**Check ArgoCD to ensure the GitOps repository is syncing correctly. You can also monitor the Tekton PipelineRun in your cluster to see if the build and GitOps update steps completed successfully.
+**2\. Hasura cannot connect to the database (CrashLoopBackOff):**Check the logs of the Helios Operator. Verify that the database was provisioned. Hasura relies on the explicit env variable mapping in your GitOps helios-app.yaml to construct the HASURA\_GRAPHQL\_DATABASE\_URL from the Operator's injected secrets.
+
+
+
+**3\. Hasura crashes on startup with a parse-failed metadata error:**This means you uncommented the metadata COPY step in the Dockerfile, but your metadata/ folder doesn't contain valid Hasura configuration files yet. Comment it back out until you have exported your metadata via the CLI.
 
 
 
@@ -194,3 +267,4 @@ If you want to track your database migrations and Hasura metadata in version con
     
 
 *   [Helios Operator Documentation](https://www.google.com/search?q=../../../../docs/OPERATOR.md)
+

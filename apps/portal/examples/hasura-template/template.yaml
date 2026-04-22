@@ -83,6 +83,18 @@ spec:
         sourcePath: ./source
         repoVisibility: public
 
+    # 3. Create the Webhook
+    - id: create-webhook
+      name: Create Gitea Webhook
+      action: gitea:create-webhook
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
+        webhookSecret: ${{ parameters.name }}-webhook-secret
+        events:
+          - push
+
+    # 4. GitOps Manifests
     - id: fetch-gitops
       name: Fetch GitOps Manifests
       action: fetch:template
@@ -95,7 +107,6 @@ spec:
           databaseName: ${{ parameters.databaseConfig.dbName }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
-          # Pass the Docker image path to the gitops template
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
@@ -109,18 +120,17 @@ spec:
         sourcePath: ./gitops
         repoVisibility: public
 
-    # Create webhook secret in cluster
+    # 5. Create webhook secret in cluster
     - id: create-webhook-secret
       name: Create Kubernetes Webhook Secret
       action: kubernetes:create-secret
       input:
         namespace: default
-        # Dynamic secret name matching the app name
         secretName: ${{ parameters.name }}-webhook-secret
         data:
-          # The Helios Operator/Tekton expects the secret value under the key 'secret'
           secret: ${{ parameters.name }}-webhook-secret
 
+    # 6. Deploy HeliosApp
     - id: apply-helios
       name: Deploy to Kubernetes
       action: kubernetes:apply
@@ -128,6 +138,7 @@ spec:
         manifestPath: ./gitops/helios-app.yaml
         namespaced: true
 
+    # 7. Registration
     - id: register
       name: Register Component
       action: catalog:register

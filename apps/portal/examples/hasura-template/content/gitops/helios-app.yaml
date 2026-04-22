@@ -2,47 +2,61 @@ apiVersion: app.helios.io/v1alpha1
 kind: HeliosApp
 metadata:
   name: ${{ values.name }}
-  namespace: default
+  namespace: ${{ values.namespace }}
 spec:
+  # Owner and Git Configuration
   owner: ${{ values.owner }}
   gitRepo: ${{ values.sourceRepo }}
   gitBranch: main
-  
-  # FIX: Tell Tekton where to push the newly built custom image
   imageRepo: ${{ values.image }}
-  
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: ${{ values.name }}
-  gitopsBranch: main
-  
   webhookSecret: ${{ values.name }}-webhook-secret
+  port: ${{ values.port }}
+  replicas: 1
   triggerType: gitea-push
-  
-  # FIX: Removed pipelineName: "" to re-enable the build pipeline!
-  
+
   components:
     - name: ${{ values.name }}
       type: web-service
       properties:
-        # FIX: Point the deployment to your newly built custom image
         image: ${{ values.image }}:latest
         port: ${{ values.port }}
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "50m"
-          limits:
-            memory: "384Mi"
-            cpu: "200m"
         env:
+          # 1. Define empty string placeholders ABOVE the URL.
+          # CUE accepts these. The Operator will seamlessly swap these 
+          # empty strings with the actual Secret references in-place.
+          - name: DB_HOST
+            value: ""
+          - name: DB_USER
+            value: ""
+          - name: DB_PASS
+            value: ""
+          - name: DB_NAME
+            value: "${{ values.databaseName or values.name }}-db"
+            
+          # 2. Build the string natively. 
+          # Because DB_HOST, DB_USER, DB_PASS, and DB_NAME are physically 
+          # located above this line, Kubernetes expands them perfectly.
+          # Note: We hardcode 5432 to avoid DB_PORT expansion issues.
           - name: HASURA_GRAPHQL_DATABASE_URL
-            value: "$(DATABASE_URL)"
+            value: "postgres://$(DB_USER):$(DB_PASS)@$(DB_HOST):5432/$(DB_NAME)"
+            
           - name: HASURA_GRAPHQL_ENABLE_CONSOLE
             value: "true"
       traits:
         - type: database
           properties:
             dbType: ${{ values.databaseType | default("postgres") }}
-            dbName: ${{ values.databaseName | default(values.name) | replace('-', '_') }}
-            version: "16"
+            dbName: ${{ values.databaseName or values.name }}-db
+            port: 5432
+            version: "${{ values.databaseVersion or '16' }}"
             storage: "1Gi"
+        - type: service
+          properties:
+            port: ${{ values.port }}
+            protocol: HTTP
+            ingress:
+              enabled: true
+              host: ${{ values.name }}.local
+              path: /
