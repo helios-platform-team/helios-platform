@@ -6,6 +6,7 @@ metadata:
   description: >-
     Scaffolds a Hasura GraphQL Engine instance connected to a
     dynamically provisioned PostgreSQL database.
+    The Helios Operator automatically injects the connection string (PGRST_DB_URI).
 spec:
   owner: user:guest
   type: service
@@ -40,7 +41,7 @@ spec:
           type: object
           ui:field: DatabasePicker
 
-    - title: GitOps Repository
+    - title: GitOps & Deployment
       required: [repoUrl]
       properties:
         repoUrl:
@@ -50,6 +51,11 @@ spec:
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts: [localhost:3030]
+        namespace:
+          title: Kubernetes Namespace
+          type: string
+          description: Namespace where the service will be deployed
+          default: default
 
     - title: Optional Extras
       properties:
@@ -89,12 +95,13 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
+        # FIX: Replaced 'default' with dynamic namespace variable
+        webhookUrl: http://el-${{ parameters.name }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}-webhook-secret
         events:
           - push
 
-    # 4. GitOps Manifests
+    # 4. Fetch GitOps Manifests
     - id: fetch-gitops
       name: Fetch GitOps Manifests
       action: fetch:template
@@ -104,6 +111,8 @@ spec:
         values:
           name: ${{ parameters.name }}
           port: ${{ parameters.port }}
+          # FIX: Passed namespace into the gitops templates
+          namespace: ${{ parameters.namespace }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
@@ -120,12 +129,20 @@ spec:
         sourcePath: ./gitops
         repoVisibility: public
 
+    # FIX: Added Namespace Creation Step
+    - id: apply-namespace
+      name: Create Kubernetes Namespace
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/namespace.yaml
+
     # 5. Create webhook secret in cluster
     - id: create-webhook-secret
       name: Create Kubernetes Webhook Secret
       action: kubernetes:create-secret
       input:
-        namespace: default
+        # FIX: Replaced 'default' with dynamic namespace variable
+        namespace: ${{ parameters.namespace }}
         secretName: ${{ parameters.name }}-webhook-secret
         data:
           secret: ${{ parameters.name }}-webhook-secret
