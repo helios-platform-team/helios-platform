@@ -23,25 +23,14 @@ spec:
         image: ${{ values.image }}:latest
         port: ${{ values.port }}
         env:
-          # 1. Define empty string placeholders ABOVE the URL.
-          # CUE accepts these. The Operator will seamlessly swap these 
-          # empty strings with the actual Secret references in-place.
-          - name: DB_HOST
-            value: ""
-          - name: DB_USER
-            value: ""
-          - name: DB_PASS
-            value: ""
-          - name: DB_NAME
-            value: "${{ values.databaseName or values.name }}-db"
-            
-          # 2. Build the string natively. 
-          # Because DB_HOST, DB_USER, DB_PASS, and DB_NAME are physically 
-          # located above this line, Kubernetes expands them perfectly.
-          # Note: We hardcode 5432 to avoid DB_PORT expansion issues.
+          # Directly reference the fully formatted, URL-encoded connection string
+          # injected by the Operator into the component's database secret.
           - name: HASURA_GRAPHQL_DATABASE_URL
-            value: "postgres://$(DB_USER):$(DB_PASS)@$(DB_HOST):5432/$(DB_NAME)"
-            
+            valueFrom:
+              secretKeyRef:
+                name: ${{ values.name }}-db-secret
+                key: PGRST_DB_URI
+                
           - name: HASURA_GRAPHQL_ENABLE_CONSOLE
             value: "true"
       traits:

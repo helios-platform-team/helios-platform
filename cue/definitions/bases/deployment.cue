@@ -9,7 +9,13 @@ package bases
 		image:    string
 		replicas: int | *1
 		port:     int
-		env: [...{name: string, value: string}] | *[]
+		
+		// FIX: Allow both standard 'value' strings and Kubernetes 'valueFrom' objects
+		env: [...{
+			name: string
+			value?: string
+			valueFrom?: {...}
+		}] | *[]
 	}
 
 	output: {
