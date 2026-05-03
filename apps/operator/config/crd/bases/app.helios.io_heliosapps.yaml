@@ -100,6 +100,11 @@ spec:
               contextSubpath:
                 description: ContextSubpath is the path where the Dockerfile is located
                 type: string
+              databaseSecretRef:
+                description: |-
+                  DatabaseSecretRef is the name of the secret containing database credentials for migrations.
+                  Defaults to {appName}-db-secret if not set.
+                type: string
               description:
                 description: Description of the application
                 type: string

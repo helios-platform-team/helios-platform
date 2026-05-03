@@ -36,15 +36,6 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 	}
 	testImage := cmp.Or(heliosApp.Spec.TestImage, "node:24")
 
-	replicas := heliosApp.Spec.Replicas
-	if replicas <= 0 {
-		replicas = 1
-	}
-	port := heliosApp.Spec.Port
-	if port <= 0 || port > 65535 {
-		port = 8080
-	}
-
 	params := make([]any, 0, 18)
 	params = append(params,
 		map[string]any{"name": "app-repo-url", "value": shared.RewriteGiteaURL(heliosApp.Spec.GitRepo)},

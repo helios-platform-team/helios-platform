@@ -12,6 +12,8 @@ const (
 	dbPortEnvName      = "DB_PORT"
 	dbNameEnvName      = "DB_NAME"
 	databaseURLEnvName = "DATABASE_URL"
+	// dbTypePostgres is the canonical DB type identifier used across the database package.
+	dbTypePostgres = "postgres"
 	// postgresDatabaseURLTemplate uses Kubernetes $(VAR) expansion from earlier env entries.
 	postgresDatabaseURLTemplate = "postgres://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
 )
@@ -20,7 +22,7 @@ const (
 // Only types with a defined URL layout are supported; others return ok=false.
 func connectionURLTemplateForDBType(dbType string) (template string, ok bool) {
 	switch strings.ToLower(strings.TrimSpace(dbType)) {
-	case "postgres", "postgresql":
+	case dbTypePostgres, "postgresql":
 		return postgresDatabaseURLTemplate, true
 	default:
 		return "", false

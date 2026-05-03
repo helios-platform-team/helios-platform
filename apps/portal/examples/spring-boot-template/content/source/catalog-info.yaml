@@ -4,7 +4,6 @@ metadata:
   name: ${{ values.name }}
   description: ${{ values.description | dump }}
   annotations:
-    gitea.org/repo-url: http://localhost:3030/${{ values.owner }}/${{ values.name }}
     backstage.io/techdocs-ref: dir:.
     backstage.io/kubernetes-id: ${{ values.name }}
     backstage.io/kubernetes-label-selector: app.kubernetes.io/name=${{ values.name }}

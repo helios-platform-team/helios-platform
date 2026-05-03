@@ -49,7 +49,10 @@ spec:
         jwtSecret:
           title: JWT Secret
           type: string
-          description: Secret for signing JWT tokens (at least 32 chars recommended)
+          description: Secret for signing JWT tokens (32-64 characters required for PostgREST)
+          minLength: 32
+          maxLength: 64
+          ui:field: Secret
         jwtRole:
           title: JWT Role
           type: string
@@ -111,7 +114,7 @@ spec:
           description: "PostgREST API: ${{ parameters.name }}"
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           apiSchema: ${{ parameters.apiSchema }}
-          jwtSecret: ${{ parameters.jwtSecret }}
+          jwtSecret: ${{ secrets.jwtSecret }}
           jwtRole: ${{ parameters.jwtRole }}
           anonRole: ${{ parameters.anonRole }}
 
@@ -152,7 +155,7 @@ spec:
           databaseName: ${{ parameters.databaseConfig.dbName }}
           databaseVersion: ${{ parameters.databaseConfig.version or '16' }}
           apiSchema: ${{ parameters.apiSchema }}
-          jwtSecret: ${{ parameters.jwtSecret }}
+          jwtSecret: ${{ secrets.jwtSecret }}
           jwtRole: ${{ parameters.jwtRole }}
           anonRole: ${{ parameters.anonRole }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
