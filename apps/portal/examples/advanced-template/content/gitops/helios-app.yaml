@@ -22,7 +22,7 @@ spec:
   gitopsSecretRef: "git-credentials-${{ values.name }}"
 
   components:
-    - name: ${{ values.name }}-backend
+    - name: ${{ values.name }}
       type: web-service
       properties:
         image: ${{ values.dockerOrg }}/${{ values.repoName }}:latest

@@ -33,9 +33,10 @@ input: schema.#HeliosApp
 
 // Trait Registry - mapping type name → trait definition
 #TraitRegistry: {
-	"service":  traits.#ServiceTrait
-	"ingress":  traits.#IngressTrait
-	"database": traits.#DatabaseTrait
+	"service":                   traits.#ServiceTrait
+	"ingress":                   traits.#IngressTrait
+	"database":                  traits.#DatabaseTrait
+	"external-secret-reference": traits.#ExternalSecretReferenceTrait
 	// Thêm trait mới chỉ cần thêm dòng ở đây
 	// "autoscale": traits.#AutoscaleTrait
 	// "servicemonitor": traits.#ServiceMonitorTrait
@@ -49,7 +50,14 @@ input: schema.#HeliosApp
 componentsRendered: {
 	for comp in input.app.components {
 		let Def = #ComponentRegistry[comp.type]
-		
+
+		// external-secret-reference: merged into web-service Deployment envFrom (Git-visible wiring).
+		let envFromSecretNames = [
+			if comp.traits != _|_ for trait in comp.traits if trait.type == "external-secret-reference" {
+				trait.properties.secretName
+			},
+		]
+
 		// Find database trait if any
 		let dbTraits = [...#DatabaseTraitRef] & [
 			if comp.traits != _|_
@@ -141,6 +149,9 @@ componentsRendered: {
 				env: list.Concat([baseEnv, dbEnv])
 				if hasDb {
 					initContainers: initConts
+				}
+				if len(envFromSecretNames) > 0 {
+					envFromSecrets: envFromSecretNames
 				}
 			}
 		}).outputs

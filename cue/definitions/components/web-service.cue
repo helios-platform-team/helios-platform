@@ -21,6 +21,8 @@ import "helios.io/cue/definitions/bases"
 			valueFrom?: {...}
 		}] | *[]
 
+		envFromSecrets: [...string] | *[]
+
 		initContainers?: [...{
 			name: string
 			image: string
@@ -45,6 +47,7 @@ import "helios.io/cue/definitions/bases"
 				replicas:       _p.replicas
 				port:           _p.port
 				env:            _p.env
+				envFromSecrets: _p.envFromSecrets
 				if _p.initContainers != _|_ {
 					initContainers: _p.initContainers
 				}

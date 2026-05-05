@@ -51,7 +51,7 @@ const COLORS_DARK = {
 };
 
 const FONTS = {
-  sans: '"Inter", "San Francisco", "Helvetica Neue", sans-serif',
+  sans: '"Geist", "Inter", "San Francisco", "Helvetica Neue", sans-serif',
   mono: '"JetBrains Mono", "Roboto Mono", monospace',
 };
 

@@ -68,6 +68,7 @@ import {
   isKubernetesAvailable,
 } from '@backstage/plugin-kubernetes';
 import { DatabaseTab } from '../database';
+import { SecretsManagementPage } from '@internal/backstage-plugin-k8s-secret-manager/src/components/SecretsManagementPage/SecretsManagementPage.tsx';
 
 const techdocsContent = (
   <EntityTechdocsContent>
@@ -184,34 +185,12 @@ const serviceEntityPage = (
       <EntityKubernetesContent refreshIntervalMs={30000} />
     </EntityLayout.Route>
 
-    <EntityLayout.Route path="/api" title="API">
-      <Grid container spacing={3} alignItems="stretch">
-        <Grid item md={6}>
-          <EntityProvidedApisCard />
-        </Grid>
-        <Grid item md={6}>
-          <EntityConsumedApisCard />
-        </Grid>
-      </Grid>
-    </EntityLayout.Route>
-
-    <EntityLayout.Route path="/dependencies" title="Dependencies">
-      <Grid container spacing={3} alignItems="stretch">
-        <Grid item md={6}>
-          <EntityDependsOnComponentsCard />
-        </Grid>
-        <Grid item md={6}>
-          <EntityDependsOnResourcesCard />
-        </Grid>
-      </Grid>
-    </EntityLayout.Route>
-
     <EntityLayout.Route path="/database" title="Database">
       <DatabaseTab />
     </EntityLayout.Route>
 
-    <EntityLayout.Route path="/docs" title="Docs">
-      {techdocsContent}
+    <EntityLayout.Route path="/secrets" title="Secrets">
+      <SecretsManagementPage />
     </EntityLayout.Route>
   </EntityLayout>
 );

@@ -17,6 +17,9 @@ package bases
 			valueFrom?: {...}
 		}] | *[]
 
+		// Secret names for envFrom — typically driven by external-secret-reference traits.
+		envFromSecrets?: [...string]
+
 		initContainers?: [...{
 			name: string
 			image: string
@@ -63,6 +66,15 @@ package bases
 						if len(parameter.env) > 0 {
 							env: parameter.env
 						}
+
+						if parameter.envFromSecrets != _|_ if len(parameter.envFromSecrets) > 0 {
+							envFrom: [
+								for secretName in parameter.envFromSecrets {
+									secretRef: name: secretName
+								}
+							]
+						}
+
 						resources: {
 							requests: {cpu: "100m", memory: "128Mi"}
 							limits: {cpu: "500m", memory: "512Mi"}
