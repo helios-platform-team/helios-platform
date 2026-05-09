@@ -44,7 +44,7 @@ describe('K8sSecretServiceImpl', () => {
     jest.clearAllMocks();
   });
 
-  it('creates secret and patches external-secret-reference trait on target component', async () => {
+  it('creates secret and appends external-secret-reference trait on target component', async () => {
     const svc = new K8sSecretServiceImpl(logger);
     mockCoreV1Api.readNamespacedSecret.mockRejectedValue(
       new k8s.ApiException(
@@ -104,12 +104,73 @@ describe('K8sSecretServiceImpl', () => {
     expect(serviceComp.traits).toEqual([
       {
         type: 'external-secret-reference',
+        properties: { secretName: 'old' },
+      },
+      {
+        type: 'external-secret-reference',
         properties: { secretName: 'my-service-db' },
       },
     ]);
     expect(logger.info).toHaveBeenCalledWith(
       expect.stringContaining('Operator reconcile will render with CUE'),
     );
+  });
+
+  it('does not duplicate external-secret-reference trait for same secret on update', async () => {
+    const svc = new K8sSecretServiceImpl(logger);
+    mockCoreV1Api.readNamespacedSecret.mockResolvedValue({
+      metadata: {
+        name: 'my-service-db',
+        namespace: 'default',
+      },
+    });
+    mockCoreV1Api.replaceNamespacedSecret.mockResolvedValue({
+      metadata: {
+        name: 'my-service-db',
+        namespace: 'default',
+      },
+    });
+    mockCustomObjectsApi.getNamespacedCustomObject.mockResolvedValue({
+      spec: {
+        components: [
+          {
+            name: 'my-service',
+            traits: [
+              {
+                type: 'external-secret-reference',
+                properties: { secretName: 'my-service-db' },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    mockCustomObjectsApi.replaceNamespacedCustomObject.mockResolvedValue({});
+
+    await svc.createSecret(
+      {
+        serviceName: 'my-service',
+        secretName: 'db',
+        namespace: 'default',
+        secretData: { DB_USER: 'u2' },
+      },
+      {
+        credentials: {
+          principal: { userEntityRef: 'user:default/alice' },
+        } as any,
+      },
+    );
+
+    const [{ body }] = mockCustomObjectsApi.replaceNamespacedCustomObject.mock.calls[0];
+    const serviceComp = body.spec.components.find(
+      (c: any) => c.name === 'my-service',
+    );
+    expect(serviceComp.traits).toEqual([
+      {
+        type: 'external-secret-reference',
+        properties: { secretName: 'my-service-db' },
+      },
+    ]);
   });
 
   it('skips HeliosApp update when service component does not exist', async () => {
@@ -150,5 +211,52 @@ describe('K8sSecretServiceImpl', () => {
     expect(logger.warn).toHaveBeenCalledWith(
       'Skipping HeliosApp trait update for my-service: component my-service not found',
     );
+  });
+
+  it('deletes secret and removes matching external-secret-reference trait', async () => {
+    const svc = new K8sSecretServiceImpl(logger);
+    mockCoreV1Api.deleteNamespacedSecret.mockResolvedValue({});
+    mockCustomObjectsApi.getNamespacedCustomObject.mockResolvedValue({
+      spec: {
+        components: [
+          {
+            name: 'my-service',
+            traits: [
+              {
+                type: 'external-secret-reference',
+                properties: { secretName: 'my-service-db' },
+              },
+              {
+                type: 'external-secret-reference',
+                properties: { secretName: 'my-service-api' },
+              },
+              { type: 'expose', properties: { port: 80 } },
+            ],
+          },
+        ],
+      },
+    });
+    mockCustomObjectsApi.replaceNamespacedCustomObject.mockResolvedValue({});
+
+    await svc.deleteSecret('my-service', 'db', 'default');
+
+    expect(mockCoreV1Api.deleteNamespacedSecret).toHaveBeenCalledWith({
+      name: 'my-service-db',
+      namespace: 'default',
+    });
+    expect(mockCustomObjectsApi.replaceNamespacedCustomObject).toHaveBeenCalledTimes(
+      1,
+    );
+    const [{ body }] = mockCustomObjectsApi.replaceNamespacedCustomObject.mock.calls[0];
+    const serviceComp = body.spec.components.find(
+      (c: any) => c.name === 'my-service',
+    );
+    expect(serviceComp.traits).toEqual([
+      {
+        type: 'external-secret-reference',
+        properties: { secretName: 'my-service-api' },
+      },
+      { type: 'expose', properties: { port: 80 } },
+    ]);
   });
 });

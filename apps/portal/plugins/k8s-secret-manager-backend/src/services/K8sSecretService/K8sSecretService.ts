@@ -127,6 +127,13 @@ export class K8sSecretServiceImpl implements K8sSecretService {
       name: fullName,
       namespace,
     });
+
+    // Keep HeliosApp desired state and GitOps source aligned when a secret is removed.
+    await this.#removeExternalSecretReferenceTrait(
+      serviceName,
+      namespace,
+      fullName,
+    );
   }
 
   // --- Private Helpers ---
@@ -205,8 +212,6 @@ export class K8sSecretServiceImpl implements K8sSecretService {
         return;
       }
 
-      this.#logger.info(`Components: ${JSON.stringify(components, null, 2)}`);
-
       const targetIndex = components.findIndex(c => c?.name === serviceName);
       if (targetIndex < 0) {
         this.#logger.warn(
@@ -244,6 +249,75 @@ export class K8sSecretServiceImpl implements K8sSecretService {
     } catch (err: any) {
       this.#logger.error(
         `HeliosApp trait update failed for ${serviceName}: ${err.message}`,
+      );
+    }
+  }
+
+  async #removeExternalSecretReferenceTrait(
+    serviceName: string,
+    namespace: string,
+    secretName: string,
+  ): Promise<void> {
+    try {
+      const heliosApp = (await this.#k8sCustomApi.getNamespacedCustomObject({
+        ...HELIOS_CRD,
+        namespace,
+        name: serviceName,
+      })) as HeliosAppResource;
+
+      const components = heliosApp.spec?.components;
+      if (!Array.isArray(components)) {
+        this.#logger.warn(
+          `Skipping HeliosApp trait removal for ${serviceName}: components missing in spec`,
+        );
+        return;
+      }
+
+      const targetIndex = components.findIndex(c => c?.name === serviceName);
+      if (targetIndex < 0) {
+        this.#logger.warn(
+          `Skipping HeliosApp trait removal for ${serviceName}: component ${serviceName} not found`,
+        );
+        return;
+      }
+
+      const updatedComponent = this.#removeTraitFromComponent(
+        components[targetIndex],
+        secretName,
+      );
+
+      const componentUnchanged =
+        JSON.stringify(updatedComponent.traits ?? []) ===
+        JSON.stringify(components[targetIndex]?.traits ?? []);
+      if (componentUnchanged) {
+        this.#logger.info(
+          `HeliosApp trait already absent for ${serviceName} secret ${secretName}`,
+        );
+        return;
+      }
+
+      const updatedComponents = [...components];
+      updatedComponents[targetIndex] = updatedComponent;
+
+      const body: HeliosAppResource = {
+        ...heliosApp,
+        spec: {
+          ...heliosApp.spec,
+          components: updatedComponents,
+        },
+      };
+
+      await this.#k8sCustomApi.replaceNamespacedCustomObject({
+        ...HELIOS_CRD,
+        namespace,
+        name: serviceName,
+        body,
+      });
+
+      await this.#syncHeliosAppToGitOps(namespace, serviceName, body);
+    } catch (err: any) {
+      this.#logger.error(
+        `HeliosApp trait removal failed for ${serviceName}: ${err.message}`,
       );
     }
   }
@@ -363,24 +437,41 @@ export class K8sSecretServiceImpl implements K8sSecretService {
     secretName: string,
   ): HeliosComponent {
     const traits = Array.isArray(component.traits) ? [...component.traits] : [];
-    const existingTraitIdx = traits.findIndex(
-      t => t?.type === externalSecretReferenceTraitType,
-    );
-
     const externalSecretTrait: HeliosTrait = {
       type: externalSecretReferenceTraitType,
       properties: { secretName },
     };
-
-    if (existingTraitIdx >= 0) {
-      traits[existingTraitIdx] = externalSecretTrait;
-    } else {
+    const hasSameSecretTrait = traits.some(
+      t =>
+        t?.type === externalSecretReferenceTraitType &&
+        t?.properties?.secretName === secretName,
+    );
+    if (!hasSameSecretTrait) {
       traits.push(externalSecretTrait);
     }
 
     return {
       ...component,
       traits,
+    };
+  }
+
+  #removeTraitFromComponent(
+    component: HeliosComponent,
+    secretName: string,
+  ): HeliosComponent {
+    const traits = Array.isArray(component.traits) ? [...component.traits] : [];
+    const filteredTraits = traits.filter(
+      t =>
+        !(
+          t?.type === externalSecretReferenceTraitType &&
+          t?.properties?.secretName === secretName
+        ),
+    );
+
+    return {
+      ...component,
+      traits: filteredTraits,
     };
   }
 }
