@@ -1,0 +1,51 @@
+apiVersion: app.helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.name }}
+  namespace: ${{ values.namespace }}
+spec:
+  # Owner and Git Configuration
+  owner: ${{ values.owner }}
+  gitRepo: ${{ values.sourceRepo }}
+  gitBranch: main
+  imageRepo: ${{ values.image }}
+  gitopsRepo: ${{ values.gitopsRepo }}
+  gitopsPath: ${{ values.name }}
+  webhookSecret: ${{ values.name }}-webhook-secret
+  port: ${{ values.port }}
+  replicas: 1
+  triggerType: gitea-push
+
+  components:
+    - name: ${{ values.name }}
+      type: web-service
+      properties:
+        image: ${{ values.image }}:latest
+        port: ${{ values.port }}
+        env:
+          # Directly reference the fully formatted, URL-encoded connection string
+          # injected by the Operator into the component's database secret.
+          - name: HASURA_GRAPHQL_DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: ${{ values.name }}-db-secret
+                key: PGRST_DB_URI
+                
+          - name: HASURA_GRAPHQL_ENABLE_CONSOLE
+            value: "true"
+      traits:
+        - type: database
+          properties:
+            dbType: ${{ values.databaseType | default("postgres") }}
+            dbName: ${{ values.databaseName or values.name }}-db
+            port: 5432
+            version: "${{ values.databaseVersion or '16' }}"
+            storage: "1Gi"
+        - type: service
+          properties:
+            port: ${{ values.port }}
+            protocol: HTTP
+            ingress:
+              enabled: true
+              host: ${{ values.name }}.local
+              path: /

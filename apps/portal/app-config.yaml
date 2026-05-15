@@ -44,6 +44,10 @@ integrations:
       baseUrl: http://127.0.0.1:3030
       username: ${GITEA_USER}
       password: ${GITEA_TOKEN}
+    - host: gitea-http.gitea.svc.cluster.local:3000
+      baseUrl: http://gitea-http.gitea.svc.cluster.local:3000
+      username: ${GITEA_USER}
+      password: ${GITEA_TOKEN}
   # Optional: GitHub integration (uncomment if you still need GitHub access)
   # github:
   #   - host: github.com
@@ -149,6 +153,12 @@ catalog:
     # PostgREST Template - Instant REST API over PostgreSQL
     - type: file
       target: ../../examples/postgrest-template/template.yaml
+      rules:
+        - allow: [Template]
+
+    # Hasura GraphQL Engine Template
+    - type: file
+      target: ../../examples/hasura-template/template.yaml
       rules:
         - allow: [Template]
 
