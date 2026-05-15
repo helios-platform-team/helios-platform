@@ -95,7 +95,7 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 		"app":                  name,
 		"helios.io/managed-by": "operator",
 		"helios.io/trait":      "database",
-		"helios.io/db-type":    "postgres",
+		"helios.io/db-type":    dbTypePostgres,
 	}
 
 	probeCommand := `pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -p "$PGPORT"`
@@ -119,12 +119,12 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "postgres",
+							Name:  dbTypePostgres,
 							Image: fmt.Sprintf("postgres:%s", version),
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: port,
-									Name:          "postgres",
+									Name:          dbTypePostgres,
 								},
 							},
 							Env: []corev1.EnvVar{

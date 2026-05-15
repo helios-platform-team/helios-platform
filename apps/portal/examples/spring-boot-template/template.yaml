@@ -124,6 +124,7 @@ spec:
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "gradle test"
+          testImage: "gradle:8.7-jdk21"
 
     - id: publish-gitops
       name: Publish GitOps Manifests

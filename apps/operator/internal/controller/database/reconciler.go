@@ -42,7 +42,7 @@ func (r *Reconciler) ReconcileSecrets(ctx context.Context, app *appv1alpha1.Heli
 	}
 
 	for _, dbTrait := range dbTraits {
-		if strings.ToLower(dbTrait.Properties.DBType) != "postgres" {
+		if strings.ToLower(dbTrait.Properties.DBType) != dbTypePostgres {
 			log.V(1).Info("Skipping credential secret creation for non-postgres database type",
 				"component", dbTrait.ComponentName,
 				"dbType", dbTrait.Properties.DBType)
@@ -146,7 +146,7 @@ func (r *Reconciler) ReconcileInstances(ctx context.Context, app *appv1alpha1.He
 	}
 
 	for _, dbTrait := range dbTraits {
-		if strings.ToLower(dbTrait.Properties.DBType) != "postgres" {
+		if strings.ToLower(dbTrait.Properties.DBType) != dbTypePostgres {
 			log.V(1).Info("Skipping non-postgres database type",
 				"component", dbTrait.ComponentName,
 				"dbType", dbTrait.Properties.DBType)
@@ -308,7 +308,7 @@ func (r *Reconciler) ReconcileInjection(ctx context.Context, app *appv1alpha1.He
 	pendingInjection := false
 
 	for _, dbTrait := range dbTraits {
-		if strings.ToLower(dbTrait.Properties.DBType) != "postgres" {
+		if strings.ToLower(dbTrait.Properties.DBType) != dbTypePostgres {
 			log.V(1).Info("Skipping env var injection for non-postgres database type",
 				"component", dbTrait.ComponentName,
 				"dbType", dbTrait.Properties.DBType)

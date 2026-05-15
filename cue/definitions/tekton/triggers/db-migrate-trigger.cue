@@ -46,7 +46,10 @@ import (
 				apiVersion: "tekton.dev/v1beta1"
 				kind:       "PipelineRun"
 				metadata: {
-					name:      "\(_bp.appName)-migrate-$(uid)"
+					// Truncate appName to at most 32 chars to keep total name ≤63 chars.
+					// CUE slice [:n] panics if string is shorter than n, so we guard with a conditional.
+					let _namePrefix = [if len(_bp.appName) > 32 {_bp.appName[:32]}, _bp.appName][0]
+					name:      "\(_namePrefix)-migrate-$(uid)"
 					namespace: _bp.namespace
 					labels: {
 						"helios.io/managed-by":       "helios-operator"
@@ -66,8 +69,8 @@ import (
 					params: [
 						{name: "app-repo-url", value: "$(tt.params.git-repo-url)"},
 						{name: "app-repo-revision", value: "$(tt.params.git-revision)"},
-						{name: "db-secret-name", value: "api-db-secret"},
-						{name: "migration-source", value: "db/migration"},
+						{name: "db-secret-name", value: _bp.databaseSecretRef},
+						{name: "migration-source", value: "db/migrations"},
 						{name: "namespace", value: _bp.namespace},
 					]
 
