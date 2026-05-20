@@ -1,0 +1,48 @@
+apiVersion: app.helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.name }}
+  namespace: ${{ values.namespace }}
+spec:
+  owner: ${{ values.owner }}
+  gitRepo: ${{ values.sourceRepo }}
+  gitBranch: main
+  imageRepo: ${{ values.image }}
+  gitopsRepo: ${{ values.gitopsRepo }}
+  gitopsPath: ${{ values.name }}
+  webhookSecret: ${{ values.name }}-webhook-secret
+  port: ${{ values.port }}
+  replicas: 1
+  
+  # Connects this app to the same zero-downtime golang-migrate pipeline as PostgREST!
+  triggerType: db-migrate
+
+  components:
+    - name: ${{ values.name }}
+      type: web-service
+      properties:
+        image: ${{ values.image }}:main
+        port: ${{ values.port }}
+        env:
+          # Changed from DATABASE_URL to POSTGRAPHILE_DB_URI to bypass Operator overwrite
+          - name: POSTGRAPHILE_DB_URI
+            valueFrom:
+              secretKeyRef:
+                name: ${{ values.name }}-db-secret
+                key: PGRST_DB_URI
+      traits:
+        - type: database
+          properties:
+            dbType: ${{ values.databaseType | default("postgres") }}
+            dbName: ${{ values.databaseName or values.name }}-db
+            port: 5432
+            version: "16"
+            storage: "1Gi"
+        - type: service
+          properties:
+            port: ${{ values.port }}
+            protocol: HTTP
+            ingress:
+              enabled: true
+              host: ${{ values.name }}.local
+              path: /

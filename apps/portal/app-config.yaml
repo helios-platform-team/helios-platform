@@ -161,6 +161,12 @@ catalog:
       target: ../../examples/hasura-template/template.yaml
       rules:
         - allow: [Template]
+    
+    # PostGraphile Template - Instant GraphQL API over PostgreSQL
+    - type: file
+      target: ../../examples/postgraphile-template/template.yaml
+      rules:
+        - allow: [Template]
 
     ## Uncomment these lines to add more example data
     # - type: url
