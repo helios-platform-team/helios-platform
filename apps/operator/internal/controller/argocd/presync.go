@@ -99,7 +99,7 @@ func (r *PreSyncReconciler) reconcileServiceAccount(ctx context.Context, heliosA
 		return err
 	}
 
-	if err := r.Client.Create(ctx, sa); err != nil {
+	if err := r.Create(ctx, sa); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			return nil // Already exists, no error
 		}
@@ -138,7 +138,7 @@ func (r *PreSyncReconciler) reconcileRole(ctx context.Context, heliosApp *appv1a
 		},
 	}
 
-	if err := r.Client.Create(ctx, role); err != nil {
+	if err := r.Create(ctx, role); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			return nil
 		}
@@ -172,7 +172,7 @@ func (r *PreSyncReconciler) reconcileRoleBinding(ctx context.Context, heliosApp 
 		},
 	}
 
-	if err := r.Client.Create(ctx, binding); err != nil {
+	if err := r.Create(ctx, binding); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			return nil
 		}
@@ -268,7 +268,7 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 	heliosAppCopy.Annotations["helios.io/presync-job"] = string(jobBytes)
 	heliosAppCopy.Annotations["helios.io/has-database-trait"] = "true"
 
-	if err := r.Client.Update(ctx, heliosAppCopy); err != nil {
+	if err := r.Update(ctx, heliosAppCopy); err != nil {
 		return fmt.Errorf("failed to update HeliosApp with PreSync Job config: %w", err)
 	}
 
