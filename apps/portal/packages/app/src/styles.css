@@ -582,3 +582,47 @@ article[class*='BackstageContent-root'] {
   padding-left: 48px;
   padding-right: 48px;
 }
+
+/* ============================================================
+   HELIOS STATUS CARD — Phase Badges & Animations
+   ============================================================ */
+
+/* Card hover glow */
+.helios-status-card:hover {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Phase badge base — colors set per-phase below */
+.helios-phase-ready {
+  color: var(--bui-fg-success-on-bg);
+  border-color: var(--bui-border-success);
+  background-color: var(--bui-bg-success);
+}
+.helios-phase-pending {
+  color: var(--bui-fg-warning-on-bg);
+  border-color: var(--bui-border-warning);
+  background-color: var(--bui-bg-warning);
+  animation: helios-pulse-pending 2s ease-in-out infinite;
+}
+.helios-phase-failed {
+  color: var(--bui-fg-danger-on-bg);
+  border-color: var(--bui-border-danger);
+  background-color: var(--bui-bg-danger);
+}
+.helios-phase-deleting {
+  color: var(--bui-fg-secondary);
+  border-color: var(--bui-border-2);
+  background-color: var(--bui-bg-neutral-2);
+}
+.helios-phase-unknown {
+  color: var(--bui-fg-secondary);
+  border-color: var(--bui-border-2);
+  background-color: var(--bui-bg-neutral-2);
+}
+
+/* Pending pulse animation */
+@keyframes helios-pulse-pending {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+

@@ -29,6 +29,10 @@ export const heliosBackendPlugin = createBackendPlugin({
           path: '/health',
           allow: 'unauthenticated',
         });
+        httpRouter.addAuthPolicy({
+          path: '/status',
+          allow: 'unauthenticated',
+        });
       },
     });
   },
