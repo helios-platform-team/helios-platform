@@ -183,5 +183,108 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     });
   });
 
+  // ----------------------------------------------------------------
+  // GET /status/:componentName — HeliosApp CRD real-time status
+  // ----------------------------------------------------------------
+  router.get('/status/:componentName', async (req, res) => {
+    const { componentName } = req.params;
+    const namespace =
+      typeof req.query.namespace === 'string' ? req.query.namespace : 'default';
+
+    try {
+      const raw: unknown = await customApi.getNamespacedCustomObject({
+        group: 'app.helios.io',
+        version: 'v1alpha1',
+        namespace,
+        plural: 'heliosapps',
+        name: componentName,
+      });
+
+      // The client may return { body: … } or the object directly.
+      const obj = (raw as { body?: Record<string, unknown> }).body ?? raw;
+      const body = obj as Record<string, unknown>;
+
+      const metadata = (body.metadata ?? {}) as Record<string, unknown>;
+      const spec = (body.spec ?? {}) as Record<string, unknown>;
+      const status = (body.status ?? {}) as Record<string, unknown>;
+
+      // Extract conditions ([]metav1.Condition)
+      const rawConditions = Array.isArray(status.conditions)
+        ? status.conditions
+        : [];
+      const conditions = rawConditions.map((c: Record<string, unknown>) => ({
+        type: String(c.type ?? ''),
+        status: String(c.status ?? ''),
+        reason: String(c.reason ?? ''),
+        message: String(c.message ?? ''),
+        lastTransitionTime: String(c.lastTransitionTime ?? ''),
+      }));
+
+      // Extract resourcesCreated ([]ResourceRef)
+      const rawResources = Array.isArray(status.resourcesCreated)
+        ? status.resourcesCreated
+        : [];
+      const resourcesCreated = rawResources.map(
+        (r: Record<string, unknown>) => ({
+          apiVersion: String(r.apiVersion ?? ''),
+          kind: String(r.kind ?? ''),
+          name: String(r.name ?? ''),
+          namespace: r.namespace ? String(r.namespace) : undefined,
+        }),
+      );
+
+      // Extract components summary from spec
+      const rawComponents = Array.isArray(spec.components)
+        ? spec.components
+        : [];
+      const components = rawComponents.map((c: Record<string, unknown>) => ({
+        name: String(c.name ?? ''),
+        type: String(c.type ?? ''),
+      }));
+
+      return res.json({
+        name: String(metadata.name ?? componentName),
+        namespace: String(metadata.namespace ?? namespace),
+        phase: String(status.phase ?? 'Unknown'),
+        message: String(status.message ?? ''),
+        conditions,
+        resourcesCreated,
+        initialBuildTriggered: Boolean(status.initialBuildTriggered),
+        // Spec context
+        owner: String(spec.owner ?? ''),
+        gitRepo: String(spec.gitRepo ?? ''),
+        imageRepo: String(spec.imageRepo ?? ''),
+        replicas: Number(spec.replicas ?? 0),
+        components,
+        createdAt: String(metadata.creationTimestamp ?? ''),
+      });
+    } catch (err: unknown) {
+      if (isNotFoundError(err)) {
+        return res.status(404).json({
+          name: componentName,
+          namespace,
+          phase: 'Unknown',
+          message: 'HeliosApp CR not found in the cluster',
+          conditions: [],
+          resourcesCreated: [],
+          initialBuildTriggered: false,
+          owner: '',
+          gitRepo: '',
+          imageRepo: '',
+          replicas: 0,
+          components: [],
+          createdAt: '',
+        });
+      }
+
+      logger.error(
+        `Failed to fetch HeliosApp status for ${componentName}: ${String(err)}`,
+      );
+      return res.status(500).json({
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+
   return router;
 }
