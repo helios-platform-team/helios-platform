@@ -16,6 +16,12 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	// preSyncFinalizerKey is used to ensure cluster-scoped RBAC resources
+	// (ClusterRole and ClusterRoleBinding) are properly cleaned up when a HeliosApp is deleted.
+	preSyncFinalizerKey = "argocd.helios.io/presync-cleanup"
+)
+
 // PreSyncReconciler creates PreSync Jobs and supporting resources for database migrations.
 type PreSyncReconciler struct {
 	client.Client
@@ -56,6 +62,11 @@ func (r *PreSyncReconciler) ReconcilePreSyncResources(
 	}
 
 	log.Info("Creating PreSync resources for database migrations", "app", heliosApp.Name)
+
+	// Add finalizer to ensure cluster-scoped RBAC resources are cleaned up on deletion
+	if err := r.AddPreSyncFinalizer(ctx, heliosApp); err != nil {
+		return fmt.Errorf("failed to add presync finalizer: %w", err)
+	}
 
 	// 1. Create ServiceAccount for PreSync Job execution
 	if err := r.reconcileServiceAccount(ctx, heliosApp); err != nil {
@@ -185,6 +196,30 @@ func (r *PreSyncReconciler) reconcileRoleBinding(ctx context.Context, heliosApp 
 // reconcilePreSyncJobconfig stores the PreSync Job configuration as a ConfigMap.
 // This config will be referenced by the ArgoCD Application and executed as a PreSync hook.
 func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, heliosApp *appv1alpha1.HeliosApp) error {
+	log := logf.FromContext(ctx)
+
+	// Find the first component with database trait to get the correct database secret
+	var databaseComponentName string
+	for _, comp := range heliosApp.Spec.Components {
+		for _, trait := range comp.Traits {
+			if trait.Type == "database" {
+				databaseComponentName = comp.Name
+				break
+			}
+		}
+		if databaseComponentName != "" {
+			break
+		}
+	}
+
+	if databaseComponentName == "" {
+		log.V(1).Info("No database component found, skipping PreSync Job config creation")
+		return nil
+	}
+
+	// The database secret is named {componentName}-db-secret following the operator's convention
+	databaseSecretName := fmt.Sprintf("%s-db-secret", databaseComponentName)
+
 	// Find migration image reference from components
 	// For now, use the standard naming convention: <app-name>-migrate:latest
 	migrateImage := fmt.Sprintf("index.docker.io/{{.Values.dockerOrg}}/%s-migrate:latest", heliosApp.Name)
@@ -206,7 +241,6 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 		"spec": map[string]interface{}{
 			"backoffLimit":            3,
 			"ttlSecondsAfterFinished": 3600,
-			"serviceAccountName":      fmt.Sprintf("%s-migrator", heliosApp.Name),
 			"template": map[string]interface{}{
 				"metadata": map[string]interface{}{
 					"labels": map[string]interface{}{
@@ -215,6 +249,7 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 					},
 				},
 				"spec": map[string]interface{}{
+					"serviceAccountName": fmt.Sprintf("%s-migrator", heliosApp.Name),
 					"containers": []map[string]interface{}{
 						{
 							"name":            "db-migrate",
@@ -225,8 +260,8 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 									"name": "PGRST_DB_URI",
 									"valueFrom": map[string]interface{}{
 										"secretKeyRef": map[string]interface{}{
-											"name": fmt.Sprintf("%s-db-credentials", heliosApp.Name),
-											"key":  "uri",
+											"name": databaseSecretName,
+											"key":  "PGRST_DB_URI",
 										},
 									},
 								},
@@ -241,13 +276,15 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 									"memory": "512Mi",
 								},
 							},
+							"securityContext": map[string]interface{}{
+								"readOnlyRootFilesystem": true,
+							},
 						},
 					},
 					"restartPolicy": "Never",
 					"securityContext": map[string]interface{}{
-						"runAsNonRoot":             true,
-						"runAsUser":                1000,
-						"fsReadOnlyRootFilesystem": true,
+						"runAsNonRoot": true,
+						"runAsUser":    1000,
 					},
 				},
 			},
@@ -286,3 +323,100 @@ func HasDatabaseTrait(heliosApp *appv1alpha1.HeliosApp) bool {
 	}
 	return false
 }
+
+// AddPreSyncFinalizer adds the presync cleanup finalizer to the HeliosApp.
+// This finalizer ensures cluster-scoped RBAC resources are properly cleaned up
+// when the HeliosApp is deleted.
+func (r *PreSyncReconciler) AddPreSyncFinalizer(ctx context.Context, heliosApp *appv1alpha1.HeliosApp) error {
+	// Check if finalizer already exists
+	for _, finalizer := range heliosApp.Finalizers {
+		if finalizer == preSyncFinalizerKey {
+			return nil // Finalizer already added
+		}
+	}
+
+	// Add finalizer
+	heliosAppCopy := heliosApp.DeepCopy()
+	heliosAppCopy.Finalizers = append(heliosAppCopy.Finalizers, preSyncFinalizerKey)
+
+	if err := r.Update(ctx, heliosAppCopy); err != nil {
+		return fmt.Errorf("failed to add presync finalizer: %w", err)
+	}
+
+	return nil
+}
+
+// HandlePreSyncCleanup cleans up cluster-scoped RBAC resources when HeliosApp is deleted.
+// This method should be called when the HeliosApp has a deletion timestamp and the
+// presync cleanup finalizer is present.
+func (r *PreSyncReconciler) HandlePreSyncCleanup(ctx context.Context, heliosApp *appv1alpha1.HeliosApp) error {
+	log := logf.FromContext(ctx)
+
+	// Delete ClusterRole
+	roleName := fmt.Sprintf("%s-presync-job-role", heliosApp.Name)
+	role := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: roleName,
+		},
+	}
+
+	if err := r.Delete(ctx, role); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete ClusterRole '%s': %w", roleName, err)
+		}
+		log.Info("ClusterRole not found, skipping deletion", "name", roleName)
+	} else {
+		log.Info("Deleted ClusterRole", "name", roleName)
+	}
+
+	// Delete ClusterRoleBinding
+	bindingName := fmt.Sprintf("%s-presync-job-binding", heliosApp.Name)
+	binding := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: bindingName,
+		},
+	}
+
+	if err := r.Delete(ctx, binding); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete ClusterRoleBinding '%s': %w", bindingName, err)
+		}
+		log.Info("ClusterRoleBinding not found, skipping deletion", "name", bindingName)
+	} else {
+		log.Info("Deleted ClusterRoleBinding", "name", bindingName)
+	}
+
+	// Remove finalizer after cleanup
+	heliosAppCopy := heliosApp.DeepCopy()
+	finalizers := []string{}
+	for _, finalizer := range heliosAppCopy.Finalizers {
+		if finalizer != preSyncFinalizerKey {
+			finalizers = append(finalizers, finalizer)
+		}
+	}
+	heliosAppCopy.Finalizers = finalizers
+
+	if err := r.Update(ctx, heliosAppCopy); err != nil {
+		return fmt.Errorf("failed to remove presync finalizer: %w", err)
+	}
+
+	log.Info("Presync cleanup completed and finalizer removed", "app", heliosApp.Name)
+	return nil
+}
+
+// HasPreSyncFinalizer checks if the HeliosApp has the presync cleanup finalizer.
+func HasPreSyncFinalizer(heliosApp *appv1alpha1.HeliosApp) bool {
+	for _, finalizer := range heliosApp.Finalizers {
+		if finalizer == preSyncFinalizerKey {
+			return true
+		}
+	}
+	return false
+}
+
+// GetPreSyncFinalizerKey returns the presync cleanup finalizer key.
+// This is exported for use by the main controller.
+func GetPreSyncFinalizerKey() string {
+	return preSyncFinalizerKey
+}
+

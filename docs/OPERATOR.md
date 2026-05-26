@@ -254,7 +254,7 @@ migrate -path /migrations -database "$PGRST_DB_URI" up
 echo "Migrations completed successfully"
 ```
 
-The `PGRST_DB_URI` environment variable is injected from the `<app>-db-credentials` Secret (managed by the operator's database trait).
+The `PGRST_DB_URI` environment variable is injected from a database Secret created by the operator's database trait. The secret is named following the convention `{componentName}-db-secret`, where `componentName` is the name of the component with the database trait (e.g., `postgrest-api-db-secret` for a component named `postgrest-api`). The secret contains the key `PGRST_DB_URI` with the PostgreSQL connection string.
 
 ### Configuration
 
@@ -279,10 +279,12 @@ spec:
         storage: "1Gi"
 ```
 
-When the `database` trait is present, the scaffolder automatically includes:
-- PreSync Job configured to use `<org>/my-api-migrate:latest` image
-- ServiceAccount with permissions to run the Job
-- Kustomization to apply all resources
+When the `database` trait is present, the operator automatically creates:
+- Database credential Secret named `{componentName}-db-secret` (e.g., `postgrest-api-db-secret`)
+- Database StatefulSet and Service for the component
+- PreSync Job configured to use `<org>/{appName}-migrate:latest` image and injected with `PGRST_DB_URI` from the database secret
+- ServiceAccount with permissions to run the PreSync Job
+- ClusterRole and ClusterRoleBinding for Job and Pod management
 
 ### Troubleshooting
 
