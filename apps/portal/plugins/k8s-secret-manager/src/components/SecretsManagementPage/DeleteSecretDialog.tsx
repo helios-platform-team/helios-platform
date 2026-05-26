@@ -1,4 +1,10 @@
-import { Dialog, DialogBody, DialogFooter, DialogHeader, Button } from '@backstage/ui';
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  Button,
+} from '@backstage/ui';
 import { type SecretTableRow } from './types';
 
 type DeleteSecretDialogProps = {
@@ -31,4 +37,3 @@ export const DeleteSecretDialog = ({
     </DialogFooter>
   </Dialog>
 );
-

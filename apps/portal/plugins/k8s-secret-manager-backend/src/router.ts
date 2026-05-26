@@ -19,16 +19,34 @@ export async function createRouter({
     serviceName: z.string().min(1),
     secretName: z.string().min(1),
     namespace: z.string().min(1),
-    secretData: z.record(z.string(), z.string()), // Key-value pairs
+    secretData: z.record(z.string(), z.string()).optional(), // Key-value pairs
     entityRef: z.string().optional(),
+  });
+
+  const entrySchema = z.object({
+    value: z.string(),
   });
 
   // GET: List secrets with filtering
   router.get('/secrets', async (req, res) => {
-    const namespace = String(req.query.namespace) ?? 'default';
+    const namespace = String(req.query.namespace || 'default');
     const serviceName = String(req.query.serviceName);
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
 
-    const secrets = await secretService.listSecrets(serviceName, namespace);
+    if (!req.query.serviceName) {
+      throw new InputError('serviceName is required');
+    }
+
+    const continueToken = req.query.continueToken
+      ? String(req.query.continueToken)
+      : undefined;
+
+    const secrets = await secretService.listSecrets(
+      serviceName,
+      namespace,
+      limit,
+      continueToken,
+    );
     res.json(secrets);
   });
 
@@ -56,6 +74,64 @@ export async function createRouter({
     await secretService.deleteSecret(serviceName, name, namespace);
     res.status(204).end();
   });
+
+  // --- Entry Level Endpoints ---
+
+  // GET: List all key-value entries of a specific secret
+  router.get(
+    '/secrets/:namespace/:serviceName/:secretName/entries',
+    async (req, res) => {
+      const { namespace, serviceName, secretName } = req.params;
+
+      const entries = await secretService.getSecretEntries(
+        serviceName,
+        secretName,
+        namespace,
+      );
+
+      res.json(entries);
+    },
+  );
+
+  // PUT: Upsert a single entry (key/value pair) inside a secret
+  router.put(
+    '/secrets/:namespace/:serviceName/:secretName/entries/:key',
+    async (req, res) => {
+      const { namespace, serviceName, secretName, key } = req.params;
+      const parsed = entrySchema.safeParse(req.body);
+
+      if (!parsed.success) {
+        throw new InputError(parsed.error.toString());
+      }
+
+      await secretService.upsertSecretEntry({
+        serviceName,
+        namespace,
+        secretName,
+        key,
+        value: parsed.data.value,
+      });
+
+      res.status(200).end();
+    },
+  );
+
+  // DELETE: Remove a single entry from a secret
+  router.delete(
+    '/secrets/:namespace/:serviceName/:secretName/entries/:key',
+    async (req, res) => {
+      const { namespace, serviceName, secretName, key } = req.params;
+
+      await secretService.deleteSecretEntry({
+        serviceName,
+        namespace,
+        secretName,
+        key,
+      });
+
+      res.status(204).end();
+    },
+  );
 
   return router;
 }

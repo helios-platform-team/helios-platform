@@ -10,4 +10,3 @@ export type SecretActionsCellProps = {
   serviceName: string;
   onRefresh: () => void;
 };
-

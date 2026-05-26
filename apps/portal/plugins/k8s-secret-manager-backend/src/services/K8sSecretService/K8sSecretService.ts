@@ -1,47 +1,18 @@
-/*
- * Copyright 2025 The Backstage Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import {
-  LoggerService,
   BackstageCredentials,
   BackstageUserPrincipal,
+  LoggerService,
 } from '@backstage/backend-plugin-api';
 import * as k8s from '@kubernetes/client-node';
-import { randomUUID } from 'crypto';
-import { promises as fs } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { promisify } from 'util';
-import { execFile as execFileCb } from 'child_process';
-import {
-  HELIOS_CRD,
-  HeliosAppResource,
-  HeliosComponent,
-  HeliosTrait,
-  K8sSecretService,
-  SecretResponse,
-} from './types';
+import { K8sSecretService, PaginatedSecretResponse, SecretDto } from './types';
+import { GitOpsService } from '../GitOpsService';
+import { HeliosAppManager } from '../HeliosAppManager';
 
-const externalSecretReferenceTraitType = 'external-secret-reference';
-const execFile = promisify(execFileCb);
-
-// --- Implementation ---
 export class K8sSecretServiceImpl implements K8sSecretService {
   readonly #logger: LoggerService;
   readonly #k8sCoreApi: k8s.CoreV1Api;
-  readonly #k8sCustomApi: k8s.CustomObjectsApi;
+  readonly #gitOpsService: GitOpsService;
+  readonly #heliosAppManager: HeliosAppManager;
 
   constructor(logger: LoggerService) {
     this.#logger = logger;
@@ -49,19 +20,35 @@ export class K8sSecretServiceImpl implements K8sSecretService {
     const kc = new k8s.KubeConfig();
     kc.loadFromDefault();
     this.#k8sCoreApi = kc.makeApiClient(k8s.CoreV1Api);
-    this.#k8sCustomApi = kc.makeApiClient(k8s.CustomObjectsApi);
+    const k8sCustomApi = kc.makeApiClient(k8s.CustomObjectsApi);
+
+    // Initialize Domain Services
+    this.#gitOpsService = new GitOpsService(logger, this.#k8sCoreApi);
+    this.#heliosAppManager = new HeliosAppManager(logger, k8sCustomApi);
   }
 
   async listSecrets(
     serviceName: string,
     namespace: string,
-  ): Promise<SecretResponse[]> {
-    const response = await this.#k8sCoreApi.listNamespacedSecret({ namespace });
+    limit: number = 10,
+    continueToken?: string,
+  ): Promise<PaginatedSecretResponse> {
     const prefix = `${serviceName}-`;
 
-    return response.items
+    const response = await this.#k8sCoreApi.listNamespacedSecret({
+      namespace,
+      limit,
+      _continue: continueToken,
+    });
+
+    const matchingSecrets = response?.items
       .filter(s => s.metadata?.name?.startsWith(prefix))
       .map(s => this.#mapSecretResponse(s, namespace));
+
+    return {
+      items: matchingSecrets,
+      nextPageToken: response.metadata?._continue,
+    };
   }
 
   async createSecret(
@@ -69,12 +56,11 @@ export class K8sSecretServiceImpl implements K8sSecretService {
       serviceName: string;
       namespace: string;
       secretName: string;
-      secretData: Record<string, string>;
       entityRef?: string;
     },
     options: { credentials: BackstageCredentials<BackstageUserPrincipal> },
-  ): Promise<SecretResponse> {
-    const { serviceName, secretName, namespace, secretData, entityRef } = input;
+  ): Promise<SecretDto> {
+    const { serviceName, secretName, namespace, entityRef } = input;
     const fullName = this.#getPrefixedName(serviceName, secretName);
     const user = options.credentials.principal.userEntityRef;
 
@@ -92,7 +78,6 @@ export class K8sSecretServiceImpl implements K8sSecretService {
           ? { 'backstage.io/managed-by-entity': entityRef }
           : {},
       },
-      stringData: secretData,
     };
 
     const responseBody = await this.#upsertSecret(
@@ -101,16 +86,42 @@ export class K8sSecretServiceImpl implements K8sSecretService {
       manifest,
     );
 
-    // Update HeliosApp desired state (trait) so operator+CUE handles GitOps rendering and push.
-    await this.#upsertExternalSecretReferenceTrait(
+    // Discover Git repo routing configuration from live K8s cluster (Read-only lookup)
+    const gitConfig = await this.#heliosAppManager.getGitOpsConfigFromCluster(
       serviceName,
       namespace,
+    );
+
+    // Clone file baseline from Git repository
+    const { workDir, targetFile, heliosApp } =
+      await this.#gitOpsService.checkoutAndFetchHeliosApp(
+        namespace,
+        serviceName,
+        gitConfig.gitopsRepo,
+        gitConfig.gitopsPath,
+        gitConfig.gitopsSecretRef,
+      );
+
+    const currentResource = heliosApp ?? {
+      apiVersion: 'app.helios.io/v1alpha1',
+      kind: 'HeliosApp',
+      spec: { ...gitConfig, components: [{ name: serviceName, traits: [] }] },
+    };
+
+    // Update memory mapping layout details
+    const updatedHeliosApp = this.#heliosAppManager.applyExternalSecretTrait(
+      currentResource,
+      serviceName,
       fullName,
     );
 
-    this.#logger.info(
-      `Secret ${fullName} applied and HeliosApp trait updated for ${serviceName}. ` +
-        `Operator reconcile will render with CUE and push manifest changes to GitOps.`,
+    // Commit changes straight out to GitOps repo (Operator takes over app syncing)
+    await this.#gitOpsService.commitAndPushSecretChange(
+      workDir,
+      targetFile,
+      serviceName,
+      updatedHeliosApp.spec,
+      namespace,
     );
 
     return this.#mapSecretResponse(responseBody, namespace);
@@ -123,17 +134,120 @@ export class K8sSecretServiceImpl implements K8sSecretService {
   ): Promise<void> {
     const fullName = this.#getPrefixedName(serviceName, name);
     this.#logger.info(`Deleting secret ${fullName} from ${namespace}`);
+
     await this.#k8sCoreApi.deleteNamespacedSecret({
       name: fullName,
       namespace,
     });
 
-    // Keep HeliosApp desired state and GitOps source aligned when a secret is removed.
-    await this.#removeExternalSecretReferenceTrait(
+    // Discover Git configurations from live CR lookup
+    const gitConfig = await this.#heliosAppManager.getGitOpsConfigFromCluster(
       serviceName,
       namespace,
+    );
+
+    // Fetch current application manifest tracking from Git repository
+    const { workDir, targetFile, heliosApp } =
+      await this.#gitOpsService.checkoutAndFetchHeliosApp(
+        namespace,
+        serviceName,
+        gitConfig.gitopsRepo,
+        gitConfig.gitopsPath,
+        gitConfig.gitopsSecretRef,
+      );
+
+    if (!heliosApp) {
+      this.#logger.warn(
+        `No manifest file found at path ${targetFile}. Skipping GitOps deletion step.`,
+      );
+      return;
+    }
+
+    // Strip out specific trait references in memory
+    const updatedHeliosApp = this.#heliosAppManager.removeExternalSecretTrait(
+      heliosApp,
+      serviceName,
       fullName,
     );
+
+    // Push clean file blueprint downstream
+    await this.#gitOpsService.commitAndPushSecretChange(
+      workDir,
+      targetFile,
+      serviceName,
+      updatedHeliosApp.spec,
+      namespace,
+    );
+  }
+
+  async getSecretEntries(
+    serviceName: string,
+    secretName: string,
+    namespace: string,
+  ): Promise<Record<string, string>> {
+    const fullName = this.#getPrefixedName(serviceName, secretName);
+    const secret = await this.#k8sCoreApi.readNamespacedSecret({
+      name: fullName,
+      namespace,
+    });
+
+    const entries: Record<string, string> = {};
+    const data = secret.data ?? {};
+
+    for (const [key, base64Value] of Object.entries(data)) {
+      entries[key] = Buffer.from(base64Value, 'base64').toString('utf8');
+    }
+
+    return entries;
+  }
+
+  async upsertSecretEntry(input: {
+    serviceName: string;
+    namespace: string;
+    secretName: string;
+    key: string;
+    value: string;
+  }): Promise<void> {
+    const { serviceName, namespace, secretName, key, value } = input;
+    const fullName = this.#getPrefixedName(serviceName, secretName);
+
+    this.#logger.info(
+      `Upserting entry '${key}' for secret ${fullName} in ${namespace}`,
+    );
+
+    const secret = await this.#k8sCoreApi.readNamespacedSecret({
+      name: fullName,
+      namespace,
+    });
+
+    secret.data = secret.data ?? {};
+    secret.data[key] = Buffer.from(value).toString('base64');
+
+    await this.#upsertSecret(fullName, namespace, secret);
+  }
+
+  async deleteSecretEntry(input: {
+    serviceName: string;
+    namespace: string;
+    secretName: string;
+    key: string;
+  }): Promise<void> {
+    const { serviceName, namespace, secretName, key } = input;
+    const fullName = this.#getPrefixedName(serviceName, secretName);
+
+    this.#logger.info(
+      `Deleting entry '${key}' from secret ${fullName} in ${namespace}`,
+    );
+
+    const secret = await this.#k8sCoreApi.readNamespacedSecret({
+      name: fullName,
+      namespace,
+    });
+
+    if (secret.data && secret.data[key]) {
+      delete secret.data[key];
+      await this.#upsertSecret(fullName, namespace, secret);
+    }
   }
 
   // --- Private Helpers ---
@@ -147,7 +261,7 @@ export class K8sSecretServiceImpl implements K8sSecretService {
   #mapSecretResponse(
     secret: k8s.V1Secret,
     fallbackNamespace: string,
-  ): SecretResponse {
+  ): SecretDto {
     return {
       name: secret.metadata?.name ?? '',
       namespace: secret.metadata?.namespace ?? fallbackNamespace,
@@ -173,9 +287,7 @@ export class K8sSecretServiceImpl implements K8sSecretService {
       if (err instanceof k8s.ApiException) {
         try {
           const k8sStatus = JSON.parse(err.body);
-          const k8sCode = k8sStatus?.code;
-
-          if (k8sCode === 404) {
+          if (k8sStatus?.code === 404) {
             const res = await this.#k8sCoreApi.createNamespacedSecret({
               namespace,
               body,
@@ -187,291 +299,7 @@ export class K8sSecretServiceImpl implements K8sSecretService {
           console.error('Failed to parse body:', parseErr);
         }
       }
-
       throw err;
     }
-  }
-
-  async #upsertExternalSecretReferenceTrait(
-    serviceName: string,
-    namespace: string,
-    secretName: string,
-  ): Promise<void> {
-    try {
-      const heliosApp = (await this.#k8sCustomApi.getNamespacedCustomObject({
-        ...HELIOS_CRD,
-        namespace,
-        name: serviceName,
-      })) as HeliosAppResource;
-
-      const components = heliosApp.spec?.components;
-      if (!Array.isArray(components)) {
-        this.#logger.warn(
-          `Skipping HeliosApp trait update for ${serviceName}: components missing in spec`,
-        );
-        return;
-      }
-
-      const targetIndex = components.findIndex(c => c?.name === serviceName);
-      if (targetIndex < 0) {
-        this.#logger.warn(
-          `Skipping HeliosApp trait update for ${serviceName}: component ${serviceName} not found`,
-        );
-        return;
-      }
-
-      const updatedComponents = [...components];
-      updatedComponents[targetIndex] = this.#upsertTraitOnComponent(
-        components[targetIndex],
-        secretName,
-      );
-
-      const body: HeliosAppResource = {
-        ...heliosApp,
-        spec: {
-          ...heliosApp.spec,
-          components: updatedComponents,
-        },
-      };
-
-      await this.#k8sCustomApi.replaceNamespacedCustomObject({
-        ...HELIOS_CRD,
-        namespace,
-        name: serviceName,
-        body,
-      });
-
-      await this.#syncHeliosAppToGitOps(
-        namespace,
-        serviceName,
-        body,
-      );
-    } catch (err: any) {
-      this.#logger.error(
-        `HeliosApp trait update failed for ${serviceName}: ${err.message}`,
-      );
-    }
-  }
-
-  async #removeExternalSecretReferenceTrait(
-    serviceName: string,
-    namespace: string,
-    secretName: string,
-  ): Promise<void> {
-    try {
-      const heliosApp = (await this.#k8sCustomApi.getNamespacedCustomObject({
-        ...HELIOS_CRD,
-        namespace,
-        name: serviceName,
-      })) as HeliosAppResource;
-
-      const components = heliosApp.spec?.components;
-      if (!Array.isArray(components)) {
-        this.#logger.warn(
-          `Skipping HeliosApp trait removal for ${serviceName}: components missing in spec`,
-        );
-        return;
-      }
-
-      const targetIndex = components.findIndex(c => c?.name === serviceName);
-      if (targetIndex < 0) {
-        this.#logger.warn(
-          `Skipping HeliosApp trait removal for ${serviceName}: component ${serviceName} not found`,
-        );
-        return;
-      }
-
-      const updatedComponent = this.#removeTraitFromComponent(
-        components[targetIndex],
-        secretName,
-      );
-
-      const componentUnchanged =
-        JSON.stringify(updatedComponent.traits ?? []) ===
-        JSON.stringify(components[targetIndex]?.traits ?? []);
-      if (componentUnchanged) {
-        this.#logger.info(
-          `HeliosApp trait already absent for ${serviceName} secret ${secretName}`,
-        );
-        return;
-      }
-
-      const updatedComponents = [...components];
-      updatedComponents[targetIndex] = updatedComponent;
-
-      const body: HeliosAppResource = {
-        ...heliosApp,
-        spec: {
-          ...heliosApp.spec,
-          components: updatedComponents,
-        },
-      };
-
-      await this.#k8sCustomApi.replaceNamespacedCustomObject({
-        ...HELIOS_CRD,
-        namespace,
-        name: serviceName,
-        body,
-      });
-
-      await this.#syncHeliosAppToGitOps(namespace, serviceName, body);
-    } catch (err: any) {
-      this.#logger.error(
-        `HeliosApp trait removal failed for ${serviceName}: ${err.message}`,
-      );
-    }
-  }
-
-  async #syncHeliosAppToGitOps(
-    namespace: string,
-    serviceName: string,
-    heliosApp: HeliosAppResource,
-  ): Promise<void> {
-    const repoUrl = heliosApp.spec?.gitopsRepo;
-    const repoPath = heliosApp.spec?.gitopsPath;
-    if (!repoUrl || !repoPath) {
-      this.#logger.warn(
-        `Skipping GitOps HeliosApp sync for ${serviceName}: gitopsRepo/gitopsPath missing`,
-      );
-      return;
-    }
-
-    const fileName = process.env.HELIOS_GITOPS_HELIOSAPP_FILE || 'helios-app.yaml';
-    const targetFile = `${repoPath.replace(/\/+$/, '')}/${fileName}`;
-    const { username, token } = await this.#resolveGitCredentials(namespace, heliosApp);
-    if (!token) {
-      this.#logger.warn(
-        `Skipping GitOps HeliosApp sync for ${serviceName}: token missing (gitopsSecretRef/env)`,
-      );
-      return;
-    }
-
-    const authRepoUrl = this.#buildAuthRepoUrl(repoUrl, username, token);
-    const workDir = join(tmpdir(), `k8s-secret-gitops-${randomUUID()}`);
-    await fs.mkdir(workDir, { recursive: true });
-
-    try {
-      await execFile('git', ['clone', '--depth', '1', authRepoUrl, workDir]);
-
-      const manifest = {
-        apiVersion: 'app.helios.io/v1alpha1',
-        kind: 'HeliosApp',
-        metadata: {
-          name: serviceName,
-          namespace,
-        },
-        spec: heliosApp.spec,
-      };
-      await fs.mkdir(join(workDir, repoPath), { recursive: true });
-      await fs.writeFile(
-        join(workDir, targetFile),
-        `${JSON.stringify(manifest, null, 2)}\n`,
-        'utf8',
-      );
-
-      await execFile('git', ['-C', workDir, 'add', targetFile]);
-      const status = await execFile('git', ['-C', workDir, 'status', '--porcelain']);
-      if (!status.stdout.trim()) {
-        this.#logger.info(`GitOps HeliosApp unchanged for ${serviceName}, skipping commit`);
-        return;
-      }
-
-      await execFile('git', [
-        '-C',
-        workDir,
-        'commit',
-        '-m',
-        `Update HeliosApp external-secret-reference for ${serviceName}`,
-      ]);
-      await execFile('git', ['-C', workDir, 'push']);
-      this.#logger.info(`Synced ${targetFile} to GitOps for ${serviceName}`);
-    } catch (err: any) {
-      this.#logger.error(
-        `GitOps HeliosApp sync failed for ${serviceName}: ${err.message}`,
-      );
-    } finally {
-      await fs.rm(workDir, { recursive: true, force: true });
-    }
-  }
-
-  async #resolveGitCredentials(
-    namespace: string,
-    heliosApp: HeliosAppResource,
-  ): Promise<{ username: string; token: string }> {
-    let token = process.env.GITEA_TOKEN ?? '';
-    let username = process.env.GITEA_USER ?? 'git';
-    const secretRef = heliosApp.spec?.gitopsSecretRef;
-
-    if (!secretRef) {
-      return { username, token };
-    }
-
-    try {
-      const secret = await this.#k8sCoreApi.readNamespacedSecret({
-        namespace,
-        name: secretRef,
-      });
-      const data = secret.data ?? {};
-      const decode = (v?: string) => (v ? Buffer.from(v, 'base64').toString('utf8') : '');
-
-      token = decode(data.token) || decode(data.password) || token;
-      username = decode(data.username) || username;
-    } catch (err: any) {
-      this.#logger.warn(
-        `Failed to read git credentials secret ${secretRef} for ${namespace}: ${err.message}`,
-      );
-    }
-
-    return { username, token };
-  }
-
-  #buildAuthRepoUrl(repoUrl: string, username: string, token: string): string {
-    const url = new URL(repoUrl);
-    url.username = username;
-    url.password = token;
-    return url.toString();
-  }
-
-  #upsertTraitOnComponent(
-    component: HeliosComponent,
-    secretName: string,
-  ): HeliosComponent {
-    const traits = Array.isArray(component.traits) ? [...component.traits] : [];
-    const externalSecretTrait: HeliosTrait = {
-      type: externalSecretReferenceTraitType,
-      properties: { secretName },
-    };
-    const hasSameSecretTrait = traits.some(
-      t =>
-        t?.type === externalSecretReferenceTraitType &&
-        t?.properties?.secretName === secretName,
-    );
-    if (!hasSameSecretTrait) {
-      traits.push(externalSecretTrait);
-    }
-
-    return {
-      ...component,
-      traits,
-    };
-  }
-
-  #removeTraitFromComponent(
-    component: HeliosComponent,
-    secretName: string,
-  ): HeliosComponent {
-    const traits = Array.isArray(component.traits) ? [...component.traits] : [];
-    const filteredTraits = traits.filter(
-      t =>
-        !(
-          t?.type === externalSecretReferenceTraitType &&
-          t?.properties?.secretName === secretName
-        ),
-    );
-
-    return {
-      ...component,
-      traits: filteredTraits,
-    };
   }
 }

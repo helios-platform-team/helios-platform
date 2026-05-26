@@ -1,40 +1,51 @@
-import {
-  BackstageCredentials,
-  BackstageUserPrincipal,
-} from '@backstage/backend-plugin-api';
-
 export const HELIOS_CRD = {
   group: 'app.helios.io',
   version: 'v1alpha1',
   plural: 'heliosapps',
 };
 
-export interface SecretResponse {
+export interface SecretDto {
   name: string;
   namespace: string;
   createdAt?: string;
+}
+
+export interface PaginatedSecretResponse {
+  items: SecretDto[];
+  nextPageToken?: string;
 }
 
 export interface K8sSecretService {
   listSecrets(
     serviceName: string,
     namespace: string,
-  ): Promise<SecretResponse[]>;
-  createSecret(
-    input: {
-      serviceName: string;
-      namespace: string;
-      secretName: string;
-      secretData: Record<string, string>;
-      entityRef?: string;
-    },
-    options: { credentials: BackstageCredentials<BackstageUserPrincipal> },
-  ): Promise<SecretResponse>;
+    limit: number,
+    continueToken?: string,
+  ): Promise<PaginatedSecretResponse>;
+  createSecret(input: any, options: any): Promise<SecretDto>;
   deleteSecret(
     serviceName: string,
     name: string,
     namespace: string,
   ): Promise<void>;
+  getSecretEntries(
+    serviceName: string,
+    secretName: string,
+    namespace: string,
+  ): Promise<Record<string, string>>;
+  upsertSecretEntry(input: {
+    serviceName: string;
+    namespace: string;
+    secretName: string;
+    key: string;
+    value: string;
+  }): Promise<void>;
+  deleteSecretEntry(input: {
+    serviceName: string;
+    namespace: string;
+    secretName: string;
+    key: string;
+  }): Promise<void>;
 }
 
 export interface HeliosTrait {

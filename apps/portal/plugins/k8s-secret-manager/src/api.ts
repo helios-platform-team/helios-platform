@@ -5,7 +5,7 @@ import {
 } from '@backstage/core-plugin-api';
 
 // 1. Define the types based on your backend responses
-export interface Secret {
+export interface SecretDto {
   name: string;
   namespace: string;
   createdAt?: string;
@@ -15,18 +15,51 @@ export interface CreateSecretInput {
   serviceName: string;
   secretName: string;
   namespace: string;
-  secretData: Record<string, string>;
+  secretData?: Record<string, string>;
   entityRef?: string;
+}
+
+export interface PaginatedSecretResponse {
+  items: SecretDto[];
+  nextPageToken?: string;
 }
 
 // 2. Define the API Interface
 export interface K8sSecretManagerApi {
-  listSecrets(namespace: string, serviceName: string): Promise<Secret[]>;
-  createSecret(input: CreateSecretInput): Promise<Secret>;
-  deleteSecret(
+  listSecrets(
+    serviceName: string,
     namespace: string,
+    limit?: number,
+    continueToken?: string,
+  ): Promise<PaginatedSecretResponse>;
+
+  createSecret(input: CreateSecretInput): Promise<SecretDto>;
+
+  deleteSecret(
     serviceName: string,
     name: string,
+    namespace: string,
+  ): Promise<void>;
+
+  getSecretEntries(
+    serviceName: string,
+    secretName: string,
+    namespace: string,
+  ): Promise<Record<string, string>>;
+
+  upsertSecretEntry(
+    serviceName: string,
+    namespace: string,
+    secretName: string,
+    key: string,
+    value: string,
+  ): Promise<void>;
+
+  deleteSecretEntry(
+    serviceName: string,
+    namespace: string,
+    secretName: string,
+    key: string,
   ): Promise<void>;
 }
 
@@ -50,12 +83,23 @@ export class K8sSecretManagerApiClient implements K8sSecretManagerApi {
     return await this.discoveryApi.getBaseUrl('k8s-secret-manager');
   }
 
-  async listSecrets(namespace: string, serviceName: string): Promise<Secret[]> {
+  async listSecrets(
+    serviceName: string,
+    namespace: string,
+    limit: number = 10,
+    continueToken?: string,
+  ): Promise<PaginatedSecretResponse> {
     const baseUrl = await this.getBaseUrl();
     const query = new URLSearchParams({
       namespace,
       serviceName,
+      limit: limit.toString(),
     });
+
+    if (continueToken) {
+      query.append('continueToken', continueToken);
+    }
+
     const response = await this.fetchApi.fetch(
       `${baseUrl}/secrets?${query.toString()}`,
     );
@@ -64,7 +108,7 @@ export class K8sSecretManagerApiClient implements K8sSecretManagerApi {
     return await response.json();
   }
 
-  async createSecret(input: CreateSecretInput): Promise<Secret> {
+  async createSecret(input: CreateSecretInput): Promise<SecretDto> {
     const baseUrl = await this.getBaseUrl();
     const response = await this.fetchApi.fetch(`${baseUrl}/secrets`, {
       method: 'POST',
@@ -77,19 +121,83 @@ export class K8sSecretManagerApiClient implements K8sSecretManagerApi {
   }
 
   async deleteSecret(
-    namespace: string,
     serviceName: string,
     name: string,
+    namespace: string,
   ): Promise<void> {
     const baseUrl = await this.getBaseUrl();
     const encodedNamespace = encodeURIComponent(namespace);
     const encodedServiceName = encodeURIComponent(serviceName);
     const encodedName = encodeURIComponent(name);
+
     const response = await this.fetchApi.fetch(
       `${baseUrl}/secrets/${encodedNamespace}/${encodedServiceName}/${encodedName}`,
+      { method: 'DELETE' },
+    );
+
+    if (!response.ok) throw new Error(await response.text());
+  }
+
+  // --- Entry Level Actions ---
+
+  async getSecretEntries(
+    serviceName: string,
+    secretName: string,
+    namespace: string,
+  ): Promise<Record<string, string>> {
+    const baseUrl = await this.getBaseUrl();
+    const encodedNamespace = encodeURIComponent(namespace);
+    const encodedServiceName = encodeURIComponent(serviceName);
+    const encodedSecretName = encodeURIComponent(secretName);
+
+    const response = await this.fetchApi.fetch(
+      `${baseUrl}/secrets/${encodedNamespace}/${encodedServiceName}/${encodedSecretName}/entries`,
+    );
+
+    if (!response.ok) throw new Error(await response.text());
+    return await response.json();
+  }
+
+  async upsertSecretEntry(
+    serviceName: string,
+    namespace: string,
+    secretName: string,
+    key: string,
+    value: string,
+  ): Promise<void> {
+    const baseUrl = await this.getBaseUrl();
+    const encodedNamespace = encodeURIComponent(namespace);
+    const encodedServiceName = encodeURIComponent(serviceName);
+    const encodedSecretName = encodeURIComponent(secretName);
+    const encodedKey = encodeURIComponent(key);
+
+    const response = await this.fetchApi.fetch(
+      `${baseUrl}/secrets/${encodedNamespace}/${encodedServiceName}/${encodedSecretName}/entries/${encodedKey}`,
       {
-        method: 'DELETE',
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value }),
       },
+    );
+
+    if (!response.ok) throw new Error(await response.text());
+  }
+
+  async deleteSecretEntry(
+    serviceName: string,
+    namespace: string,
+    secretName: string,
+    key: string,
+  ): Promise<void> {
+    const baseUrl = await this.getBaseUrl();
+    const encodedNamespace = encodeURIComponent(namespace);
+    const encodedServiceName = encodeURIComponent(serviceName);
+    const encodedSecretName = encodeURIComponent(secretName);
+    const encodedKey = encodeURIComponent(key);
+
+    const response = await this.fetchApi.fetch(
+      `${baseUrl}/secrets/${encodedNamespace}/${encodedServiceName}/${encodedSecretName}/entries/${encodedKey}`,
+      { method: 'DELETE' },
     );
 
     if (!response.ok) throw new Error(await response.text());

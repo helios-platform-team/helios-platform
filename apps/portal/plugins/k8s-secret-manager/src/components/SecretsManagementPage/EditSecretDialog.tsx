@@ -1,4 +1,12 @@
-import { Dialog, DialogBody, DialogFooter, DialogHeader, Flex, TextField, Button } from '@backstage/ui';
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  Flex,
+  TextField,
+  Button,
+} from '@backstage/ui';
 import { type SecretTableRow } from './types';
 
 type EditSecretDialogProps = {
@@ -51,4 +59,3 @@ export const EditSecretDialog = ({
     </DialogFooter>
   </Dialog>
 );
-

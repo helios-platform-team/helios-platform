@@ -1,9 +1,4 @@
-import {
-  ButtonIcon,
-  Menu,
-  MenuItem,
-  MenuTrigger,
-} from '@backstage/ui';
+import { ButtonIcon, Menu, MenuItem, MenuTrigger } from '@backstage/ui';
 import { alertApiRef, useApi } from '@backstage/core-plugin-api';
 import { RiDeleteBinLine, RiEditLine, RiMore2Line } from '@remixicon/react';
 import { useState } from 'react';
@@ -52,7 +47,8 @@ export const SecretActionsCell = ({
       setIsEditDialogOpen(false);
       onRefresh();
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Failed to update secret';
+      const message =
+        e instanceof Error ? e.message : 'Failed to update secret';
       alertApi.post({ message, severity: 'error', display: 'transient' });
     } finally {
       setIsUpdating(false);
@@ -73,7 +69,8 @@ export const SecretActionsCell = ({
       setIsDeleteDialogOpen(false);
       onRefresh();
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Failed to delete secret';
+      const message =
+        e instanceof Error ? e.message : 'Failed to delete secret';
       alertApi.post({ message, severity: 'error', display: 'transient' });
     } finally {
       setIsDeleting(false);
@@ -83,7 +80,11 @@ export const SecretActionsCell = ({
   return (
     <>
       <MenuTrigger>
-        <ButtonIcon icon={<RiMore2Line />} variant="tertiary" aria-label="More actions" />
+        <ButtonIcon
+          icon={<RiMore2Line />}
+          variant="tertiary"
+          aria-label="More actions"
+        />
         <Menu>
           <MenuItem
             iconStart={<RiEditLine />}
@@ -124,4 +125,3 @@ export const SecretActionsCell = ({
     </>
   );
 };
-
