@@ -22,7 +22,9 @@ backend:
     # Content-Security-Policy directives follow the Helmet format: https://helmetjs.github.io/#reference
     # Default Helmet Content-Security-Policy values can be removed by setting the key to false
   cors:
-    origin: http://localhost:3000
+    origin:
+      - http://localhost:3000
+      - http://127.0.0.1:3000
     methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
     credentials: true
   # This is for local development only, it is not recommended to use this in production
@@ -40,6 +42,10 @@ integrations:
       password: ${GITEA_TOKEN}
     - host: 127.0.0.1:3030
       baseUrl: http://127.0.0.1:3030
+      username: ${GITEA_USER}
+      password: ${GITEA_TOKEN}
+    - host: gitea-http.gitea.svc.cluster.local:3000
+      baseUrl: http://gitea-http.gitea.svc.cluster.local:3000
       username: ${GITEA_USER}
       password: ${GITEA_TOKEN}
   # Optional: GitHub integration (uncomment if you still need GitHub access)
@@ -60,7 +66,7 @@ proxy:
   # Local dev: Overridden in app-config.local.yaml
   endpoints:
     '/argocd/api':
-      target: http://argocd-server.argocd.svc.cluster.local/api/v1/
+      target: https://127.0.0.1:8080/api/v1/
       changeOrigin: true
       secure: false
       headers:
@@ -132,6 +138,30 @@ catalog:
       rules:
         - allow: [Template]
 
+    # .NET Web API Template
+    - type: file
+      target: ../../examples/dotnet-template/template.yaml
+      rules:
+        - allow: [Template]
+
+    # Spring Boot Template
+    - type: file
+      target: ../../examples/spring-boot-template/template.yaml
+      rules:
+        - allow: [Template]
+
+    # PostgREST Template - Instant REST API over PostgreSQL
+    - type: file
+      target: ../../examples/postgrest-template/template.yaml
+      rules:
+        - allow: [Template]
+
+    # Hasura GraphQL Engine Template
+    - type: file
+      target: ../../examples/hasura-template/template.yaml
+      rules:
+        - allow: [Template]
+
     ## Uncomment these lines to add more example data
     # - type: url
     #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml
@@ -161,12 +191,7 @@ kubernetes:
   serviceLocatorMethod:
     type: 'multiTenant'
   clusterLocatorMethods:
-    - type: 'config'
-      clusters:
-        - url: https://kubernetes.default.svc
-          name: in-cluster
-          authProvider: 'serviceAccount'
-          skipTLSVerify: true
+    - type: 'localKubectlProxy'
   # Required for Tekton visibility - enables fetching PipelineRuns and TaskRuns
   customResources:
     - group: 'tekton.dev'

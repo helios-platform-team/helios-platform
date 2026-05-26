@@ -1,0 +1,47 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    backstage.io/kubernetes-id: ${{ values.name }}
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/name=${{ values.name }}
+    backstage.io/kubernetes-namespace: default
+    janus-idp.io/tekton: ${{ values.name }}
+    tekton.dev/ci-cd: "true"
+    argocd/app-name: ${{ values.name }}-argocd
+spec:
+  type: service
+  lifecycle: production
+  owner: ${{ values.owner }}
+  provides:
+    - name: REST API
+      type: openapi
+      uri: /
+  consumesApis:
+    - database-postgres
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: ${{ values.name }}-api
+  description: PostgREST Auto-Generated CRUD API
+spec:
+  type: openapi
+  owner: ${{ values.owner }}
+  lifecycle: production
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: ${{ values.name }} API
+      version: 1.0.0
+    servers:
+      - url: http://localhost:${{ values.port }}
+    paths:
+      /:
+        get:
+          summary: API Health Check
+          responses:
+            '200':
+              description: API is operational
+    x-service-binding: true

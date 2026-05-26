@@ -33,6 +33,12 @@ let _testCommand = [
 	"",
 ][0]
 
+// Resolve Test Image safely.
+let _testImage = [
+	if tektonInput.testImage != _|_ { tektonInput.testImage },
+	tekton.#CommonParams.test.image.default,
+][0]
+
 // Argo CD API URL: explicit override or in-cluster default.
 let _argoCDNamespace = [
 	if tektonInput.argoCDNamespace != _|_ { tektonInput.argoCDNamespace },
@@ -53,13 +59,26 @@ _tasks: [
 	}
 ]
 
-// 2. RENDER PIPELINE
-_pipeline: [
+// 2. RENDER PIPELINES
+// Render primary pipeline always
+_primaryPipeline: [
 	(pipelines.#RenderPipeline & {
 		pipelineType: tektonInput.pipelineType
 		namespace:    tektonInput.namespace
 	}).output
 ]
+
+// Also render db-migrate pipeline if it's available and needed by triggers
+_dbMigratePipeline: [
+	if tektonInput.triggerType == "gitea-push" || tektonInput.triggerType == "db-migrate" {
+		(pipelines.#RenderPipeline & {
+			pipelineType: "db-migrate"
+			namespace:    tektonInput.namespace
+		}).output
+	}
+]
+
+_pipeline: list.Concat([_primaryPipeline, _dbMigratePipeline])
 
 // 3. RENDER TRIGGERS
 _triggers: (triggers.#RenderTriggers & {
@@ -92,10 +111,11 @@ _triggers: (triggers.#RenderTriggers & {
 		// Use the pre-calculated concrete string
 		testCommand:    _testCommand
 
-		// Updated per Code Review: Use default from CommonParams
-		testImage:      tekton.#CommonParams.test.image.default 
+		// Use explicit test image when provided, else common default.
+		testImage:      _testImage
 		serviceAccount: tektonInput.serviceAccount
 		dockerSecret:   tektonInput.dockerSecret
+		databaseSecretRef: tektonInput.databaseSecretRef
 
 		argoCDNamespace: _argoCDNamespace
 		argoCDAppName:   "\(tektonInput.appName)-argocd"

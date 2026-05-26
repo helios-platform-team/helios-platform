@@ -1,0 +1,29 @@
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+
+# Prerequisites
+*.dat
+*.o
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+dist/
+build/
+*.tar.gz

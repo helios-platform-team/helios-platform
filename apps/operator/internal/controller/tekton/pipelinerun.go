@@ -26,7 +26,17 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 	gitOpsSecretRef := cmp.Or(heliosApp.Spec.GitOpsSecretRef, "helios-gitops-bot")
 	argoNS := cmp.Or(heliosApp.Spec.ArgoCDNamespace, "argocd")
 
-	params := make([]any, 0, 17)
+	replicas := heliosApp.Spec.Replicas
+	if replicas <= 0 {
+		replicas = 1
+	}
+	port := heliosApp.Spec.Port
+	if port <= 0 || port > 65535 {
+		port = 8080
+	}
+	testImage := cmp.Or(heliosApp.Spec.TestImage, "node:24")
+
+	params := make([]any, 0, 18)
 	params = append(params,
 		map[string]any{"name": "app-repo-url", "value": shared.RewriteGiteaURL(heliosApp.Spec.GitRepo)},
 		map[string]any{"name": "app-repo-revision", "value": appRepoRevision},
@@ -38,9 +48,10 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 		map[string]any{"name": "GITOPS_AUTHOR_NAME", "value": "Helios Bot"},
 		map[string]any{"name": "GITOPS_AUTHOR_EMAIL", "value": "helios-bot@helios.local"},
 		map[string]any{"name": "CONTEXT_SUBPATH", "value": contextSubpath},
-		map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", heliosApp.Spec.Replicas)},
-		map[string]any{"name": "port", "value": fmt.Sprintf("%d", heliosApp.Spec.Port)},
+		map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", replicas)},
+		map[string]any{"name": "port", "value": fmt.Sprintf("%d", port)},
 		map[string]any{"name": "test-command", "value": heliosApp.Spec.TestCommand},
+		map[string]any{"name": "test-image", "value": testImage},
 		map[string]any{"name": "argocd-namespace", "value": argoNS},
 		map[string]any{"name": "argocd-app-name", "value": heliosApp.Name + "-argocd"},
 	)

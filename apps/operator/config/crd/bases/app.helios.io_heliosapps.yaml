@@ -100,6 +100,11 @@ spec:
               contextSubpath:
                 description: ContextSubpath is the path where the Dockerfile is located
                 type: string
+              databaseSecretRef:
+                default: api-db-secret
+                description: DatabaseSecretRef is the name of the secret containing
+                  database credentials for migrations
+                type: string
               description:
                 description: Description of the application
                 type: string
@@ -369,6 +374,17 @@ spec:
                 type: string
               testCommand:
                 description: TestCommand is the command to run tests (e.g. "npm test")
+                type: string
+              testImage:
+                description: TestImage is the container image used to execute testCommand
+                  (e.g. "node:24")
+                type: string
+              triggerType:
+                default: gitea-push
+                description: TriggerType is the type of trigger to use for the pipeline
+                enum:
+                - gitea-push
+                - db-migrate
                 type: string
               webhookDomain:
                 description: WebhookDomain is the external domain (e.g., ngrok) for

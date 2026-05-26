@@ -1,0 +1,58 @@
+apiVersion: app.helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.name }}
+  namespace: ${{ values.namespace }}
+spec:
+  # Owner and Git Configuration
+  owner: ${{ values.owner }}
+  gitRepo: ${{ values.sourceRepo }}
+  gitBranch: main
+  imageRepo: ${{ values.image }}
+  gitopsRepo: ${{ values.gitopsRepo }}
+  gitopsPath: ${{ values.name }}
+  webhookSecret: ${{ values.name }}-webhook-secret
+  port: ${{ values.port }}
+  replicas: 1
+  triggerType: db-migrate
+
+  components:
+    - name: ${{ values.name }}
+      type: web-service
+      properties:
+        # Use official PostgREST image from Docker Hub
+        image: index.docker.io/postgrest/postgrest:latest
+        port: ${{ values.port }}
+        env:
+          # PostgREST Configuration
+          # PGRST_DB_URI format: postgres://user:password@host:port/database
+          # The Operator automatically injects DB_HOST, DB_USER, DB_PASS, DB_PORT, DB_NAME from the database trait
+          # The native operator Phase 0.9 reconciliation builds the PGRST_DB_URI from these and injects it
+          - name: PGRST_DB_SCHEMA
+            value: "${{ values.apiSchema }}"
+          - name: PGRST_DB_ANON_ROLE
+            value: "${{ values.anonRole }}"
+          - name: PGRST_JWT_AUDIENCE
+            value: "${{ values.jwtRole }}"
+          - name: PGRST_JWT_SECRET
+            value: "${{ values.jwtSecret }}"
+          - name: PGRST_MAX_ROWS
+            value: "1000"
+          - name: PGRST_LOG_LEVEL
+            value: "info"
+      traits:
+        - type: database
+          properties:
+            dbType: postgres
+            dbName: ${{ values.databaseName or values.name }}-db
+            port: 5432
+            version: "${{ values.databaseVersion or '16' }}"
+            storage: "1Gi"
+        - type: service
+          properties:
+            port: ${{ values.port }}
+            protocol: HTTP
+            ingress:
+              enabled: true
+              host: ${{ values.name }}.local
+              path: /

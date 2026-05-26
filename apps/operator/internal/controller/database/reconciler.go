@@ -42,7 +42,7 @@ func (r *Reconciler) ReconcileSecrets(ctx context.Context, app *appv1alpha1.Heli
 	}
 
 	for _, dbTrait := range dbTraits {
-		if strings.ToLower(dbTrait.Properties.DBType) != "postgres" {
+		if strings.ToLower(dbTrait.Properties.DBType) != dbTypePostgres {
 			log.V(1).Info("Skipping credential secret creation for non-postgres database type",
 				"component", dbTrait.ComponentName,
 				"dbType", dbTrait.Properties.DBType)
@@ -90,7 +90,18 @@ func (r *Reconciler) ReconcileSecrets(ctx context.Context, app *appv1alpha1.Heli
 			return fmt.Errorf("failed to generate credentials for %s: %w", dbTrait.ComponentName, err)
 		}
 
-		secret := GenerateDatabaseSecret(app.Namespace, secretName, dbTrait.ComponentName, creds, dbHost)
+		// Compute effective database name and port
+		effectiveDBName := dbTrait.Properties.DBName
+		if effectiveDBName == "" {
+			effectiveDBName = fmt.Sprintf("%s-db", dbTrait.ComponentName)
+		}
+
+		effectivePort := dbTrait.Properties.Port
+		if effectivePort <= 0 {
+			effectivePort = DefaultPostgresPort
+		}
+
+		secret := GenerateDatabaseSecret(app.Namespace, secretName, dbTrait.ComponentName, creds, dbHost, effectiveDBName, int32(effectivePort))
 
 		if err := ctrl.SetControllerReference(app, secret, r.Scheme); err != nil {
 			log.Error(err, "Failed to set owner reference for database secret",
@@ -115,7 +126,9 @@ func (r *Reconciler) ReconcileSecrets(ctx context.Context, app *appv1alpha1.Heli
 		log.Info("Successfully created database secret",
 			"component", dbTrait.ComponentName,
 			"secret", secretName,
-			"dbHost", dbHost)
+			"dbHost", dbHost,
+			"effectiveDBName", effectiveDBName,
+			"effectivePort", effectivePort)
 	}
 
 	return nil
@@ -133,7 +146,7 @@ func (r *Reconciler) ReconcileInstances(ctx context.Context, app *appv1alpha1.He
 	}
 
 	for _, dbTrait := range dbTraits {
-		if strings.ToLower(dbTrait.Properties.DBType) != "postgres" {
+		if strings.ToLower(dbTrait.Properties.DBType) != dbTypePostgres {
 			log.V(1).Info("Skipping non-postgres database type",
 				"component", dbTrait.ComponentName,
 				"dbType", dbTrait.Properties.DBType)
@@ -143,10 +156,7 @@ func (r *Reconciler) ReconcileInstances(ctx context.Context, app *appv1alpha1.He
 		dbHost := GetDatabaseHost(dbTrait.ComponentName)
 		secretName := GetDatabaseSecretName(dbTrait.ComponentName)
 
-		effectiveDBName := dbTrait.Properties.DBName
-		if effectiveDBName == "" {
-			effectiveDBName = fmt.Sprintf("%s-db", dbTrait.ComponentName)
-		}
+		effectiveDBName := EffectiveDatabaseName(dbTrait)
 
 		version := dbTrait.Properties.Version
 		if version == "" {
@@ -298,7 +308,7 @@ func (r *Reconciler) ReconcileInjection(ctx context.Context, app *appv1alpha1.He
 	pendingInjection := false
 
 	for _, dbTrait := range dbTraits {
-		if strings.ToLower(dbTrait.Properties.DBType) != "postgres" {
+		if strings.ToLower(dbTrait.Properties.DBType) != dbTypePostgres {
 			log.V(1).Info("Skipping env var injection for non-postgres database type",
 				"component", dbTrait.ComponentName,
 				"dbType", dbTrait.Properties.DBType)
@@ -329,7 +339,8 @@ func (r *Reconciler) ReconcileInjection(ctx context.Context, app *appv1alpha1.He
 			port = DefaultPostgresPort
 		}
 
-		changed, exactContainerMatch := InjectDatabaseEnvVarsForContainer(deploy, secretName, dbTrait.ComponentName, int32(port))
+		dbName := EffectiveDatabaseName(dbTrait)
+		changed, exactContainerMatch := InjectDatabaseEnvVarsForContainer(deploy, secretName, dbTrait.ComponentName, int32(port), dbName, dbTrait.Properties.DBType)
 		if !exactContainerMatch {
 			fallbackContainer := "<no-containers>"
 			if len(deploy.Spec.Template.Spec.Containers) > 0 {

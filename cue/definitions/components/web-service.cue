@@ -12,7 +12,14 @@ import "helios.io/cue/definitions/bases"
 		image:    string
 		replicas: int | *1
 		port:     int | *8080
-		env: [...{name: string, value: string}] | *[]
+		
+		// FIX: Make 'value' optional and allow 'valueFrom' objects
+		// This permits standard Kubernetes Secret references!
+		env: [...{
+			name: string
+			value?: string
+			valueFrom?: {...}
+		}] | *[]
 	}
 
 	// Alias để tránh scope issues
@@ -29,7 +36,5 @@ import "helios.io/cue/definitions/bases"
 				env:      _p.env
 			}
 		}).output
-
-
 	}
 }

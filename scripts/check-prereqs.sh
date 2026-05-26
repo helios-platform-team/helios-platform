@@ -65,6 +65,18 @@ check_tool() {
 }
 
 # ---------------------------------------------------------------------------
+# Check an optional tool (only warns if missing)
+# ---------------------------------------------------------------------------
+check_optional_tool() {
+  local name="$1" hint="$2"
+  if ! command -v "$name" &>/dev/null; then
+    warn "$name not found. (Optional, but recommended for Gitea setup). Install: $hint"
+  else
+    pass "$name $(command -v "$name")"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 echo -e "\n${BOLD}Helios Platform - Prerequisite Check${NC}\n"
@@ -91,8 +103,7 @@ check_tool "cue" "" \
   "cue version | head -1 | sed -n -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
   "go install cuelang.org/go/cmd/cue@latest"
 
-check_tool "helm" "" \
-  "helm version --short | sed -n -E 's/^v([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
+check_optional_tool "helm" \
   "https://helm.sh/docs/intro/install/"
 
 echo -e "\n${BOLD}Node.js / Frontend${NC}"
@@ -105,8 +116,7 @@ check_tool "yarn" "" \
   "corepack enable && corepack prepare yarn@4 --activate"
 
 echo -e "\n${BOLD}CLI Helpers${NC}"
-check_tool "jq" "" \
-  "jq --version | awk '{print \$1}'" \
+check_optional_tool "jq" \
   "https://stedolan.github.io/jq/download/"
 
 echo -e "\n${BOLD}Runtime Checks${NC}"
@@ -142,7 +152,7 @@ if $CHECK_ENV; then
   else
     pass ".env file exists"
 
-    REQUIRED_VARS=(DOCKER_USERNAME DOCKER_PASSWORD)
+    REQUIRED_VARS=(DOCKER_USERNAME DOCKER_TOKEN)
     # Gitea vars are auto-configured by 'task setup:gitea-token', so only warn
     SETUP_VARS=(GITEA_TOKEN GITEA_USER)
     OPTIONAL_VARS=(AUTH_GITHUB_CLIENT_ID AUTH_GITHUB_CLIENT_SECRET)

@@ -9,10 +9,33 @@ export interface RouterOptions {
   config: Config;
 }
 
+function isNotFoundError(err: unknown): boolean {
+  const statusCode =
+    (err as { statusCode?: number; response?: { statusCode?: number } })
+      ?.statusCode ??
+    (err as { response?: { statusCode?: number } })?.response?.statusCode ??
+    (err as { body?: { code?: number } })?.body?.code;
+
+  if (statusCode === 404) {
+    return true;
+  }
+
+  const msg = String(err).toLowerCase();
+  return (
+    msg.includes('not found') ||
+    (msg.includes('status code') && msg.includes('404'))
+  );
+}
+
 /** Matches Helm operator: GetDatabaseSecretName / GetDatabaseHost (traits.go). */
-const databaseSecretName = (componentName: string) =>
-  `${componentName}-db-secret`;
-const databasePodLabel = (componentName: string) => `app=${componentName}-db`;
+const databaseSecretNames = (componentName: string) => [
+  `${componentName}-db-secret`,
+  `${componentName}-backend-db-secret`,
+];
+const databasePodLabels = (componentName: string) => [
+  `app=${componentName}-db`,
+  `app=${componentName}-backend-db`,
+];
 
 function parseTraitProperties(raw: unknown): Record<string, unknown> | null {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
@@ -71,7 +94,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   router.get('/info/:componentName', async (req, res) => {
     const { componentName } = req.params;
     const namespace = 'default';
-    const secretName = databaseSecretName(componentName);
+    const secretCandidates = databaseSecretNames(componentName);
 
     let dbName = `${componentName}-db`;
     try {
@@ -89,27 +112,34 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     }
 
     let secret: k8s.V1Secret | undefined;
-    try {
-      const read = await k8sApi.readNamespacedSecret({
-        name: secretName,
-        namespace,
-      });
-      secret = (read as { body?: k8s.V1Secret }).body ?? (read as k8s.V1Secret);
-    } catch (err: unknown) {
-      const code =
-        (err as { statusCode?: number; response?: { statusCode?: number } })
-          ?.statusCode ??
-        (err as { response?: { statusCode?: number } })?.response?.statusCode;
-      if (code === 404) {
-        return res.status(404).json({
-          error: `Secret ${secretName} not found in namespace ${namespace}`,
+    let resolvedSecretName = '';
+    for (const secretName of secretCandidates) {
+      try {
+        const read = await k8sApi.readNamespacedSecret({
+          name: secretName,
+          namespace,
         });
+        secret =
+          (read as { body?: k8s.V1Secret }).body ?? (read as k8s.V1Secret);
+        resolvedSecretName = secretName;
+        break;
+      } catch (err: unknown) {
+        if (!isNotFoundError(err)) {
+          logger.error(
+            `Failed to read database secret ${secretName}: ${String(err)}`,
+          );
+          return res.status(500).json({
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
-      logger.error(
-        `Failed to read database secret ${secretName}: ${String(err)}`,
-      );
-      return res.status(500).json({
-        error: err instanceof Error ? err.message : String(err),
+    }
+
+    if (!secret) {
+      return res.status(404).json({
+        error: `No database secret found in namespace ${namespace}. Tried: ${secretCandidates.join(
+          ', ',
+        )}`,
       });
     }
 
@@ -119,16 +149,21 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
 
     let status: 'Running' | 'Failed' | 'Unknown' = 'Unknown';
     try {
-      const pods: unknown = await k8sApi.listNamespacedPod({
-        namespace,
-        labelSelector: databasePodLabel(componentName),
-      });
-      const podList = (pods as { body?: k8s.V1PodList }).body ?? pods;
-      const items = (podList as k8s.V1PodList)?.items;
-      if (items && items.length > 0) {
+      for (const labelSelector of databasePodLabels(componentName)) {
+        const pods: unknown = await k8sApi.listNamespacedPod({
+          namespace,
+          labelSelector,
+        });
+        const podList = (pods as { body?: k8s.V1PodList }).body ?? pods;
+        const items = (podList as k8s.V1PodList)?.items;
+        if (!items || items.length === 0) {
+          continue;
+        }
+
         const phase = items[0].status?.phase;
         if (phase === 'Running') status = 'Running';
         else if (phase === 'Failed') status = 'Failed';
+        break;
       }
     } catch {
       // Pod listing is best-effort.
@@ -138,6 +173,7 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
     const port = portStr ? parseInt(portStr, 10) : 5432;
 
     return res.json({
+      secretName: resolvedSecretName,
       host: decode(data.DB_HOST),
       port,
       user: decode(data.DB_USER),

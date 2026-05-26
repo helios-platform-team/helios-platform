@@ -46,7 +46,7 @@ func TestReconcileSecrets(t *testing.T) {
 	dbProps := map[string]any{
 		"dbType":  "postgres",
 		"dbName":  "mydb",
-		"version": "16",
+		"version": "18.3",
 	}
 	dbPropsJSON, _ := json.Marshal(dbProps)
 
@@ -193,7 +193,7 @@ func TestReconcileInstances(t *testing.T) {
 	dbProps := map[string]any{
 		"dbType":  "postgres",
 		"dbName":  "my_custom_db",
-		"version": "16",
+		"version": "18.3",
 		"storage": "2Gi",
 	}
 	dbPropsJSON, _ := json.Marshal(dbProps)
@@ -348,7 +348,7 @@ func TestReconcileInstances(t *testing.T) {
 				Replicas: func() *int32 { r := int32(1); return &r }(),
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{{Name: "postgres", Image: "postgres:15"}},
+						Containers: []corev1.Container{{Name: "postgres", Image: "postgres:18.3"}},
 					},
 				},
 				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
@@ -379,8 +379,8 @@ func TestReconcileInstances(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to get updated StatefulSet: %v", err)
 		}
-		if got := updatedSts.Spec.Template.Spec.Containers[0].Image; got != "postgres:16" {
-			t.Fatalf("expected image postgres:16, got %s", got)
+		if got := updatedSts.Spec.Template.Spec.Containers[0].Image; got != "postgres:18.3" {
+			t.Fatalf("expected image postgres:18.3, got %s", got)
 		}
 
 		updatedSvc := &corev1.Service{}
@@ -425,7 +425,7 @@ func TestReconcileInstances(t *testing.T) {
 }
 
 func TestReconcileInjection(t *testing.T) {
-	dbProps := map[string]any{"dbType": "postgres", "dbName": "mydb", "version": "16"}
+	dbProps := map[string]any{"dbType": "postgres", "dbName": "mydb", "version": "18.3"}
 	dbPropsJSON, _ := json.Marshal(dbProps)
 
 	app := &appv1alpha1.HeliosApp{
@@ -481,15 +481,33 @@ func TestReconcileInjection(t *testing.T) {
 		}
 
 		container := updatedDeploy.Spec.Template.Spec.Containers[0]
-		expectedEnvNames := map[string]bool{"DB_HOST": false, "DB_USER": false, "DB_PASS": false}
+		expectedEnvNames := map[string]bool{
+			"DB_HOST": false, "DB_USER": false, "DB_PASS": false,
+			"DB_PORT": false, "DB_NAME": false, "DATABASE_URL": false,
+		}
 		for _, env := range container.Env {
 			if _, ok := expectedEnvNames[env.Name]; ok {
 				expectedEnvNames[env.Name] = true
-				if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
-					t.Errorf("Env %s should reference a secret", env.Name)
-				} else if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
-					t.Errorf("Env %s: expected secret name %q, got %q",
-						env.Name, "api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+				switch env.Name {
+				case "DB_HOST", "DB_USER", "DB_PASS":
+					if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil {
+						t.Errorf("Env %s should reference a secret", env.Name)
+					} else if env.ValueFrom.SecretKeyRef.Name != "api-server-db-secret" {
+						t.Errorf("Env %s: expected secret name %q, got %q",
+							env.Name, "api-server-db-secret", env.ValueFrom.SecretKeyRef.Name)
+					}
+				case "DB_PORT":
+					if env.Value != "5432" || env.ValueFrom != nil {
+						t.Errorf("Env DB_PORT: expected literal 5432, got %+v", env)
+					}
+				case "DB_NAME":
+					if env.Value != "mydb" || env.ValueFrom != nil {
+						t.Errorf("Env DB_NAME: expected literal mydb, got %+v", env)
+					}
+				case "DATABASE_URL":
+					if env.Value != postgresDatabaseURLTemplate || env.ValueFrom != nil {
+						t.Errorf("Env DATABASE_URL: expected template value, got %+v", env)
+					}
 				}
 			}
 		}

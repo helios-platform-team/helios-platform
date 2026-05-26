@@ -27,23 +27,30 @@ func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
 		PipelineName:    app.Spec.PipelineName,
 		// PipelineType is intentionally derived from PipelineName because
 		// the HeliosApp CRD does not have a separate PipelineType field.
-		PipelineType:    app.Spec.PipelineName,
-		TriggerType:     "gitea-push",
-		ServiceAccount:  app.Spec.ServiceAccount,
-		PVCName:         app.Spec.PVCName,
-		ContextSubpath:  app.Spec.ContextSubpath,
-		Replicas:        int(app.Spec.Replicas),
-		Port:            int(app.Spec.Port),
-		TestCommand:     app.Spec.TestCommand,
-		DockerSecret:    "docker-credentials",
-		ArgoCDNamespace: app.Spec.ArgoCDNamespace,
-		ArgoCDProject:   app.Spec.ArgoCDProject,
+		PipelineType:      app.Spec.PipelineName,
+		TriggerType:       app.Spec.TriggerType,
+		ServiceAccount:    app.Spec.ServiceAccount,
+		PVCName:           app.Spec.PVCName,
+		ContextSubpath:    app.Spec.ContextSubpath,
+		Replicas:          int(app.Spec.Replicas),
+		Port:              int(app.Spec.Port),
+		TestCommand:       app.Spec.TestCommand,
+		TestImage:         app.Spec.TestImage,
+		DockerSecret:      "docker-credentials",
+		DatabaseSecretRef: app.Spec.DatabaseSecretRef,
+		ArgoCDNamespace:   app.Spec.ArgoCDNamespace,
+		ArgoCDProject:     app.Spec.ArgoCDProject,
 	}
 
 	input.GitBranch = cmp.Or(input.GitBranch, "main")
 	input.GitOpsBranch = cmp.Or(input.GitOpsBranch, "main")
 	input.GitOpsSecretRef = cmp.Or(input.GitOpsSecretRef, "helios-gitops-bot")
 	input.WebhookSecret = cmp.Or(input.WebhookSecret, "gitea-webhook-secret")
+	// Derive the database secret name dynamically from app name if not explicitly set
+	if input.DatabaseSecretRef == "" {
+		input.DatabaseSecretRef = app.Name + "-db-secret"
+	}
+	input.TriggerType = cmp.Or(input.TriggerType, "gitea-push")
 	if input.PipelineName == "" {
 		input.PipelineName = defaultPipelineName
 		input.PipelineType = defaultPipelineName

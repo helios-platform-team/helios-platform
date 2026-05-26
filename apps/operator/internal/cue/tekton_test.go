@@ -67,9 +67,11 @@ func TestRenderTektonResources_AllResources(t *testing.T) {
 		t.Fatalf("RenderTektonResources failed: %v", err)
 	}
 
-	// With webhookDomain set, we expect 9 objects:
-	// 4 Tasks + 1 Pipeline + 1 TriggerBinding + 1 TriggerTemplate + 1 EventListener + 1 Ingress
-	expectedCount := 9
+	// With webhookDomain set, we expect 13 objects:
+	// 6 Tasks (git-clone, kaniko-build, git-update-manifest, argocd-sync, db-migrate, postgrest-reload)
+	// + 2 Pipelines (from-code-to-cluster + db-migrate)
+	// + 1 TriggerBinding + 2 TriggerTemplates (gitea + db-migrate) + 1 EventListener + 1 Ingress
+	expectedCount := 13
 	if len(objects) != expectedCount {
 		t.Errorf("Expected %d objects, got %d", expectedCount, len(objects))
 		for i, obj := range objects {
@@ -79,10 +81,10 @@ func TestRenderTektonResources_AllResources(t *testing.T) {
 
 	// Verify each expected kind is present
 	expectedKinds := map[string]int{
-		"Task":            4,
-		"Pipeline":        1,
+		"Task":            6,
+		"Pipeline":        2,
 		"TriggerBinding":  1,
-		"TriggerTemplate": 1,
+		"TriggerTemplate": 2,
 		"EventListener":   1,
 		"Ingress":         1,
 	}
@@ -115,8 +117,9 @@ func TestRenderTektonResources_WithoutWebhook(t *testing.T) {
 		t.Fatalf("RenderTektonResources failed: %v", err)
 	}
 
-	// Without webhookDomain: 8 objects (no Ingress)
-	expectedCount := 8
+	// Without webhookDomain: 12 objects (no Ingress)
+	// 6 Tasks + 2 Pipelines + 1 TriggerBinding + 2 TriggerTemplates + 1 EventListener
+	expectedCount := 12
 	if len(objects) != expectedCount {
 		t.Errorf("Expected %d objects (no webhook), got %d", expectedCount, len(objects))
 		for i, obj := range objects {
@@ -174,6 +177,8 @@ func TestRenderTektonResources_CorrectTaskNames(t *testing.T) {
 		"kaniko-build":        false,
 		"git-update-manifest": false,
 		"argocd-sync":         false,
+		"db-migrate":          false,
+		"postgrest-reload":    false,
 	}
 
 	for _, obj := range objects {
@@ -253,17 +258,15 @@ func TestRenderTektonResources_BuildOnlyPipeline(t *testing.T) {
 		t.Fatalf("RenderTektonResources failed: %v", err)
 	}
 
-	// Verify pipeline name is "build-only"
-	foundPipeline := false
+	// Verify the primary pipeline with name "build-only" exists among rendered pipelines.
+	// Note: db-migrate pipeline is always rendered alongside the primary pipeline.
+	foundBuildOnly := false
 	for _, obj := range objects {
-		if obj.GetKind() == "Pipeline" {
-			if obj.GetName() != "build-only" {
-				t.Errorf("Expected pipeline name 'build-only', got %q", obj.GetName())
-			}
-			foundPipeline = true
+		if obj.GetKind() == "Pipeline" && obj.GetName() == "build-only" {
+			foundBuildOnly = true
 		}
 	}
-	if !foundPipeline {
-		t.Error("Pipeline not found in rendered objects")
+	if !foundBuildOnly {
+		t.Error("Expected primary pipeline 'build-only' not found in rendered objects")
 	}
 }

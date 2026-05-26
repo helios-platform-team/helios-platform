@@ -98,6 +98,13 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	log.Info("Reconciling HeliosApp", "name", heliosApp.Name, "namespace", heliosApp.Namespace)
 
+	// Pre-flight validation: Check if all referenced secrets exist
+	if err := r.validateSecretReferences(ctx, &heliosApp); err != nil {
+		log.Error(err, "Pre-flight validation failed: referenced secret does not exist")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Configuration error: %v", err))
+		return ctrl.Result{}, err
+	}
+
 	// 2. Map CRD to Application Model
 	appModel, err := mapCRDToModel(&heliosApp)
 	if err != nil {
@@ -150,7 +157,7 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// ------------------------------------------------------------------
 	// PHASE 0.9: Inject Database Credentials into Backend Deployment
 	// Patches the live Deployment (deployed by ArgoCD) to add DB_HOST,
-	// DB_USER, DB_PASS env vars referencing the operator-managed Secret.
+	// DB_USER, DB_PASS, DB_PORT, DB_NAME, and DATABASE_URL (via $(VAR) expansion).
 	// Runs AFTER secrets and instances so the Secret already exists.
 	// ------------------------------------------------------------------
 	dbInjectionPending, err := r.Database.ReconcileInjection(ctx, &heliosApp)
@@ -240,7 +247,8 @@ func (r *HeliosAppReconciler) findObjectsForSecret(ctx context.Context, obj clie
 	for _, app := range heliosAppList.Items {
 		// Check if this app references the changed secret
 		if app.Spec.GitOpsSecretRef == obj.GetName() ||
-			app.Spec.WebhookSecret == obj.GetName() {
+			app.Spec.WebhookSecret == obj.GetName() ||
+			app.Spec.DatabaseSecretRef == obj.GetName() {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      app.Name,
@@ -251,4 +259,32 @@ func (r *HeliosAppReconciler) findObjectsForSecret(ctx context.Context, obj clie
 	}
 
 	return requests
+}
+
+// validateSecretReferences checks if all referenced secrets exist in the cluster.
+// This is a pre-flight validation to catch configuration errors early.
+// Note: Database secrets are NOT validated here because they are auto-created
+// by the operator in Phase 0.5 if database traits are present.
+func (r *HeliosAppReconciler) validateSecretReferences(ctx context.Context, app *appv1alpha1.HeliosApp) error {
+	secretsToValidate := map[string]string{
+		"webhook secret": app.Spec.WebhookSecret,
+		"GitOps secret":  app.Spec.GitOpsSecretRef,
+		// Note: database secret is NOT validated here - it's auto-created in Phase 0.5
+	}
+
+	for secretType, secretName := range secretsToValidate {
+		if secretName == "" {
+			continue // Skip empty references
+		}
+
+		var secret corev1.Secret
+		if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: app.Namespace}, &secret); err != nil {
+			if errors.IsNotFound(err) {
+				return fmt.Errorf("%s '%s' not found in namespace '%s'", secretType, secretName, app.Namespace)
+			}
+			return fmt.Errorf("failed to validate %s '%s': %w", secretType, secretName, err)
+		}
+	}
+
+	return nil
 }

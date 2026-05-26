@@ -62,6 +62,12 @@ type HeliosAppSpec struct {
 	// +kubebuilder:default="from-code-to-cluster"
 	PipelineName string `json:"pipelineName,omitempty"`
 
+	// TriggerType is the type of trigger to use for the pipeline
+	// +optional
+	// +kubebuilder:validation:Enum=gitea-push;db-migrate
+	// +kubebuilder:default="gitea-push"
+	TriggerType string `json:"triggerType,omitempty"`
+
 	// WebhookSecret is the name of the secret containing the Gitea webhook secret token
 	// +optional
 	// +kubebuilder:default="gitea-webhook-secret"
@@ -100,6 +106,10 @@ type HeliosAppSpec struct {
 	// +optional
 	TestCommand string `json:"testCommand,omitempty"`
 
+	// TestImage is the container image used to execute testCommand (e.g. "node:24")
+	// +optional
+	TestImage string `json:"testImage,omitempty"`
+
 	// Env variables for the application
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
@@ -119,6 +129,11 @@ type HeliosAppSpec struct {
 	// ContextSubpath is the path where the Dockerfile is located
 	// +optional
 	ContextSubpath string `json:"contextSubpath,omitempty"`
+
+	// DatabaseSecretRef is the name of the secret containing database credentials for migrations.
+	// Defaults to {appName}-db-secret if not set.
+	// +optional
+	DatabaseSecretRef string `json:"databaseSecretRef,omitempty"`
 
 	// Components define the workloads of the application
 	Components []Component `json:"components"`

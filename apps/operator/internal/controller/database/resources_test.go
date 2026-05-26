@@ -12,18 +12,87 @@ import (
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
 )
 
+func TestFormatPostgresURI(t *testing.T) {
+	tests := []struct {
+		name     string
+		username string
+		password string
+		host     string
+		dbName   string
+		port     int32
+		expected string
+	}{
+		{
+			name:     "basic credentials",
+			username: "user",
+			password: "pass",
+			host:     "localhost",
+			dbName:   "mydb",
+			port:     5432,
+			expected: "postgres://user:pass@localhost:5432/mydb?sslmode=disable",
+		},
+		{
+			name:     "special chars in password",
+			username: "user",
+			password: "p@ss:word/",
+			host:     "db.example.com",
+			dbName:   "app_db",
+			port:     5432,
+			expected: "postgres://user:p%40ss%3Aword%2F@db.example.com:5432/app_db?sslmode=disable",
+		},
+		{
+			name:     "special chars in username",
+			username: "user+admin",
+			password: "password",
+			host:     "postgres-host",
+			dbName:   "database",
+			port:     5432,
+			expected: "postgres://user%2Badmin:password@postgres-host:5432/database?sslmode=disable",
+		},
+		{
+			name:     "custom port",
+			username: "admin",
+			password: "secret123",
+			host:     "db-instance",
+			dbName:   "prod_db",
+			port:     5433,
+			expected: "postgres://admin:secret123@db-instance:5433/prod_db?sslmode=disable",
+		},
+		{
+			name:     "IPv6 host",
+			username: "user",
+			password: "pass",
+			host:     "::1",
+			dbName:   "testdb",
+			port:     5432,
+			expected: "postgres://user:pass@::1:5432/testdb?sslmode=disable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatPostgresURI(tt.username, tt.password, tt.host, tt.dbName, tt.port)
+			if got != tt.expected {
+				t.Errorf("formatPostgresURI() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestGenerateDatabaseSecret(t *testing.T) {
 	namespace := "test-namespace"
 	secretName := "my-app-db-secret"
 	componentName := "my-app"
 	dbHost := "my-app-db"
+	dbName := "my-app-db"
+	port := int32(5432)
 
 	creds := &DatabaseCredentials{
 		Username: "testuser",
 		Password: "testpassword123",
 	}
 
-	secret := GenerateDatabaseSecret(namespace, secretName, componentName, creds, dbHost)
+	secret := GenerateDatabaseSecret(namespace, secretName, componentName, creds, dbHost, dbName, port)
 
 	if secret.Name != secretName {
 		t.Errorf("Expected secret name %q, got %q", secretName, secret.Name)
@@ -54,6 +123,12 @@ func TestGenerateDatabaseSecret(t *testing.T) {
 
 	if string(secret.Data["DB_HOST"]) != dbHost {
 		t.Errorf("Expected DB_HOST %q, got %q", dbHost, string(secret.Data["DB_HOST"]))
+	}
+
+	// Check that PGRST_DB_URI is generated and properly escaped
+	expectedURI := "postgres://testuser:testpassword123@my-app-db:5432/my-app-db?sslmode=disable"
+	if string(secret.Data["PGRST_DB_URI"]) != expectedURI {
+		t.Errorf("Expected PGRST_DB_URI %q, got %q", expectedURI, string(secret.Data["PGRST_DB_URI"]))
 	}
 
 	if secret.Type != corev1.SecretTypeOpaque {
@@ -105,7 +180,7 @@ func TestExtractDatabaseTraits(t *testing.T) {
 	dbProps := map[string]any{
 		"dbType":  "postgres",
 		"dbName":  "mydb",
-		"version": "16",
+		"version": "18.3",
 	}
 	dbPropsJSON, _ := json.Marshal(dbProps)
 
@@ -173,7 +248,7 @@ func TestExtractDatabaseTraits(t *testing.T) {
 func TestGenerateDatabaseStatefulSet(t *testing.T) {
 	sts, err := GenerateDatabaseStatefulSet(
 		"test-ns", "my-app-db", "my-app-db-secret",
-		"my_custom_db", "16", "2Gi", 5432,
+		"my_custom_db", "18.3", "2Gi", 5432,
 	)
 
 	if err != nil {
@@ -208,8 +283,8 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 	}
 
 	container := containers[0]
-	if container.Image != "postgres:16" {
-		t.Errorf("Expected image %q, got %q", "postgres:16", container.Image)
+	if container.Image != "postgres:18.3" {
+		t.Errorf("Expected image %q, got %q", "postgres:18.3", container.Image)
 	}
 
 	if len(container.Ports) != 1 || container.Ports[0].ContainerPort != 5432 {

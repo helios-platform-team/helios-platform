@@ -58,9 +58,11 @@ type TektonInput struct {
 
 	// === TESTING ===
 	TestCommand string `json:"testCommand,omitempty"`
+	TestImage   string `json:"testImage,omitempty"`
 
 	// === SECRETS ===
-	DockerSecret string `json:"dockerSecret,omitempty"`
+	DockerSecret      string `json:"dockerSecret,omitempty"`
+	DatabaseSecretRef string `json:"databaseSecretRef,omitempty"`
 
 	// === ARGOCD ===
 	ArgoCDNamespace string `json:"argoCDNamespace,omitempty"`
