@@ -323,4 +323,3 @@ func (r *HeliosAppReconciler) handlePreSyncCleanup(ctx context.Context, heliosAp
 
 	return ctrl.Result{}, nil
 }
-

@@ -20,6 +20,9 @@ const (
 	// preSyncFinalizerKey is used to ensure cluster-scoped RBAC resources
 	// (ClusterRole and ClusterRoleBinding) are properly cleaned up when a HeliosApp is deleted.
 	preSyncFinalizerKey = "argocd.helios.io/presync-cleanup"
+
+	// databaseTraitType is the type identifier for database traits in components.
+	databaseTraitType = "database"
 )
 
 // PreSyncReconciler creates PreSync Jobs and supporting resources for database migrations.
@@ -49,7 +52,7 @@ func (r *PreSyncReconciler) ReconcilePreSyncResources(
 	hasDatabaseTrait := false
 	for _, comp := range heliosApp.Spec.Components {
 		for _, trait := range comp.Traits {
-			if trait.Type == "database" {
+			if trait.Type == databaseTraitType {
 				hasDatabaseTrait = true
 				break
 			}
@@ -202,7 +205,7 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 	var databaseComponentName string
 	for _, comp := range heliosApp.Spec.Components {
 		for _, trait := range comp.Traits {
-			if trait.Type == "database" {
+			if trait.Type == databaseTraitType {
 				databaseComponentName = comp.Name
 				break
 			}
@@ -316,7 +319,7 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 func HasDatabaseTrait(heliosApp *appv1alpha1.HeliosApp) bool {
 	for _, comp := range heliosApp.Spec.Components {
 		for _, trait := range comp.Traits {
-			if trait.Type == "database" {
+			if trait.Type == databaseTraitType {
 				return true
 			}
 		}
@@ -419,4 +422,3 @@ func HasPreSyncFinalizer(heliosApp *appv1alpha1.HeliosApp) bool {
 func GetPreSyncFinalizerKey() string {
 	return preSyncFinalizerKey
 }
-
