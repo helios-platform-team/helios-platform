@@ -235,10 +235,12 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 			"name":      fmt.Sprintf("%s-db-migrate-presync", heliosApp.Name),
 			"namespace": heliosApp.Namespace,
 			"labels": map[string]interface{}{
-				"app":                     heliosApp.Name,
-				"job-type":                "db-migration",
-				"argocd.argoproj.io/hook": "PreSync",
-				"argocd.argoproj.io/hook-deletion-policy": "BeforeHookCreation",
+				"app":      heliosApp.Name,
+				"job-type": "db-migration",
+			},
+			"annotations": map[string]interface{}{
+				"argocd.argoproj.io/hook":               "PreSync",
+				"argocd.argoproj.io/hook-delete-policy": "BeforeHookCreation",
 			},
 		},
 		"spec": map[string]interface{}{
@@ -301,7 +303,12 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 	}
 
 	// Update HeliosApp with PreSync Job definition as annotation
-	heliosAppCopy := heliosApp.DeepCopy()
+	// Refetch the latest object to avoid stale object conflicts after finalizer addition
+	latest := &appv1alpha1.HeliosApp{}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(heliosApp), latest); err != nil {
+		return fmt.Errorf("failed to refetch HeliosApp before annotation update: %w", err)
+	}
+	heliosAppCopy := latest.DeepCopy()
 	if heliosAppCopy.Annotations == nil {
 		heliosAppCopy.Annotations = make(map[string]string)
 	}

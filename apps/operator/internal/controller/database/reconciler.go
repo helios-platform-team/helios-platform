@@ -70,9 +70,7 @@ func (r *Reconciler) ReconcileSystemSecrets(ctx context.Context, app *appv1alpha
 
 		if err != nil {
 			if errors.IsNotFound(err) {
-				log.Info("System secret not found in default namespace, skipping",
-					"secret", secretName)
-				continue
+				return fmt.Errorf("required system secret %s not found in default namespace: %w", secretName, err)
 			}
 			log.Error(err, "Failed to read system secret from default namespace",
 				"secret", secretName)

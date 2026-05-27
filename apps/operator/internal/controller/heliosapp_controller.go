@@ -329,7 +329,7 @@ func (r *HeliosAppReconciler) handlePreSyncCleanup(ctx context.Context, heliosAp
 		// Clean up cluster-scoped RBAC resources
 		if err := preSyncReconciler.HandlePreSyncCleanup(ctx, heliosApp); err != nil {
 			log.Error(err, "Failed to cleanup presync resources")
-			// Continue with deletion even if cleanup fails, but log the error
+			return ctrl.Result{}, fmt.Errorf("failed to cleanup presync resources: %w", err)
 		}
 	}
 
