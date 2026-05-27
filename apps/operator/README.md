@@ -1,17 +1,29 @@
-# operator
-// TODO(user): Add simple overview of use/purpose
+# Helios Operator
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+The Helios Operator is a Kubernetes controller designed for the Helios Developer Platform. It reconciles `HeliosApp` custom resources to coordinate GitOps repository structures, configure backing databases, deploy Tekton CI pipelines, and orchestrate ArgoCD deployment applications.
 
 ## Getting Started
 See [GIT_OPS_GUIDE.md](GIT_OPS_GUIDE.md) for detailed GitOps setup instructions.
 
 ### Prerequisites
-- go version v1.26.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+The following tools are required for development (managed via `mise` using the project's local `mise.toml` configuration):
+- Go: `1.26.3`
+- Node.js: `22`
+- Yarn: `4.15.0`
+- CUE: `0.16.1`
+- Make: `4.4.1`
+- Operator SDK: `1.42.2`
+- Kubectl: `1.36.1+`
+- K3d: `5.8.3+`
+- Docker: `29.0.0+` (Running daemon)
+
+### E2E Testing
+To run the end-to-end integration tests locally on an isolated, temporary Kubernetes cluster:
+```sh
+make test-e2e
+```
+This target installs k3d if needed, provisions an ephemeral cluster, builds and loads the operator docker image, deploys Cert-Manager, runs Ginkgo integration tests, and automatically cleans up the cluster afterward.
 
 ### To Deploy on the cluster
 **Build and push your image to the location specified by `IMG`:**
@@ -112,7 +124,7 @@ previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml
 is manually re-applied afterwards.
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+Contributions are welcome! Please open an issue or submit a pull request. Make sure all formatting, linting, and tests (`make lint`, `make test`, and `make test-e2e`) pass successfully before submitting changes.
 
 **NOTE:** Run `make help` for more information on all potential `make` targets
 

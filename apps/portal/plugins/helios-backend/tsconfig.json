@@ -2,7 +2,9 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "stableTypeOrdering": true,
+    "noImplicitOverride": true
   },
   "include": ["src"]
 }

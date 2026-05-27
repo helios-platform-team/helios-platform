@@ -13,12 +13,10 @@ import {
   CircularProgress,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
-import {
-  Visibility,
-  VisibilityOff,
-  FileCopy,
-  FileCopyOutlined,
-} from '@material-ui/icons';
+import Visibility from '@material-ui/icons/Visibility';
+import VisibilityOff from '@material-ui/icons/VisibilityOff';
+import FileCopy from '@material-ui/icons/FileCopy';
+import FileCopyOutlined from '@material-ui/icons/FileCopyOutlined';
 import { makeStyles } from '@material-ui/core/styles';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { useApi, fetchApiRef, configApiRef } from '@backstage/core-plugin-api';
@@ -120,7 +118,7 @@ export const DatabaseTab: React.FC = () => {
     };
 
     fetchDatabaseInfo();
-  }, [componentName]);
+  }, [componentName, configApi, fetchApi]);
 
   const handleCopyToClipboard = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text);
@@ -231,6 +229,14 @@ cursor = conn.cursor()`;
               className={classes.cardTitle}
             />
             <CardContent>
+              <Alert severity="info" style={{ marginBottom: '16px' }}>
+                These connectivity details represent the internal cluster address. To connect from your local machine, you must port-forward the database service:
+                <br />
+                <code style={{ display: 'block', margin: '8px 0', padding: '8px', backgroundColor: 'rgba(0, 0, 0, 0.08)', borderRadius: '4px', fontFamily: 'monospace' }}>
+                  kubectl port-forward -n default svc/{databaseInfo.host} {databaseInfo.port}:{databaseInfo.port}
+                </code>
+                Once port-forwarded, you can use the connection snippets below by replacing the Host with <code>localhost</code> (or <code>127.0.0.1</code>) and Port with <code>{databaseInfo.port}</code>.
+              </Alert>
               <Grid container spacing={2} className={classes.connectivityGrid}>
                 {/* Host */}
                 <Grid item xs={12} sm={6}>

@@ -61,21 +61,11 @@ tasks:
   # Setup Tasks
   # ===========================================================================
   setup:
-    desc: Bootstrap the full local development environment
+    desc: Bootstrap the full local development environment using Terraform
     deps: [check:env]
     cmds:
-      - task: setup:cluster
-      - task: setup:coredns
+      - task: setup:terraform
       - task: setup:tekton
-      - task: setup:tekton-pruner
-      - task: setup:argocd
-      - task: setup:gitea
-      - task: setup:gitea-token
-      - task: setup:gitea-gitops-secret
-      - task: setup:argocd-gitea
-      - task: setup:crds
-      - task: setup:tekton-rbac
-      - task: setup:credentials
       - task: setup:portal-deps
       - echo ""
       - echo "============================================="
@@ -84,13 +74,39 @@ tasks:
       - echo "  Run 'task dev' to start developing."
       - echo "============================================="
 
+  setup:terraform:
+    desc: Bootstrap the local environment (cluster + apps) using Terraform
+    dir: infrastructure/environments/local-dev
+    cmds:
+      - |
+        echo "Ensuring k3d cluster '{{.CLUSTER_NAME}}' exists..."
+        mkdir -p ~/.kube
+        touch ~/.kube/config
+        if ! k3d cluster list {{.CLUSTER_NAME}} >/dev/null 2>&1; then
+          echo "Creating k3d cluster '{{.CLUSTER_NAME}}'..."
+          k3d cluster create {{.CLUSTER_NAME}} \
+            --image rancher/k3s:v1.36.1-k3s1 \
+            --agents 1 \
+            --wait \
+            --api-port 127.0.0.1:6550 \
+            --k3s-arg "--disable=traefik@server:0" \
+            --k3s-arg "--disable=metrics-server@server:0"
+        fi
+        echo "Merging kubeconfig context..."
+        k3d kubeconfig merge {{.CLUSTER_NAME}} -d -s >/dev/null 2>&1 || true
+      - terraform init
+      - >-
+        terraform apply -auto-approve
+        -var="docker_username=${DOCKER_USERNAME:-}"
+        -var="docker_password=${DOCKER_TOKEN:-}"
+
   setup:cluster:
     desc: Create a k3d cluster (idempotent)
     status:
       - k3d kubeconfig get {{.CLUSTER_NAME}}
     cmds:
       - echo "Creating k3d cluster '{{.CLUSTER_NAME}}'..."
-      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 127.0.0.1:6550 --k3s-arg "--disable=traefik@server:0"
+      - k3d cluster create {{.CLUSTER_NAME}} --image rancher/k3s:v1.36.1-k3s1 --agents 1 --wait --api-port 127.0.0.1:6550 --k3s-arg "--disable=traefik@server:0"
       - kubectl config set-cluster k3d-{{.CLUSTER_NAME}} --server=https://localhost:6550
       - kubectl cluster-info
 
@@ -113,11 +129,25 @@ tasks:
     desc: Install Tekton Pipeline, Triggers, and Interceptors
     status:
       - kubectl get namespace tekton-pipelines
-      - kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines
-      - kubectl get deployment/tekton-pipelines-webhook -n tekton-pipelines
+      - kubectl get deployment/tekton-triggers-controller -n tekton-pipelines
+      - kubectl get deployment/tekton-triggers-webhook -n tekton-pipelines
     cmds:
-      - echo "Installing Tekton Pipeline..."
-      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml --request-timeout=120s
+      - echo "Waiting for ArgoCD to deploy Tekton Pipelines..."
+      - cmd: |
+          for i in {1..120}; do
+            if kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines >/dev/null 2>&1; then
+              echo "Tekton Pipelines controller deployment found."
+              exit 0
+            fi
+            echo "Waiting for deployment to be created..."
+            sleep 5
+          done
+          echo "Timeout waiting for Tekton Pipelines deployment"
+          exit 1
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -ExecutionPolicy Bypass -Command "for ($i=1; $i -le 120; $i++) { if (kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines 2>$null) { echo 'Tekton Pipelines controller deployment found.'; exit 0 }; echo 'Waiting for deployment to be created...'; Start-Sleep -Seconds 5 }; echo 'Timeout waiting for Tekton Pipelines deployment'; exit 1"
+        platforms: [windows]
       - echo "Installing Tekton Triggers..."
       - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml --request-timeout=120s
       - echo "Installing Tekton Interceptors..."
@@ -435,6 +465,7 @@ tasks:
           else
             echo "pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)"
           fi
+          kubectl patch sa default -p '{"imagePullSecrets": [{"name": "docker-credentials"}]}'
         platforms: [linux, darwin]
       - cmd: powershell -ExecutionPolicy Bypass -File scripts/setup-credentials.ps1
         platforms: [windows]
@@ -501,7 +532,7 @@ tasks:
     desc: Run portal tests
     dir: apps/portal
     cmds:
-      - yarn test
+      - yarn test --watchAll=false
 
   # ===========================================================================
   # Teardown Tasks
@@ -512,7 +543,11 @@ tasks:
       - task: clean:cluster
 
   clean:cluster:
-    desc: Delete the k3d cluster
+    desc: Delete the k3d cluster and all resources using Terraform
+    dir: infrastructure/environments/local-dev
     cmds:
-      - k3d cluster delete {{.CLUSTER_NAME}}
-      - echo "Cluster '{{.CLUSTER_NAME}}' deleted."
+      - >-
+        terraform destroy -auto-approve
+        -var="docker_username=${DOCKER_USERNAME:-}"
+        -var="docker_password=${DOCKER_TOKEN:-}"
+      - echo "Cluster '{{.CLUSTER_NAME}}' and all resources deleted."

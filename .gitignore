@@ -17,3 +17,9 @@ apps/portal/packages/backend/*.sqlite
 
 # mise
 mise.toml
+
+# Terraform local cache and state files
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.backup
+**/*.tfstate.lock.info

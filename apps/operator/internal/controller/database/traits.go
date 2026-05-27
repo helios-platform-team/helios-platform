@@ -17,7 +17,7 @@ const (
 	UsernameCharset = "abcdefghijklmnopqrstuvwxyz0123456789"
 
 	DatabaseTraitType      = "database"
-	DefaultPostgresVersion = "18.3"
+	DefaultPostgresVersion = "18.4"
 	DefaultPostgresPort    = 5432
 	DefaultDatabaseStorage = "1Gi"
 	PostgresDataPath       = "/var/lib/postgresql/data"

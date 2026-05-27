@@ -116,7 +116,7 @@ spec:
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "dotnet test"
-          testImage: "mcr.microsoft.com/dotnet/sdk:10.0.202"
+          testImage: "mcr.microsoft.com/dotnet/sdk:10.0.300"
           dbType: ${{ parameters.databaseConfig.dbType }}
           dbName: ${{ parameters.databaseConfig.dbName }}
           dbVersion: ${{ parameters.databaseConfig.dbVersion }}
@@ -149,21 +149,21 @@ spec:
     - id: register
       name: Register Component
       action: catalog:register
-      if: '{{ parameters.registerToCatalog }}'
+      if: "{{ parameters.registerToCatalog }}"
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
-        catalogInfoPath: 'catalog-info.yaml'
+        catalogInfoPath: "catalog-info.yaml"
 
     - id: notify
       name: Notify User
       action: notification:send
-      if: '{{ parameters.sendNotification }}'
+      if: "{{ parameters.sendNotification }}"
       input:
         recipients: entity
         entityRefs:
           - user:default/guest
-        title: '.NET Template Executed'
-        info: 'Your .NET Web API service has been scaffolded and deployed via GitOps.'
+        title: ".NET Template Executed"
+        info: "Your .NET Web API service has been scaffolded and deployed via GitOps."
 
   output:
     links:

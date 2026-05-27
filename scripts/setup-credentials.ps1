@@ -28,3 +28,7 @@ if ($LASTEXITCODE -eq 0) {
 } else {
     Write-Host "pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)"
 }
+
+Write-Host "Patching default service account for image pull secrets..."
+kubectl patch sa default -p '{"imagePullSecrets": [{"name": "docker-credentials"}]}'
+Write-Host "Patched default service account with docker-credentials image pull secret"

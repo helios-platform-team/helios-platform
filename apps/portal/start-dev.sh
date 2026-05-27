@@ -78,6 +78,7 @@ ARGOCD_AUTH_TOKEN=""
 if kubectl -n argocd get secret argocd-initial-admin-secret &>/dev/null; then
   echo -e "${YELLOW}🔑  Fetching ArgoCD Admin Password...${NC}"
   ARGOCD_PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | decode_base64)
+  echo -e "${GREEN}🔑  ArgoCD Admin Password: $ARGOCD_PASS${NC}"
 
   echo -e "${YELLOW}🚀  Starting ArgoCD Port-Forward (localhost:8080)...${NC}"
   kubectl port-forward -n argocd svc/argocd-server 8080:443 > /dev/null 2>&1 &

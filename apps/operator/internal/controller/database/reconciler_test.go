@@ -46,7 +46,7 @@ func TestReconcileSecrets(t *testing.T) {
 	dbProps := map[string]any{
 		"dbType":  "postgres",
 		"dbName":  "mydb",
-		"version": "18.3",
+		"version": "18.4",
 	}
 	dbPropsJSON, _ := json.Marshal(dbProps)
 
@@ -193,7 +193,7 @@ func TestReconcileInstances(t *testing.T) {
 	dbProps := map[string]any{
 		"dbType":  "postgres",
 		"dbName":  "my_custom_db",
-		"version": "18.3",
+		"version": "18.4",
 		"storage": "2Gi",
 	}
 	dbPropsJSON, _ := json.Marshal(dbProps)
@@ -348,7 +348,7 @@ func TestReconcileInstances(t *testing.T) {
 				Replicas: func() *int32 { r := int32(1); return &r }(),
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{{Name: "postgres", Image: "postgres:18.3"}},
+						Containers: []corev1.Container{{Name: "postgres", Image: "postgres:18.4"}},
 					},
 				},
 				VolumeClaimTemplates: []corev1.PersistentVolumeClaim{{
@@ -379,8 +379,8 @@ func TestReconcileInstances(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to get updated StatefulSet: %v", err)
 		}
-		if got := updatedSts.Spec.Template.Spec.Containers[0].Image; got != "postgres:18.3" {
-			t.Fatalf("expected image postgres:18.3, got %s", got)
+		if got := updatedSts.Spec.Template.Spec.Containers[0].Image; got != "postgres:18.4" {
+			t.Fatalf("expected image postgres:18.4, got %s", got)
 		}
 
 		updatedSvc := &corev1.Service{}
@@ -425,7 +425,7 @@ func TestReconcileInstances(t *testing.T) {
 }
 
 func TestReconcileInjection(t *testing.T) {
-	dbProps := map[string]any{"dbType": "postgres", "dbName": "mydb", "version": "18.3"}
+	dbProps := map[string]any{"dbType": "postgres", "dbName": "mydb", "version": "18.4"}
 	dbPropsJSON, _ := json.Marshal(dbProps)
 
 	app := &appv1alpha1.HeliosApp{
