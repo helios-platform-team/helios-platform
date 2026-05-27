@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,6 +28,99 @@ type Reconciler struct {
 // NewReconciler creates a new database Reconciler.
 func NewReconciler(c client.Client, scheme *runtime.Scheme) *Reconciler {
 	return &Reconciler{Client: c, Scheme: scheme}
+}
+
+// ReconcileSystemSecrets copies system-level secrets (docker-credentials, etc.)
+// from the default namespace to the app's namespace. This ensures that Tekton
+// tasks have access to required secrets for image building and pushing.
+func (r *Reconciler) ReconcileSystemSecrets(ctx context.Context, app *appv1alpha1.HeliosApp) error {
+	log := logf.FromContext(ctx)
+
+	// System secrets to provision to each app namespace
+	systemSecrets := []string{"docker-credentials", "helios-gitops-bot"}
+
+	for _, secretName := range systemSecrets {
+		// Check if secret already exists in app namespace
+		appSecret := &corev1.Secret{}
+		err := r.Client.Get(ctx, types.NamespacedName{
+			Name:      secretName,
+			Namespace: app.Namespace,
+		}, appSecret)
+
+		if err == nil {
+			log.V(1).Info("System secret already exists in app namespace, skipping",
+				"secret", secretName,
+				"namespace", app.Namespace)
+			continue
+		}
+
+		if !errors.IsNotFound(err) {
+			log.Error(err, "Failed to check for system secret in app namespace",
+				"secret", secretName,
+				"namespace", app.Namespace)
+			return fmt.Errorf("failed to check for system secret %s in namespace %s: %w", secretName, app.Namespace, err)
+		}
+
+		// Read secret from default namespace
+		defaultSecret := &corev1.Secret{}
+		err = r.Client.Get(ctx, types.NamespacedName{
+			Name:      secretName,
+			Namespace: "default",
+		}, defaultSecret)
+
+		if err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("System secret not found in default namespace, skipping",
+					"secret", secretName)
+				continue
+			}
+			log.Error(err, "Failed to read system secret from default namespace",
+				"secret", secretName)
+			return fmt.Errorf("failed to read system secret %s from default namespace: %w", secretName, err)
+		}
+
+		// Copy secret to app namespace
+		newSecret := r.copySecret(defaultSecret, app.Namespace)
+
+		// Note: Do NOT set controller reference for system secrets
+		// They are not "owned" by the app and should persist if the app is deleted
+
+		if err := r.Client.Create(ctx, newSecret); err != nil {
+			if errors.IsAlreadyExists(err) {
+				log.Info("System secret was created concurrently, skipping",
+					"secret", secretName,
+					"namespace", app.Namespace)
+				continue
+			}
+			log.Error(err, "Failed to create system secret in app namespace",
+				"secret", secretName,
+				"namespace", app.Namespace)
+			return fmt.Errorf("failed to create system secret %s in namespace %s: %w", secretName, app.Namespace, err)
+		}
+
+		log.Info("Successfully provisioned system secret to app namespace",
+			"secret", secretName,
+			"namespace", app.Namespace)
+	}
+
+	return nil
+}
+
+// copySecret creates a copy of a secret with a new namespace.
+// It preserves the secret type and data, but resets metadata.
+func (r *Reconciler) copySecret(source *corev1.Secret, targetNamespace string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      source.Name,
+			Namespace: targetNamespace,
+			Labels: map[string]string{
+				"helios.io/managed-by":    "operator",
+				"helios.io/system-secret": "true",
+			},
+		},
+		Type: source.Type,
+		Data: source.Data,
+	}
 }
 
 // ReconcileSecrets ensures database credential secrets exist for all

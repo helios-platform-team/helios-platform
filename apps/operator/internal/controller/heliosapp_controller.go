@@ -137,6 +137,18 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// ------------------------------------------------------------------
+	// PHASE 0.3: System Secrets Provisioning
+	// Copy system-level secrets (docker-credentials, etc.) from the default
+	// namespace to the app's namespace. This ensures Tekton tasks have access
+	// to required secrets for image building and pushing.
+	// ------------------------------------------------------------------
+	if err := r.Database.ReconcileSystemSecrets(ctx, &heliosApp); err != nil {
+		log.Error(err, "Failed to provision system secrets")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("System secret provisioning failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	// ------------------------------------------------------------------
 	// PHASE 0.5: Database Credential Secrets
 	// Generate and store secure credentials for components with database traits.
 	// Secrets are created BEFORE GitOps sync to ensure credentials exist
