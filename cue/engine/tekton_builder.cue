@@ -117,6 +117,10 @@ _triggers: (triggers.#RenderTriggers & {
 		dockerSecret:   tektonInput.dockerSecret
 		databaseSecretRef: tektonInput.databaseSecretRef
 
+		storageDriver:    tektonInput.storageDriver
+		buildahIsolation: tektonInput.buildahIsolation
+		buildPlatforms:   tektonInput.buildPlatforms
+
 		argoCDNamespace: _argoCDNamespace
 		argoCDAppName:   "\(tektonInput.appName)-argocd"
 	}

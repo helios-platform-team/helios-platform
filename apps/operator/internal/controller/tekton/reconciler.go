@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -89,6 +90,27 @@ func (r *Reconciler) ReconcileInitialPipelineRun(ctx context.Context, app *appv1
 	pipelineName := app.Spec.PipelineName
 	if pipelineName == "" {
 		pipelineName = defaultPipelineName
+	}
+
+	// Only trigger if triggerType is not gitea-push or if we want to force initial build.
+	// If it's gitea-push, we only skip if a PipelineRun ALREADY exists (triggered by webhook).
+	// This prevents missing the initial build if the webhook fails or is delayed.
+	if app.Spec.TriggerType == "gitea-push" {
+		prList := &unstructured.UnstructuredList{}
+		prList.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "tekton.dev",
+			Version: "v1",
+			Kind:    "PipelineRunList",
+		})
+		err := r.Client.List(ctx, prList, client.InNamespace(app.Namespace), client.MatchingLabels{
+			"app.kubernetes.io/instance": app.Name,
+		})
+		if err == nil && len(prList.Items) > 0 {
+			log.Info("Skipping initial PipelineRun because one already exists for gitea-push", "count", len(prList.Items))
+			app.Status.InitialBuildTriggered = true
+			return r.Client.Status().Update(ctx, app)
+		}
+		log.Info("No PipelineRun found for gitea-push app; triggering initial build as fallback")
 	}
 
 	pr, err := GeneratePipelineRun(app, pipelineName)

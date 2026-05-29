@@ -161,7 +161,10 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
+	@# Free port 8081 (health probe) in case a previous run wasn't cleanly shut down.
+	@pids=$$(lsof -ti :8081 2>/dev/null || true); [ -z "$$pids" ] || (echo "Killing stale process on :8081 ($$pids)..." && kill -9 $$pids)
 	go run ./cmd/main.go
+
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.

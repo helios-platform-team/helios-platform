@@ -115,7 +115,7 @@ func TestE2E_CueVsLegacy_TaskNames(t *testing.T) {
 	}
 
 	// CUE TaskRegistry: clone, build, gitops update, Argo CD sync, db-migrate, postgrest-reload
-	expectedTaskNames := []string{"argocd-sync", "db-migrate", "git-clone", "git-update-manifest", "kaniko-build", "postgrest-reload"}
+	expectedTaskNames := []string{"argocd-sync", "buildah-build", "db-migrate", "git-clone", "git-update-manifest", "postgrest-reload"}
 	slices.Sort(expectedTaskNames)
 
 	var actualTaskNames []string
@@ -419,7 +419,6 @@ func TestE2E_NoLegacyFunctionReferences(t *testing.T) {
 		"func GenerateIngress(",
 		"func GeneratePVC(",
 		"func GenerateGitCloneTask(",
-		"func GenerateKanikoBuildTask(",
 		"func GenerateGitUpdateManifestTask(",
 		"func GeneratePipeline(",
 	}

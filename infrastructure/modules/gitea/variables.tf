@@ -17,6 +17,12 @@ variable "gitea_admin_pass" {
   sensitive   = true
 }
 
+variable "gitea_configure" {
+  type        = bool
+  description = "Whether to wait for Gitea and configure org/token"
+  default     = true
+}
+
 variable "gitea_internal_host" {
   type        = string
   description = "Gitea internal DNS name within Kubernetes"

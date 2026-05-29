@@ -1,11 +1,11 @@
 # ---- Build Stage ----
-FROM node:24-alpine AS builder
+FROM node:22-alpine3.23 AS builder
 
 WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts --no-audit --no-fund --progress=false
 
 # Copy Prisma schema and config, then generate client
 COPY prisma ./prisma/
@@ -17,13 +17,13 @@ COPY . .
 RUN npm run build
 
 # ---- Production Stage ----
-FROM node:24-alpine AS production
+FROM node:22-alpine3.23 AS production
 
 WORKDIR /app
 
 # Install production dependencies only
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund --progress=false
 
 # Copy Prisma schema, config, and generated client from builder
 COPY --from=builder /app/prisma ./prisma/

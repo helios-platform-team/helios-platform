@@ -167,19 +167,26 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	for _, comp := range appModel.App.Components {
-		if img, ok := comp.Properties["image"].(string); !ok || img == "" {
-			msg := fmt.Sprintf("Component '%s' is waiting for image (likely building). Status: Pending.", comp.Name)
-			log.Info(msg)
-			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhasePending, msg)
-			return ctrl.Result{}, nil
-		}
-	}
-
 	if err := r.Tekton.ReconcileInitialPipelineRun(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile initial PipelineRun")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Initial PipelineRun failed: %v", err))
 		return ctrl.Result{}, err
+	}
+
+	for _, comp := range appModel.App.Components {
+		// Only check for image if the component is NOT a web-service or similar that requires building.
+		// If it's a web-service and the image is empty, we expect Tekton to build it.
+		if img, ok := comp.Properties["image"].(string); !ok || img == "" {
+			if comp.Type != "web-service" && comp.Type != "worker" {
+				msg := fmt.Sprintf("Component '%s' is waiting for image. Status: Pending.", comp.Name)
+				log.Info(msg)
+				r.updateStatus(ctx, &heliosApp, appv1alpha1.PhasePending, msg)
+				return ctrl.Result{}, nil
+			}
+			log.Info("Component image empty but it is a buildable component, waiting for PipelineRun to complete", "component", comp.Name)
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhasePending, fmt.Sprintf("Waiting for component '%s' image build", comp.Name))
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
 	}
 
 	// ------------------------------------------------------------------

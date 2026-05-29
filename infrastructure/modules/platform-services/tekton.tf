@@ -27,6 +27,18 @@ resource "kubernetes_namespace_v1" "tekton_pipelines" {
       "pod-security.kubernetes.io/enforce" = "restricted"
     }
   }
+
+  provisioner "local-exec" {
+    when = destroy
+
+    # Force any lingering Tekton pods to disappear before the namespace delete
+    # waits on Kubernetes garbage collection. This avoids terraform destroy
+    # timing out on a namespace stuck in Terminating.
+    command = <<-EOT
+      kubectl delete pod --all -n tekton-pipelines --force --grace-period=0 --ignore-not-found=true --wait=false || true
+      kubectl patch namespace tekton-pipelines -p '{"spec":{"finalizers":[]}}' --type=merge >/dev/null 2>&1 || true
+    EOT
+  }
 }
 
 resource "kubernetes_config_map_v1" "tekton_pruner_config" {

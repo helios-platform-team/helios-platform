@@ -40,6 +40,7 @@ module "gitea" {
   gitea_port         = 3030
   gitea_admin_user   = "helios"
   gitea_admin_pass   = "helios123"
+  gitea_configure    = var.gitea_configure
   workspace_root     = "${path.module}/../../.."
   gitops_secret_name = "helios-gitops-bot"
 }

@@ -4,7 +4,7 @@ package tasks
 // Registry mapping task names to their definitions
 #TaskRegistry: {
 	"git-clone":           #GitClone
-	"kaniko-build":        #KanikoBuild
+	"buildah-build":       #BuildahBuild
 	"git-update-manifest": #GitUpdateManifest
 	"argocd-sync":         #ArgoCDSync
 	"db-migrate":          #DBMigrate

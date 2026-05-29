@@ -1,12 +1,32 @@
+# Explicitly delete the Gitea PVC on destroy so Helm doesn't emit
+# "These resources were kept due to the resource policy" warnings.
+# The Gitea chart annotates gitea-shared-storage with helm.sh/resource-policy=keep.
+resource "terraform_data" "gitea_pvc_cleanup" {
+  depends_on = [helm_release.gitea]
+
+  provisioner "local-exec" {
+    when    = destroy
+    # Do not block terraform destroy on PVC finalizers/volume detach delays.
+    # We only need to issue the delete request before tearing down the cluster.
+    command = "kubectl delete pvc gitea-shared-storage -n gitea --ignore-not-found=true --wait=false || true"
+  }
+}
+
 resource "helm_release" "gitea" {
   name             = "gitea"
   repository       = "oci://registry-1.docker.io/giteacharts"
   chart            = "gitea"
   namespace        = "gitea"
   create_namespace = true
+  wait             = var.gitea_configure
+  timeout          = 600
 
   values = [
     yamlencode({
+      image = {
+        registry   = "docker.io"
+        repository = "gitea/gitea"
+      }
       gitea = {
         admin = {
           username = var.gitea_admin_user
@@ -68,6 +88,7 @@ resource "helm_release" "gitea" {
 }
 
 resource "terraform_data" "configure_gitea" {
+  count      = var.gitea_configure ? 1 : 0
   depends_on = [helm_release.gitea]
 
   input = {
@@ -77,7 +98,7 @@ resource "terraform_data" "configure_gitea" {
   provisioner "local-exec" {
     command = <<-EOT
       echo "Waiting for Gitea deployment..."
-      kubectl rollout status deployment/gitea -n gitea --timeout=300s
+      kubectl rollout status deployment/gitea -n gitea --timeout=600s
 
       echo "Finding Gitea pod..."
       POD_NAME=$(kubectl get pods -n gitea -l app.kubernetes.io/name=gitea -o jsonpath="{.items[0].metadata.name}")
@@ -133,7 +154,7 @@ resource "terraform_data" "configure_gitea" {
 }
 
 resource "kubernetes_secret_v1" "gitea_repo_creds" {
-  depends_on = [terraform_data.configure_gitea]
+  depends_on = [helm_release.gitea]
 
   metadata {
     name      = "gitea-repo-creds"
@@ -152,7 +173,7 @@ resource "kubernetes_secret_v1" "gitea_repo_creds" {
 }
 
 resource "kubernetes_secret_v1" "gitea_gitops_secret" {
-  depends_on = [terraform_data.configure_gitea]
+  depends_on = [helm_release.gitea]
 
   metadata {
     name      = var.gitops_secret_name

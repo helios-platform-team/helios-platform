@@ -3,7 +3,7 @@
 
 provider "registry.terraform.io/alekc/kubectl" {
   version     = "2.4.0"
-  constraints = ">= 2.0.0"
+  constraints = "~> 2.4.0"
   hashes = [
     "h1:r7g4xiv18glIeUo5Gk/VUibTbyay40vqLXzquH/SSMY=",
     "zh:055d41f21619cfb31c03edaa445d242303e94e4fd06b0adbcdaee359fcdb079d",
@@ -64,7 +64,7 @@ provider "registry.terraform.io/hashicorp/kubernetes" {
 
 provider "registry.terraform.io/hashicorp/time" {
   version     = "0.14.0"
-  constraints = ">= 0.9.0"
+  constraints = "~> 0.14.0"
   hashes = [
     "h1:4EThC3ocCFiFPMZQSUvSGSxoJqBcGWxMcFYmL67uS7Y=",
     "zh:12abfd6b800e4d7fa6db7310dec8ffd440b31993861ef188c7ed5260b3073937",

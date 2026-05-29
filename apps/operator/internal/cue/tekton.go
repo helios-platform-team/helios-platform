@@ -67,6 +67,11 @@ type TektonInput struct {
 	// === ARGOCD ===
 	ArgoCDNamespace string `json:"argoCDNamespace,omitempty"`
 	ArgoCDProject   string `json:"argoCDProject,omitempty"`
+
+	// === BUILD CUSTOMIZATIONS ===
+	StorageDriver    string `json:"storageDriver,omitempty"`
+	BuildahIsolation string `json:"buildahIsolation,omitempty"`
+	BuildPlatforms   string `json:"buildPlatforms,omitempty"`
 }
 
 // TektonRendererInterface defines methods for Tekton CUE rendering.

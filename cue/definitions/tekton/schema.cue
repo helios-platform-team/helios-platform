@@ -15,7 +15,7 @@ package tekton
 	gitBranch: string | *"main"
 
 	// === CONTAINER IMAGE ===
-	imageRepo: string // e.g. "docker.io/myuser/myapp"
+	imageRepo: string & !~"\\s+" // e.g. "docker.io/myuser/myapp" (no spaces allowed)
 
 	// === GITOPS ===
 	gitopsRepo:      string
@@ -33,7 +33,7 @@ package tekton
 	triggerType:    string | *"gitea-push"           // For registry lookup
 	serviceAccount: string | *"default"
 	pvcName:        string | *"shared-workspace-pvc"
-	contextSubpath: string | *""
+	contextSubpath: string & !~"\\.\\./" | *"" // Prevent directory traversal
 
 	// === APP CONFIG ===
 	replicas: int & >=1 | *1
@@ -50,4 +50,9 @@ package tekton
 	// === ARGOCD ===
 	argoCDNamespace: string | *"argocd"
 	argoCDProject:   string | *"default"
+
+	// === BUILD CUSTOMIZATIONS ===
+	storageDriver:    string | *"overlay"
+	buildahIsolation: string | *"chroot"
+	buildPlatforms:   string | *"linux/amd64"
 }

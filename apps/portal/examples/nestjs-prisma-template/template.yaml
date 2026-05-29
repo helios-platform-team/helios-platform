@@ -111,16 +111,21 @@ spec:
         targetPath: ./gitops
         values:
           name: ${{ parameters.repoName }}
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          # No index.docker.io prefix — imageRepo stored as org/repo, tag appended by pipeline
+          image: ${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
           port: ${{ parameters.port }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
+          databaseVersion: ${{ parameters.databaseConfig.dbVersion }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
-          testCommand: "npm ci && npm test"
+          # Node_modules caching (keyed by package-lock.json hash) is handled
+          # by the pipeline's run-tests step — only the test runner is needed here.
+          testCommand: "npm test"
+          testImage: "node:24"
 
     - id: publish-gitops
       name: Publish GitOps Manifests

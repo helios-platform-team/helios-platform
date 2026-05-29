@@ -6,7 +6,13 @@ resource "terraform_data" "k3d_cluster" {
   # Runs upon 'terraform apply'
   provisioner "local-exec" {
     command = <<-EOT
-      if k3d cluster list ${var.cluster_name} >/dev/null 2>&1; then
+      # Write containerd registry mirror config so all Docker Hub pulls
+      # go through the local pull-through cache registry first.
+      mkdir -p "$${HOME}/.k3d"
+      printf 'mirrors:\n  "docker.io":\n    endpoint:\n      - "http://k3d-${var.registry_name}:${var.registry_port}"\n  "registry-1.docker.io":\n    endpoint:\n      - "http://k3d-${var.registry_name}:${var.registry_port}"\n' \
+        > "$${HOME}/.k3d/helios-registries.yaml"
+
+      if k3d cluster list ${var.cluster_name} > /dev/null 2>&1; then
         echo "Cluster ${var.cluster_name} already exists. Skipping creation."
       else
         k3d cluster create ${var.cluster_name} \
@@ -15,9 +21,11 @@ resource "terraform_data" "k3d_cluster" {
           --wait \
           --api-port 127.0.0.1:6550 \
           --k3s-arg "--disable=traefik@server:0" \
-          --k3s-arg "--disable=metrics-server@server:0"
+          --k3s-arg "--disable=metrics-server@server:0" \
+          --registry-use "k3d-${var.registry_name}:${var.registry_port}" \
+          --registry-config "$${HOME}/.k3d/helios-registries.yaml"
       fi
-      
+
       kubectl config set-cluster k3d-${var.cluster_name} --server=https://localhost:6550
       kubectl cluster-info
     EOT

@@ -1,3 +1,23 @@
+# Explicitly delete ArgoCD CRDs on destroy so Helm doesn't emit
+# "These resources were kept due to the resource policy" warnings.
+# ArgoCD's chart annotates its CRDs with helm.sh/resource-policy=keep,
+# which prevents helm uninstall from removing them. We clean them up
+# ourselves before the helm release is destroyed.
+resource "terraform_data" "argocd_crds_cleanup" {
+  depends_on = [helm_release.argocd]
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      kubectl delete crd \
+        applications.argoproj.io \
+        applicationsets.argoproj.io \
+        appprojects.argoproj.io \
+        --ignore-not-found=true
+    EOT
+  }
+}
+
 resource "helm_release" "argocd" {
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"

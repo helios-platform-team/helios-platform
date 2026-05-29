@@ -10,9 +10,8 @@
 #   Uses a minimal Eclipse Temurin JRE-only Alpine image to keep
 #   the final image small (~200 MB vs ~800 MB with a full JDK).
 #
-# Kaniko Compatibility
-#   This Dockerfile avoids features that are problematic for
-#   Kaniko (e.g. mounting secrets, multi-platform builds).
+# Buildah Compatibility
+#   This Dockerfile is optimized to run rootless under Buildah.
 #   The build is fully self-contained.
 # ──────────────────────────────────────────────────────────
 

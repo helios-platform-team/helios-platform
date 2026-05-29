@@ -10,6 +10,12 @@ variable "git_organization" {
   default     = "helios-platform"
 }
 
+variable "gitea_configure" {
+  type        = bool
+  description = "Whether to wait for Gitea and configure org/token"
+  default     = true
+}
+
 variable "docker_username" {
   type        = string
   description = "Docker Hub username"

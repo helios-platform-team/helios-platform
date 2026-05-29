@@ -52,7 +52,7 @@ check_tool() {
   if [[ -n "$min_ver" ]]; then
     local actual_ver
     actual_ver=$(eval "$ver_cmd" 2>/dev/null || echo "unknown")
-    if [[ "$actual_ver" == "unknown" ]]; then
+    if [[ "$actual_ver" == "unknown" || -z "$actual_ver" ]]; then
       warn "$name installed but could not determine version"
     elif version_gte "$actual_ver" "$min_ver"; then
       pass "$name $actual_ver (>= $min_ver)"
@@ -103,8 +103,7 @@ check_tool "cue" "0.16" \
   "cue version | head -1 | sed -n -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
   "go install cuelang.org/go/cmd/cue@latest"
 
-check_tool "make" "4.4" \
-  "make --version | head -1 | sed -n -E 's/.*Make ([0-9]+\.[0-9]+).*/\\1/p'" \
+check_optional_tool "make" \
   "apt-get install make (or brew install make)"
 
 check_tool "operator-sdk" "1.42" \

@@ -15,7 +15,7 @@ import (
 // GeneratePipelineRun creates a PipelineRun to trigger the CI/CD pipeline.
 // PipelineRuns are ephemeral (unique timestamp per run), unlike the static
 // resources that CUE handles.
-func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) (*unstructured.Unstructured, error) {
+func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string, npmCachePVCName ...string) (*unstructured.Unstructured, error) {
 	timestamp := time.Now().Format("20060102-150405.000")
 	prName := fmt.Sprintf("%s-manifest-%s", heliosApp.Name, timestamp)
 
@@ -41,13 +41,13 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 		map[string]any{"name": "app-repo-url", "value": shared.RewriteGiteaURL(heliosApp.Spec.GitRepo)},
 		map[string]any{"name": "app-repo-revision", "value": appRepoRevision},
 		map[string]any{"name": "image-repo", "value": heliosApp.Spec.ImageRepo},
-		map[string]any{"name": "GITOPS_REPO_URL", "value": shared.RewriteGiteaURL(heliosApp.Spec.GitOpsRepo)},
-		map[string]any{"name": "MANIFEST_PATH", "value": heliosApp.Spec.GitOpsPath},
-		map[string]any{"name": "GITOPS_REPO_BRANCH", "value": gitOpsBranch},
-		map[string]any{"name": "GITOPS_SECRET_REF", "value": gitOpsSecretRef},
-		map[string]any{"name": "GITOPS_AUTHOR_NAME", "value": "Helios Bot"},
-		map[string]any{"name": "GITOPS_AUTHOR_EMAIL", "value": "helios-bot@helios.local"},
-		map[string]any{"name": "CONTEXT_SUBPATH", "value": contextSubpath},
+		map[string]any{"name": "gitops-repo-url", "value": shared.RewriteGiteaURL(heliosApp.Spec.GitOpsRepo)},
+		map[string]any{"name": "manifest-path", "value": heliosApp.Spec.GitOpsPath},
+		map[string]any{"name": "gitops-repo-branch", "value": gitOpsBranch},
+		map[string]any{"name": "gitops-secret-ref", "value": gitOpsSecretRef},
+		map[string]any{"name": "gitops-author-name", "value": "Helios Bot"},
+		map[string]any{"name": "gitops-author-email", "value": "helios-bot@helios.local"},
+		map[string]any{"name": "context-subpath", "value": contextSubpath},
 		map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", replicas)},
 		map[string]any{"name": "port", "value": fmt.Sprintf("%d", port)},
 		map[string]any{"name": "test-command", "value": heliosApp.Spec.TestCommand},
@@ -70,6 +70,11 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 	}
 	params = append(params, map[string]any{"name": "resources", "value": string(resourcesJSON)})
 
+	npmCachePVC := ""
+	if len(npmCachePVCName) > 0 {
+		npmCachePVC = npmCachePVCName[0]
+	}
+
 	workspaceBindings := []any{
 		map[string]any{
 			"name": "source-workspace",
@@ -89,6 +94,15 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 				},
 			},
 		},
+		map[string]any{
+			"name": "npm-cache",
+			"volumeClaimTemplate": map[string]any{
+				"spec": map[string]any{
+					"accessModes": []any{"ReadWriteOnce"},
+					"resources":   map[string]any{"requests": map[string]any{"storage": "5Gi"}},
+				},
+			},
+		},
 	}
 
 	if heliosApp.Spec.PVCName != "" {
@@ -103,6 +117,33 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 				"persistentVolumeClaim": map[string]any{"claimName": heliosApp.Spec.PVCName},
 				"subPath":               "gitops",
 			},
+		}
+		npmCacheBinding := map[string]any{
+			"name": "npm-cache",
+			"volumeClaimTemplate": map[string]any{
+				"spec": map[string]any{
+					"accessModes": []any{"ReadWriteOnce"},
+					"resources":   map[string]any{"requests": map[string]any{"storage": "5Gi"}},
+				},
+			},
+		}
+		if npmCachePVC != "" {
+			npmCacheBinding = map[string]any{
+				"name":                  "npm-cache",
+				"persistentVolumeClaim": map[string]any{"claimName": npmCachePVC},
+			}
+		}
+		workspaceBindings = append(workspaceBindings, npmCacheBinding)
+	} else if npmCachePVC != "" {
+		// Replace the volumeClaimTemplate with a persistent PVC
+		for i, wb := range workspaceBindings {
+			if wbMap, ok := wb.(map[string]any); ok && wbMap["name"] == "npm-cache" {
+				workspaceBindings[i] = map[string]any{
+					"name":                  "npm-cache",
+					"persistentVolumeClaim": map[string]any{"claimName": npmCachePVC},
+				}
+				break
+			}
 		}
 	}
 

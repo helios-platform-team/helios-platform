@@ -20,11 +20,11 @@ import "helios.io/cue/definitions/tekton"
 			tekton.#CommonParams.gitops.secretRef,
 			tekton.#CommonParams.gitops.authorName,
 			tekton.#CommonParams.gitops.authorEmail, {
-			name:    "REPLICAS"
+			name:    "replicas"
 			default: "2"
 			type:    "string"
 		}, {
-			name:    "PORT"
+			name:    "port"
 			default: "8080"
 			type:    "string"
 		}]
@@ -38,20 +38,37 @@ import "helios.io/cue/definitions/tekton"
 			script: """
 				#!/bin/sh
 				set -e
+				if ! command -v git >/dev/null 2>&1; then
+					apk add --no-cache git
+				fi
 				
-				# Clean workspace
-				cd "$(workspaces.gitops-repo.path)"
-				rm -rf ./*
-				rm -rf ./.??*
-				rm -rf .git
-				
-				# Clone
-				echo "Cloning $(params.GITOPS_REPO_URL) to current dir..."
-				git clone "$(params.GITOPS_REPO_URL)" .
-				git checkout -B "$(params.GITOPS_REPO_BRANCH)"
+				WORKSPACE_PATH="$(workspaces.gitops-repo.path)"
+				cd "$WORKSPACE_PATH"
 
-				# Ensure subsequent steps (possibly running as non-root) can modify files.
-				chmod -R a+rwX "$(workspaces.gitops-repo.path)"
+				# Tekton PVC ownership can differ from the running UID.
+				# Force git to trust this workspace path.
+				git_safe() {
+					git -c safe.directory="$WORKSPACE_PATH" "$@"
+				}
+
+				# Prepare repo content using git primitives (no rm dependency).
+				echo "Cloning $(params.gitops-repo-url) to current dir..."
+				if [ -d .git ]; then
+					git_safe remote remove origin || true
+				else
+					git_safe init
+				fi
+				git_safe remote add origin "$(params.gitops-repo-url)"
+				git_safe fetch --depth=1 origin "$(params.gitops-repo-branch)"
+				git_safe checkout -B "$(params.gitops-repo-branch)" FETCH_HEAD
+				git_safe reset --hard FETCH_HEAD
+				git_safe clean -fdx
+
+				# Ensure subsequent steps can modify files when chmod is available.
+				# Some minimal git images do not ship coreutils.
+				if command -v chmod >/dev/null 2>&1; then
+					chmod -R a+rwX "$WORKSPACE_PATH"
+				fi
 				"""
 		}, {
 			// Step 2: Update Manifests using YQ image
@@ -65,9 +82,9 @@ import "helios.io/cue/definitions/tekton"
 				set -e
 				cd "$(workspaces.gitops-repo.path)"
 
-				export IMAGE_URL="$(params.NEW_IMAGE_URL)"
-				export REPLICAS="$(params.REPLICAS)"
-				export PORT="$(params.PORT)"
+				export IMAGE_URL="$(params.new-image-url)"
+				export REPLICAS="$(params.replicas)"
+				export PORT="$(params.port)"
 
 				# Defensive defaults: avoid generating invalid manifests when inputs are empty/0
 				if [ -z "${REPLICAS}" ] || [ "${REPLICAS}" = "0" ]; then
@@ -76,7 +93,7 @@ import "helios.io/cue/definitions/tekton"
 				if [ -z "${PORT}" ] || [ "${PORT}" = "0" ]; then
 				  export PORT="8080"
 				fi
-				MANIFEST_PATH="$(params.MANIFEST_PATH)"
+				MANIFEST_PATH="$(params.manifest-path)"
 
 				# Logic tạo file tự động
 				if echo "$MANIFEST_PATH" | grep -qvE '\\.ya?ml$'; then
@@ -131,41 +148,61 @@ import "helios.io/cue/definitions/tekton"
 			image: _config.images.gitClone
 			envFrom: [{
 				secretRef: {
-					name:     "helios-gitops-bot"
-					optional: false
+					// Use task param instead of hardcoded secret so environments can vary.
+					name:     "$(params.gitops-secret-ref)"
+					// Keep step runnable even when secret is absent; script handles missing creds.
+					optional: true
 				}
 			}]
 			script: """
 				#!/bin/sh
 				set -e
-				cd "$(workspaces.gitops-repo.path)"
+					if ! command -v git >/dev/null 2>&1; then
+						apk add --no-cache git
+					fi
+				WORKSPACE_PATH="$(workspaces.gitops-repo.path)"
+				cd "$WORKSPACE_PATH"
+				git_safe() {
+					git -c safe.directory="$WORKSPACE_PATH" "$@"
+				}
 
-				git config user.email "$(params.GITOPS_AUTHOR_EMAIL)"
-				git config user.name "$(params.GITOPS_AUTHOR_NAME)"
+				git_safe config user.email "$(params.gitops-author-email)"
+				git_safe config user.name "$(params.gitops-author-name)"
 
 				if [ -n "${username:-}" ] && [ -n "${password:-}" ]; then
-				  RAW_URL="$(params.GITOPS_REPO_URL)"
-				  # Strip any embedded credentials from http/https URL first.
-				  RAW_URL="$(echo "$RAW_URL" | sed -e 's|^https://[^@]*@|https://|' -e 's|^http://[^@]*@|http://|')"
-				  if echo "$RAW_URL" | grep -q '^https://'; then
-				    REPO_URL_WITH_AUTH="$(echo "$RAW_URL" | sed "s|^https://|https://${username}:${password}@|")"
-				  elif echo "$RAW_URL" | grep -q '^http://'; then
-				    REPO_URL_WITH_AUTH="$(echo "$RAW_URL" | sed "s|^http://|http://${username}:${password}@|")"
-				  else
-				    echo "Unsupported GitOps repo URL scheme: $RAW_URL"
-				    exit 1
-				  fi
-				  git remote set-url origin "${REPO_URL_WITH_AUTH}"
+				  RAW_URL="$(params.gitops-repo-url)"
+				  # Strip embedded credentials without sed (minimal images may not include it).
+				  case "$RAW_URL" in
+				    https://*@*)
+				      RAW_URL="https://${RAW_URL#https://*@}"
+				      ;;
+				    http://*@*)
+				      RAW_URL="http://${RAW_URL#http://*@}"
+				      ;;
+				  esac
+				  case "$RAW_URL" in
+				    https://*)
+				      REPO_URL_WITH_AUTH="https://${username}:${password}@${RAW_URL#https://}"
+				      ;;
+				    http://*)
+				      REPO_URL_WITH_AUTH="http://${username}:${password}@${RAW_URL#http://}"
+				      ;;
+				    *)
+				      echo "Unsupported GitOps repo URL scheme: $RAW_URL"
+				      exit 1
+				      ;;
+				  esac
+				  git_safe remote set-url origin "${REPO_URL_WITH_AUTH}"
 				else
 				    echo "WARNING: username or password env vars not set. Push might fail."
 				fi
 
-				git add .
-				if git diff-index --quiet HEAD --; then
+				git_safe add .
+				if git_safe diff-index --quiet HEAD --; then
 				    echo "No changes to commit"
 				else
-				    git commit -m "chore: Update image=$(params.NEW_IMAGE_URL) [skip-ci]"
-				    git push origin "$(params.GITOPS_REPO_BRANCH)"
+				    git_safe commit -m "chore: Update image=$(params.new-image-url) [skip-ci]"
+				    git_safe push origin "$(params.gitops-repo-branch)"
 				fi
 				"""
 		}]
