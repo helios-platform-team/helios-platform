@@ -3,6 +3,7 @@ package tekton
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -73,6 +74,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp) 
 	}
 
 	r.ensureRBAC(ctx, app)
+
+	// Keep only the 3 most recent PipelineRuns for this application
+	if err := r.PrunePipelineRuns(ctx, app.Namespace, app.Name, 3); err != nil {
+		log.Error(err, "Failed to prune old PipelineRuns")
+	}
+
+	// Cancel any older concurrent PipelineRuns to prevent out-of-order deployments
+	if err := r.CancelOlderPipelineRuns(ctx, app.Namespace, app.Name); err != nil {
+		log.Error(err, "Failed to cancel concurrent PipelineRuns")
+	}
 
 	return nil
 }
@@ -186,4 +197,133 @@ func (r *Reconciler) ensureRBAC(ctx context.Context, app *appv1alpha1.HeliosApp)
 			}
 		}
 	}
+}
+
+// PrunePipelineRuns deletes older PipelineRuns, keeping only the 'keep' most recent ones.
+func (r *Reconciler) PrunePipelineRuns(ctx context.Context, namespace, appName string, keep int) error {
+	log := logf.FromContext(ctx)
+
+	prList := &unstructured.UnstructuredList{}
+	prList.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "tekton.dev",
+		Version: "v1",
+		Kind:    "PipelineRunList",
+	})
+
+	err := r.Client.List(ctx, prList, client.InNamespace(namespace), client.MatchingLabels{
+		"app.kubernetes.io/name": appName,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list PipelineRuns for pruning: %w", err)
+	}
+
+	if len(prList.Items) <= keep {
+		return nil
+	}
+
+	// Sort oldest first
+	sort.Slice(prList.Items, func(i, j int) bool {
+		iTime := prList.Items[i].GetCreationTimestamp()
+		jTime := prList.Items[j].GetCreationTimestamp()
+		return iTime.Before(&jTime)
+	})
+
+	toDelete := len(prList.Items) - keep
+	log.Info("Pruning old PipelineRuns", "count", toDelete, "appName", appName)
+
+	for i := 0; i < toDelete; i++ {
+		pr := prList.Items[i]
+		log.Info("Pruning PipelineRun", "name", pr.GetName())
+		if err := r.Client.Delete(ctx, &pr); err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "Failed to delete old PipelineRun during pruning", "name", pr.GetName())
+		}
+	}
+
+	return nil
+}
+
+// CancelOlderPipelineRuns cancels any active PipelineRuns except the most recent one.
+func (r *Reconciler) CancelOlderPipelineRuns(ctx context.Context, namespace, appName string) error {
+	log := logf.FromContext(ctx)
+
+	prList := &unstructured.UnstructuredList{}
+	prList.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "tekton.dev",
+		Version: "v1",
+		Kind:    "PipelineRunList",
+	})
+
+	err := r.Client.List(ctx, prList, client.InNamespace(namespace), client.MatchingLabels{
+		"app.kubernetes.io/name": appName,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list PipelineRuns for cancellation check: %w", err)
+	}
+
+	if len(prList.Items) <= 1 {
+		return nil
+	}
+
+	// Sort newest first (jTime before iTime means iTime is newer, so sorting newest first)
+	sort.Slice(prList.Items, func(i, j int) bool {
+		iTime := prList.Items[i].GetCreationTimestamp()
+		jTime := prList.Items[j].GetCreationTimestamp()
+		return jTime.Before(&iTime)
+	})
+
+	// Find the most recent active/running PipelineRun to keep
+	var activeRunToKeep *unstructured.Unstructured
+	for i := range prList.Items {
+		pr := &prList.Items[i]
+		if isPipelineRunActive(pr) {
+			activeRunToKeep = pr
+			break
+		}
+	}
+
+	if activeRunToKeep == nil {
+		return nil
+	}
+
+	// Cancel any other running PipelineRuns that are older than the activeRunToKeep
+	for i := range prList.Items {
+		pr := &prList.Items[i]
+		if pr.GetName() == activeRunToKeep.GetName() {
+			continue
+		}
+
+		if isPipelineRunActive(pr) {
+			log.Info("Cancelling older running PipelineRun to prevent race condition", "name", pr.GetName(), "appName", appName)
+
+			patch := client.MergeFrom(pr.DeepCopy())
+			if err := unstructured.SetNestedField(pr.Object, "Cancelled", "spec", "status"); err != nil {
+				log.Error(err, "Failed to set status field for cancellation", "name", pr.GetName())
+				continue
+			}
+			if err := r.Client.Patch(ctx, pr, patch); err != nil {
+				log.Error(err, "Failed to cancel older PipelineRun", "name", pr.GetName())
+			}
+		}
+	}
+
+	return nil
+}
+
+// isPipelineRunActive checks if a PipelineRun is currently active/running.
+func isPipelineRunActive(pr *unstructured.Unstructured) bool {
+	conditions, found, _ := unstructured.NestedSlice(pr.Object, "status", "conditions")
+	if !found || len(conditions) == 0 {
+		return true // No conditions yet means it's newly created and active
+	}
+
+	for _, condObj := range conditions {
+		cond, ok := condObj.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if cond["type"] == "Succeeded" {
+			return cond["status"] == "Unknown"
+		}
+	}
+	return true
 }

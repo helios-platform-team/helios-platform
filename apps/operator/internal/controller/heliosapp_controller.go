@@ -25,7 +25,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -224,6 +226,13 @@ func (r *HeliosAppReconciler) updateStatus(ctx context.Context, app *appv1alpha1
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	pr := &unstructured.Unstructured{}
+	pr.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "tekton.dev",
+		Version: "v1",
+		Kind:    "PipelineRun",
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appv1alpha1.HeliosApp{}).
 		Owns(&appsv1.Deployment{}).
@@ -233,6 +242,10 @@ func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
+		).
+		Watches(
+			pr,
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForPipelineRun),
 		).
 		Named("heliosapp").
 		Complete(r)
@@ -266,6 +279,23 @@ func (r *HeliosAppReconciler) findObjectsForSecret(ctx context.Context, obj clie
 	}
 
 	return requests
+}
+
+// findObjectsForPipelineRun maps PipelineRun changes to HeliosApp reconcile requests.
+func (r *HeliosAppReconciler) findObjectsForPipelineRun(ctx context.Context, obj client.Object) []reconcile.Request {
+	appName := obj.GetLabels()["app.kubernetes.io/name"]
+	if appName == "" {
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      appName,
+				Namespace: obj.GetNamespace(),
+			},
+		},
+	}
 }
 
 // validateSecretReferences checks if all referenced secrets exist in the cluster.
