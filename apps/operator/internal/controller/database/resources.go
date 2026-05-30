@@ -209,7 +209,8 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "data",
+						Name:   "data",
+						Labels: labels,
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{

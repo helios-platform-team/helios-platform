@@ -20,6 +20,7 @@ spec:
           title: Name
           type: string
           description: Unique name of the component
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
           title: Port
@@ -79,6 +80,18 @@ spec:
           port: ${{ parameters.port }}
           description: "NestJS service: ${{ parameters.name }}"
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+
+    - id: fetch-source-db
+      name: Fetch Database Source Files
+      if: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+      action: fetch:template
+      input:
+        url: ./content/source-db
+        targetPath: ./source
+        values:
+          name: ${{ parameters.name }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
 
     - id: publish-source
       name: Publish Source Code
@@ -116,9 +129,10 @@ spec:
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
           port: ${{ parameters.port }}
-          databaseType: ${{ parameters.databaseConfig.dbType }}
-          databaseName: ${{ parameters.databaseConfig.dbName }}
-          databaseVersion: ${{ parameters.databaseConfig.dbVersion }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+          databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          databaseName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          databaseVersion: ${{ parameters.databaseConfig.dbVersion if parameters.databaseConfig.dbType == 'postgres' else '' }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops

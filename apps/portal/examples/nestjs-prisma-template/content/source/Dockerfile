@@ -7,10 +7,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund --progress=false
 
+{% if values.hasDatabase %}
 # Copy Prisma schema and config, then generate client
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 RUN npx prisma generate
+{% endif %}
 
 # Build NestJS application
 COPY . .
@@ -31,11 +33,13 @@ COPY --chown=nestjs:nodejs package*.json ./
 # Install production dependencies only
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund --progress=false
 
+{% if values.hasDatabase %}
 # Copy Prisma schema, config, and generated client from builder
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma/
 COPY --from=builder --chown=nestjs:nodejs /app/prisma.config.ts ./
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma/
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma/
+{% endif %}
 
 # Copy built application
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist/
@@ -57,5 +61,10 @@ EXPOSE ${{ values.port }}
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || '${{ values.port }}') + '/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
 
+{% if values.hasDatabase %}
 # Run migrations and start the application
-CMD ["npm", "run", "start:migrate:prod"]
+CMD ["npm", "run", "start:prod"]
+{% else %}
+# Start the application
+CMD ["node", "dist/main"]
+{% endif %}

@@ -2,8 +2,8 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: dotnet-webapi-template
-  title: .NET Web API Template (Database-backed)
-  description: Scaffolds an ASP.NET Core Web API service with PostgreSQL-ready GitOps manifests.
+  title: .NET Web API Template (Optional Database)
+  description: Scaffolds an ASP.NET Core Web API service with optional PostgreSQL-ready GitOps manifests.
 spec:
   owner: user:guest
   type: service
@@ -20,6 +20,7 @@ spec:
           title: Name
           type: string
           description: Unique name of the component
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
           title: Port
@@ -78,6 +79,7 @@ spec:
           port: ${{ parameters.port }}
           description: ".NET Web API service for ${{ parameters.name }}"
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
 
     - id: publish-source
       name: Publish Source Code
@@ -106,20 +108,21 @@ spec:
         targetPath: ./gitops
         values:
           name: ${{ parameters.name }}
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          image: ${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
           port: ${{ parameters.port }}
-          databaseType: ${{ parameters.databaseConfig.dbType }}
-          databaseName: ${{ parameters.databaseConfig.dbName }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+          databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          databaseName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
           owner: user:default/${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "dotnet test"
           testImage: "mcr.microsoft.com/dotnet/sdk:10.0.300"
-          dbType: ${{ parameters.databaseConfig.dbType }}
-          dbName: ${{ parameters.databaseConfig.dbName }}
-          dbVersion: ${{ parameters.databaseConfig.dbVersion }}
+          dbType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          dbName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          dbVersion: ${{ parameters.databaseConfig.dbVersion if parameters.databaseConfig.dbType == 'postgres' else '' }}
 
     - id: publish-gitops
       name: Publish GitOps Manifests

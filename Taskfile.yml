@@ -693,6 +693,7 @@ tasks:
 
           if [ "$APPS_RAW" = "all" ]; then
             task reset:gitea-repo APP="all"
+            task reset:portal-db
             # Clean DB state from any remaining k8s secrets
             APPS=$(kubectl get secrets -n default -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | sed -n 's/-db-secret$//p' | sort -u)
             for a in $APPS; do
@@ -706,6 +707,8 @@ tasks:
               [ -z "$a" ] && continue
               task reset:db-state APP="$a"
               task reset:gitea-repo APP="$a"
+              # Clean from Backstage Catalog
+              curl -s -X DELETE "http://localhost:7007/api/catalog/entities/by-name/component/default/${a}" >/dev/null 2>&1 || true
             done
             IFS="$OLD_IFS"
           fi

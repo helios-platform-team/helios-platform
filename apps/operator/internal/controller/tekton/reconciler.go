@@ -103,7 +103,7 @@ func (r *Reconciler) ReconcileInitialPipelineRun(ctx context.Context, app *appv1
 			Kind:    "PipelineRunList",
 		})
 		err := r.Client.List(ctx, prList, client.InNamespace(app.Namespace), client.MatchingLabels{
-			"app.kubernetes.io/instance": app.Name,
+			"app.kubernetes.io/name": app.Name,
 		})
 		if err == nil && len(prList.Items) > 0 {
 			log.Info("Skipping initial PipelineRun because one already exists for gitea-push", "count", len(prList.Items))

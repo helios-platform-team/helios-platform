@@ -35,16 +35,23 @@ package bases
 		metadata: {
 			name: parameter.name
 			labels: {
-				app:                    parameter.name
-				"helios.io/managed-by": "operator"
+				app:                      parameter.name
+				"app.kubernetes.io/name": parameter.name
+				"helios.io/managed-by":   "operator"
 			}
 		}
 		spec: {
 			replicas: parameter.replicas
 			revisionHistoryLimit: 2
-			selector: matchLabels: app: parameter.name
+			selector: matchLabels: {
+				app:                      parameter.name
+				"app.kubernetes.io/name": parameter.name
+			}
 			template: {
-				metadata: labels: app: parameter.name
+				metadata: labels: {
+					app:                      parameter.name
+					"app.kubernetes.io/name": parameter.name
+				}
 				spec: {
 					if parameter.initContainers != _|_ {
 						initContainers: parameter.initContainers

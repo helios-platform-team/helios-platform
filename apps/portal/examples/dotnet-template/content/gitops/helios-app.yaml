@@ -35,8 +35,10 @@ spec:
           properties:
             port: ${{ values.port }}
             targetPort: ${{ values.port }}
+{% if values.hasDatabase %}
         - type: database
           properties:
             dbType: ${{ values.dbType | dump }}
             dbName: ${{ values.dbName | dump }}
             version: ${{ values.dbVersion | dump }}
+{% endif %}
