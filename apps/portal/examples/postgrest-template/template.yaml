@@ -108,7 +108,7 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: "PostgREST API: ${{ parameters.name }}"
@@ -132,8 +132,8 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        webhookUrl: http://el-${{ parameters.repoName }}-db-migrate-listener.${{ parameters.namespace }}.svc.cluster.local:8080
-        webhookSecret: ${{ parameters.repoName }}
+        webhookUrl: http://el-${{ parameters.name }}-db-migrate-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookSecret: ${{ parameters.name }}
         events:
           - push
 
@@ -145,7 +145,7 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
@@ -184,12 +184,12 @@ spec:
       action: kubernetes:create-secret
       input:
         namespace: ${{ parameters.namespace }}
-        secretName: ${{ parameters.repoName }}-webhook-secret
+        secretName: ${{ parameters.name }}-webhook-secret
         data:
           # Tekton Triggers interceptor expects the shared secret under key `secret`.
-          secret: ${{ parameters.repoName }}
+          secret: ${{ parameters.name }}
           # Keep `secretToken` for compatibility with any legacy consumers.
-          secretToken: ${{ parameters.repoName }}
+          secretToken: ${{ parameters.name }}
 
     # 5. Deploy HeliosApp to cluster
     - id: apply-heliosapp

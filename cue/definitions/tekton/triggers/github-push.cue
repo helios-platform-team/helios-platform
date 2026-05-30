@@ -99,16 +99,6 @@ import (
                                 }
                             }
                         },
-                        {
-                            // Per-run npm-cache workspace (PVC created for each PipelineRun).
-                            name: "npm-cache"
-                            volumeClaimTemplate: {
-                                spec: {
-                                    accessModes: ["ReadWriteOnce"]
-                                    resources: requests: storage: "1Gi"
-                                }
-                            }
-                        },
                     ]
                 }
             }]

@@ -51,7 +51,7 @@ func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Un
 					"group": "apps",
 					"kind":  "Deployment",
 					"jqPathExpressions": []any{
-						`.spec.template.spec.containers[].env[]? | select(.name | test("^DB_"))`,
+						`.spec.template.spec.containers[].env[]? | select(.name | test("^(DB_|DATABASE_URL$)"))`,
 					},
 				},
 			},

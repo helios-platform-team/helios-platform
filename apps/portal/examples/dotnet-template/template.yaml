@@ -73,7 +73,7 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           owner: user:default/${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: ".NET Web API service for ${{ parameters.name }}"
@@ -93,8 +93,8 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ parameters.repoUrl }}
-        webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
-        webhookSecret: ${{ parameters.repoName }}
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
+        webhookSecret: ${{ parameters.name }}
         events:
           - push
 
@@ -105,7 +105,7 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
@@ -134,10 +134,10 @@ spec:
       name: Create Git Credentials Secret
       action: kubernetes:create-git-credentials-secret
       input:
-        name: ${{ parameters.repoName }}
+        name: ${{ parameters.name }}
         namespace: default
         username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-        webhookSecret: ${{ parameters.repoName }}
+        webhookSecret: ${{ parameters.name }}
 
     - id: apply-helios
       name: Deploy to Kubernetes

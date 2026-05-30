@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
 	heliosCue "github.com/helios-platform-team/helios-platform/apps/operator/internal/cue"
@@ -194,8 +195,8 @@ func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 	if err != nil {
 		t.Errorf("Reconcile() error = %v, wantErr %v", err, nil)
 	}
-	if (res != ctrl.Result{}) {
-		t.Errorf("Reconcile() result = %v, want empty", res)
+	if res.RequeueAfter != 30*time.Second {
+		t.Errorf("Reconcile() result = %v, want RequeueAfter: 30s", res)
 	}
 
 	updatedApp := &appv1alpha1.HeliosApp{}

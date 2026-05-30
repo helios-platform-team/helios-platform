@@ -93,6 +93,8 @@ export const DatabaseTab: React.FC = () => {
 
   const componentName = entity.metadata.name;
 
+  const [hasDatabase, setHasDatabase] = useState<boolean | null>(null);
+
   useEffect(() => {
     const fetchDatabaseInfo = async () => {
       try {
@@ -101,6 +103,12 @@ export const DatabaseTab: React.FC = () => {
         const response = await fetchApi.fetch(
           `${backendUrl}/api/helios/info/${componentName}`,
         );
+        if (response.status === 404) {
+          setHasDatabase(false);
+          setDatabaseInfo(null);
+          setError(null);
+          return;
+        }
         if (!response.ok) {
           throw new Error(
             `Failed to fetch database info: ${response.statusText}`,
@@ -108,10 +116,12 @@ export const DatabaseTab: React.FC = () => {
         }
         const data = await response.json();
         setDatabaseInfo(data);
+        setHasDatabase(true);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
         setDatabaseInfo(null);
+        setHasDatabase(null);
       } finally {
         setLoading(false);
       }
@@ -192,10 +202,10 @@ cursor = conn.cursor()`;
     );
   }
 
-  if (!databaseInfo) {
+  if (hasDatabase === false || !databaseInfo) {
     return (
       <Box className={classes.root}>
-        <Alert severity="info">No database information available</Alert>
+        <Alert severity="info">No database is associated with this component.</Alert>
       </Box>
     );
   }

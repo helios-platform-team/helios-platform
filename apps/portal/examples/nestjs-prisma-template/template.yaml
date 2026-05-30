@@ -2,8 +2,8 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: nestjs-prisma-template
-  title: NestJS + Prisma Template (Database-backed)
-  description: Scaffolds a NestJS service with Prisma and PostgreSQL-ready GitOps manifests.
+  title: NestJS + Prisma Template (Optional Database)
+  description: Scaffolds a NestJS service with optional Prisma/PostgreSQL-ready GitOps manifests.
 spec:
   owner: user:guest
   type: service
@@ -74,7 +74,7 @@ spec:
         targetPath: ./source
         values:
           # Use repoName as the app identifier to keep it Kubernetes/URL safe.
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: "NestJS service: ${{ parameters.name }}"
@@ -95,10 +95,10 @@ spec:
       input:
         repoUrl: ${{ parameters.repoUrl }}
         # Tekton EventListener address is the service root.
-        webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
         # Deterministic secret so users don't have to provide one.
         # Must match the Kubernetes secret value created below.
-        webhookSecret: ${{ parameters.repoName }}
+        webhookSecret: ${{ parameters.name }}
         events:
           - push
 
@@ -110,7 +110,7 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           # No index.docker.io prefix — imageRepo stored as org/repo, tag appended by pipeline
           image: ${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
@@ -141,10 +141,10 @@ spec:
       name: Create Git Credentials Secret
       action: kubernetes:create-git-credentials-secret
       input:
-        name: ${{ parameters.repoName }}
+        name: ${{ parameters.name }}
         namespace: default
         username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-        webhookSecret: ${{ parameters.repoName }}
+        webhookSecret: ${{ parameters.name }}
 
     - id: apply-helios
       name: Deploy to Kubernetes

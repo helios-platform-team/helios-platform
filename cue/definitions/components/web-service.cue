@@ -20,6 +20,17 @@ import "helios.io/cue/definitions/bases"
 			value?: string
 			valueFrom?: {...}
 		}] | *[]
+
+		initContainers?: [...{
+			name: string
+			image: string
+			command?: [...string]
+			env?: [...{
+				name: string
+				value?: string
+				valueFrom?: {...}
+			}]
+		}]
 	}
 
 	// Alias để tránh scope issues
@@ -29,11 +40,14 @@ import "helios.io/cue/definitions/bases"
 	outputs: {
 		deployment: (bases.#Deployment & {
 			parameter: {
-				name:     _p.name
-				image:    _p.image
-				replicas: _p.replicas
-				port:     _p.port
-				env:      _p.env
+				name:           _p.name
+				image:          _p.image
+				replicas:       _p.replicas
+				port:           _p.port
+				env:            _p.env
+				if _p.initContainers != _|_ {
+					initContainers: _p.initContainers
+				}
 			}
 		}).output
 	}

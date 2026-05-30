@@ -23,3 +23,7 @@ mise.toml
 **/*.tfstate
 **/*.tfstate.backup
 **/*.tfstate.lock.info
+
+# AI skills
+skills-lock.json
+.agents/

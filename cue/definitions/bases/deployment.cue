@@ -16,6 +16,17 @@ package bases
 			value?: string
 			valueFrom?: {...}
 		}] | *[]
+
+		initContainers?: [...{
+			name: string
+			image: string
+			command?: [...string]
+			env?: [...{
+				name: string
+				value?: string
+				valueFrom?: {...}
+			}]
+		}]
 	}
 
 	output: {
@@ -30,21 +41,27 @@ package bases
 		}
 		spec: {
 			replicas: parameter.replicas
+			revisionHistoryLimit: 2
 			selector: matchLabels: app: parameter.name
 			template: {
 				metadata: labels: app: parameter.name
-				spec: containers: [{
-					name:  parameter.name
-					image: parameter.image
-					ports: [{containerPort: parameter.port}]
-					if len(parameter.env) > 0 {
-						env: parameter.env
+				spec: {
+					if parameter.initContainers != _|_ {
+						initContainers: parameter.initContainers
 					}
-					resources: {
-						requests: {cpu: "100m", memory: "128Mi"}
-						limits: {cpu: "500m", memory: "512Mi"}
-					}
-				}]
+					containers: [{
+						name:  parameter.name
+						image: parameter.image
+						ports: [{containerPort: parameter.port}]
+						if len(parameter.env) > 0 {
+							env: parameter.env
+						}
+						resources: {
+							requests: {cpu: "100m", memory: "128Mi"}
+							limits: {cpu: "500m", memory: "512Mi"}
+						}
+					}]
+				}
 			}
 		}
 	}

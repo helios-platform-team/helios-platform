@@ -88,16 +88,11 @@ import "helios.io/cue/definitions/tekton"
 	gitops: {
 		name: tekton.#Defaults.workspaces.gitops
 	}
-	npmCache: {
-		name:     tekton.#Defaults.workspaces.npmCache
-		optional: true
-	}
 }
 
 #PipelineWorkspacesList: [
 	#PipelineWorkspaces.source,
 	#PipelineWorkspaces.gitops,
-	#PipelineWorkspaces.npmCache,
 ]
 
 // =====================================================
@@ -126,15 +121,7 @@ import "helios.io/cue/definitions/tekton"
 	}
 }
 
-// #RunTestsPattern — with best-practice node_modules caching.
-//
-// Caching strategy:
-//   1. Hash package-lock.json (or package.json as fallback) with sha256sum.
-//   2. If /npm-cache/modules-cache/<hash>/node_modules exists → restore it (cache HIT).
-//   3. Otherwise → run npm ci, then save node_modules into the cache (cache MISS).
-//
-// This means on a warm run npm ci is skipped entirely, yielding a 10-50x speedup.
-// The npm-cache workspace is optional: if not bound, behaviour falls back to plain npm ci.
+// #RunTestsPattern — installs dependencies and runs tests.
 #RunTestsPattern: {
 	_name:     string | *"run-tests"
 	_runAfter: [...string]
@@ -146,10 +133,6 @@ import "helios.io/cue/definitions/tekton"
 			{
 				name:      "source"
 				workspace: #PipelineWorkspaces.source.name
-			},
-			{
-				name:      "npmcache"
-				workspace: #PipelineWorkspaces.npmCache.name
 			},
 		]
 		params: [
@@ -163,14 +146,11 @@ import "helios.io/cue/definitions/tekton"
 			]
 			workspaces: [
 				{name: "source"},
-				{name: "npmcache", mountPath: "/npm-cache", optional: true},
 			]
 			steps: [
 				{
-					// Step 1: Restore node_modules from cache (keyed by package-lock.json hash).
-					// On a cache HIT the entire npm install phase is skipped.
-					// On a cache MISS npm ci runs and the result is saved for next time.
-					name:       "restore-npm-cache"
+					// Step 1: Install dependencies.
+					name:       "install-dependencies"
 					image:      "$(params.\(tekton.#CommonParams.test.image.name))"
 					workingDir: "$(workspaces.source.path)"
 					script: """
@@ -185,49 +165,20 @@ import "helios.io/cue/definitions/tekton"
 
 						# Check for package-lock.json or package.json
 						if [ ! -f package-lock.json ] && [ ! -f package.json ]; then
-						  echo "No package.json or package-lock.json found - skipping npm install/caching."
+						  echo "No package.json or package-lock.json found - skipping npm install."
 						  exit 0
 						fi
 
 						# Check if npm is available
 						if ! command -v npm >/dev/null 2>&1; then
-						  echo "npm not found - skipping npm install/caching."
+						  echo "npm not found - skipping npm install."
 						  exit 0
 						fi
 
-						# Only attempt caching when the workspace is bound.
-						if [ ! -d "/npm-cache" ]; then
-						  echo "npm-cache workspace not mounted; running npm ci directly."
-						  npm ci --ignore-scripts --no-audit --no-fund --progress=false
-						  if [ -f prisma/schema.prisma ]; then
-						    npm run prisma:generate
-						  fi
-						  exit 0
-						fi
-
-						# Compute cache key from package-lock.json (fall back to package.json).
-						if [ -f package-lock.json ]; then
-						  LOCK_HASH=$(sha256sum package-lock.json | cut -d' ' -f1)
-						else
-						  LOCK_HASH=$(sha256sum package.json | cut -d' ' -f1)
-						fi
-
-						CACHE_DIR="/npm-cache/modules-cache/${LOCK_HASH}"
-						echo "Cache key: ${LOCK_HASH}"
-
-						if [ -d "${CACHE_DIR}/node_modules" ]; then
-						  echo "Cache HIT - restoring node_modules (skipping npm ci)."
-						  cp -rl "${CACHE_DIR}/node_modules" ./node_modules 2>/dev/null || cp -a "${CACHE_DIR}/node_modules" ./node_modules
-						else
-						  echo "Cache MISS - running npm ci."
-						  npm ci --ignore-scripts --no-audit --no-fund --progress=false
-						  if [ -f prisma/schema.prisma ]; then
-						    npm run prisma:generate
-						  fi
-						  echo "Saving node_modules to cache."
-						  mkdir -p "${CACHE_DIR}"
-						  cp -rl ./node_modules "${CACHE_DIR}/node_modules" 2>/dev/null || cp -a ./node_modules "${CACHE_DIR}/node_modules"
-						  echo "Cache saved: ${CACHE_DIR}"
+						echo "Running npm ci directly."
+						npm ci --ignore-scripts --no-audit --no-fund --progress=false --fetch-retries=5 --fetch-retry-mintimeout=15000
+						if [ -f prisma/schema.prisma ]; then
+						  npm run prisma:generate
 						fi
 						"""
 				},

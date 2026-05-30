@@ -68,7 +68,6 @@ tasks:
       - echo ""
       - echo "Useful targeted commands:"
       - echo "  task setup:terraform             Recreate cluster/apps from Terraform"
-      - echo "  task setup:npm-cache             Create persistent npm cache PVC"
       - echo "  task reset:generated APP=name(s) Remove generated runtime state"
       - echo "  task reset:gitea-repo APP=name(s) Delete generated Gitea repos"
       - echo "  task clean:registry              Remove local registry cache"
@@ -128,7 +127,6 @@ tasks:
       - task: setup:terraform
       - task: setup:tekton
       - task: setup:portal-deps
-      - task: setup:npm-cache
 
   setup:registry:
     desc: Create a persistent local pull-through cache registry (survives task clean)
@@ -163,7 +161,7 @@ tasks:
           # Render the registry mirror config from the committed template
           mkdir -p ~/.k3d
           sed \
-            -e "s/REGISTRY_NAME/k3d-{{.REGISTRY_NAME}}/g" \
+            -e "s/REGISTRY_NAME/{{.REGISTRY_NAME}}/g" \
             -e "s/REGISTRY_PORT/{{.REGISTRY_PORT}}/g" \
             "$(pwd)/../../modules/cluster-k3d/registries.yaml.tpl" \
             > ~/.k3d/helios-registries.yaml
@@ -609,34 +607,6 @@ tasks:
     cmds:
       - yarn install
 
-  setup:npm-cache:
-    desc: Create persistent npm cache PVC for faster pipeline tests
-    cmds:
-      - cmd: |
-          PVC_NAME="helios-npm-cache"
-          NS="default"
-
-          if kubectl get pvc "$PVC_NAME" -n "$NS" > /dev/null 2>&1; then
-            echo "npm cache PVC '$PVC_NAME' already exists."
-          else
-            echo "Creating npm cache PVC '$PVC_NAME' (5Gi)..."
-            kubectl apply -f - <<EOF
-          apiVersion: v1
-          kind: PersistentVolumeClaim
-          metadata:
-            name: $PVC_NAME
-            namespace: $NS
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 5Gi
-          EOF
-            echo "npm cache PVC created."
-          fi
-        platforms: [linux, darwin]
-
   # ===========================================================================
   # Development Tasks
   # ===========================================================================
@@ -752,9 +722,10 @@ tasks:
               kubectl delete application "$APP_NAME" -n argocd --ignore-not-found=true || true
             fi
           done
+          kubectl delete deployment,statefulset,service,configmap,secret,pvc -n default -l helios.io/managed-by=operator --ignore-not-found=true || true
         platforms: [linux, darwin]
       - cmd: |
-          powershell -ExecutionPolicy Bypass -Command "kubectl delete heliosapp --all -A --ignore-not-found=true; $apps = kubectl get application -n argocd -o jsonpath='{range .items[*]}{.metadata.name}{\"`n\"}{end}' 2>$null; foreach ($app in $apps -split \"`n\") { if ($app -and $app -ne 'helios-bootstrap') { kubectl delete application $app -n argocd --ignore-not-found=true } }"
+          powershell -ExecutionPolicy Bypass -Command "kubectl delete heliosapp --all -A --ignore-not-found=true; $apps = kubectl get application -n argocd -o jsonpath='{range .items[*]}{.metadata.name}{\"`n\"}{end}' 2>$null; foreach ($app in $apps -split \"`n\") { if ($app -and $app -ne 'helios-bootstrap') { kubectl delete application $app -n argocd --ignore-not-found=true } }; kubectl delete deployment,statefulset,service,configmap,secret,pvc -n default -l helios.io/managed-by=operator --ignore-not-found=true"
         platforms: [windows]
 
   reset:tekton-runs:
@@ -806,6 +777,14 @@ tasks:
           powershell -ExecutionPolicy Bypass -Command "$app='{{.APP}}'; if (-not $app) { Write-Host 'APP is required. Example: task reset:db-state APP=nestjs-prisma'; exit 1 }; kubectl delete secret ($app + '-db-secret') -n default --ignore-not-found=true; kubectl delete pvc ('data-' + $app + '-db-0') -n default --ignore-not-found=true"
         platforms: [windows]
 
+  reset:portal-db:
+    desc: Reset the local persistent SQLite database of the Backstage portal
+    cmds:
+      - cmd: rm -rf apps/portal/packages/backend/.database
+        platforms: [linux, darwin]
+      - cmd: powershell -ExecutionPolicy Bypass -Command "Remove-Item -Recurse -Force -Path apps/portal/packages/backend/.database -ErrorAction SilentlyContinue"
+        platforms: [windows]
+
   reset:gitea-repo:
     desc: "Delete Gitea repos (APP: single, comma-sep, or all)"
     cmds:
@@ -851,21 +830,27 @@ tasks:
             exit 0
           fi
 
+          delete_repo() {
+            REPO_FULL_NAME="$1"
+            [ -z "$REPO_FULL_NAME" ] && return 0
+
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X DELETE \
+              -u "${GITEA_USER}:${GITEA_PASS}" \
+              "${GITEA_BASE}/api/v1/repos/${REPO_FULL_NAME}" || true)
+            if [ "$CODE" = "204" ]; then
+              echo "Deleted: ${REPO_FULL_NAME}"
+            fi
+          }
+
           if [ "$APP_RAW" = "all" ]; then
-            # Delete all repos from both owners (no discovery needed)
-            for OWNER in "$GITEA_USER" "helios-platform"; do
-              REPOS_JSON=$(curl -s -u "${GITEA_USER}:${GITEA_PASS}" \
-                "${GITEA_BASE}/api/v1/users/${OWNER}/repos" 2>/dev/null || echo "[]")
-              REPO_NAMES=$(echo "$REPOS_JSON" | grep -o '"name":"[^"]*"' | sed 's/"name":"//;s/"//' || true)
-              for REPO in $REPO_NAMES; do
-                CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-                  -X DELETE \
-                  -u "${GITEA_USER}:${GITEA_PASS}" \
-                  "${GITEA_BASE}/api/v1/repos/${OWNER}/${REPO}" || true)
-                if [ "$CODE" = "204" ]; then
-                  echo "Deleted: ${OWNER}/${REPO}"
-                fi
-              done
+            # Delete every repo visible to the authenticated user so a refresh
+            # starts from a true clean slate, regardless of owner or org.
+            REPOS_JSON=$(curl -s -u "${GITEA_USER}:${GITEA_PASS}" \
+              "${GITEA_BASE}/api/v1/user/repos?limit=1000" 2>/dev/null || echo "[]")
+            REPO_FULL_NAMES=$(echo "$REPOS_JSON" | grep -o '"full_name":"[^"]*"' | sed 's/"full_name":"//;s/"//' || true)
+            for REPO_FULL_NAME in $REPO_FULL_NAMES; do
+              delete_repo "$REPO_FULL_NAME"
             done
           else
             APPS=$(echo "$APP_RAW" | tr ',' '\n')
@@ -921,6 +906,7 @@ tasks:
     desc: Delete the k3d cluster and clean up (registry cache is preserved)
     cmds:
       - task: clean:cluster
+      - task: reset:portal-db
 
   clean:all:
     desc: Delete the k3d cluster and all resources

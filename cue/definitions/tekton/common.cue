@@ -36,7 +36,6 @@ package tekton
 		source:         "source-workspace"
 		gitops:         "gitops-workspace"
 		gitCredentials: "git-credentials-workspace"
-		npmCache:       "npm-cache"
 	}
 }
 
