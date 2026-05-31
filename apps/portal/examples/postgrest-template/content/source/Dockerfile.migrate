@@ -1,0 +1,28 @@
+# Dockerfile.migrate: Build a Docker image containing golang-migrate and SQL migration scripts
+# This image is used by ArgoCD PreSync hooks to run database migrations before deploying PostgREST
+
+FROM golang:1.22-alpine AS builder
+
+# Install wget for downloading golang-migrate
+RUN apk add --no-cache wget
+
+# Download golang-migrate binary
+RUN wget -qO- https://github.com/golang-migrate/migrate/releases/download/v4.17.0/migrate-linux-amd64.tar.gz | tar xz -C /tmp/
+
+# Final stage: minimal runtime image
+FROM alpine:3.19
+
+# Install PostgreSQL client for schema inspection if needed
+RUN apk add --no-cache postgresql-client bash
+
+# Copy golang-migrate binary from builder
+COPY --from=builder /tmp/migrate /usr/local/bin/migrate
+
+# Copy migration scripts from source repo
+# These will be mounted from the Kubernetes volume in the PreSync Job
+COPY db/migrations /migrations
+
+# Create a simple wrapper script to run migrations
+RUN echo '#!/bin/bash\nset -e\necho "Running database migrations..."\nmigrate -path /migrations -database "$PGRST_DB_URI" up\necho "Migrations completed successfully"\n' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

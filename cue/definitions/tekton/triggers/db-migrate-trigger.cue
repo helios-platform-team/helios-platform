@@ -41,7 +41,7 @@ import (
 				{name: "git-revision", description: "Git commit SHA from webhook"},
 			]
 
-			// PipelineRun for db-migrate pipeline
+			// PipelineRun for db-migrate pipeline (runs database migrations via PreSync hook)
 			resourcetemplates: [{
 				apiVersion: "tekton.dev/v1beta1"
 				kind:       "PipelineRun"
@@ -69,7 +69,7 @@ import (
 					params: [
 						{name: "app-repo-url", value: "$(tt.params.git-repo-url)"},
 						{name: "app-repo-revision", value: "$(tt.params.git-revision)"},
-						{name: "db-secret-name", value: _bp.databaseSecretRef},
+						{name: "db-secret-name", value: "\(_bp.appName)-db-secret"},
 						{name: "migration-source", value: "db/migrations"},
 						{name: "namespace", value: _bp.namespace},
 					]

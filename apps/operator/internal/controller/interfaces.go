@@ -19,6 +19,7 @@ type ArgoCDReconciler interface {
 
 // DatabaseReconciler handles database provisioning and secret management.
 type DatabaseReconciler interface {
+	ReconcileSystemSecrets(ctx context.Context, app *appv1alpha1.HeliosApp) error
 	ReconcileSecrets(ctx context.Context, app *appv1alpha1.HeliosApp) error
 	ReconcileInstances(ctx context.Context, app *appv1alpha1.HeliosApp) error
 	ReconcileInjection(ctx context.Context, app *appv1alpha1.HeliosApp) (pending bool, err error)
