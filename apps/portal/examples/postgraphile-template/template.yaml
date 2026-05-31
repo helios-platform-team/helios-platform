@@ -22,7 +22,7 @@ spec:
         port:
           title: API Port
           type: number
-          description: The port PostGraphile listens on
+          description: the port PostGraphile listens on
           default: 5000
         dockerOrg:
           title: Docker Registry Org/User
@@ -65,7 +65,6 @@ spec:
         values:
           name: ${{ parameters.repoName }}
           port: ${{ parameters.port }}
-          # FIX: Pass namespace and owner into source code generation
           namespace: ${{ parameters.namespace }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
 
@@ -113,12 +112,6 @@ spec:
         repoUrl: ${{ parameters.repoUrl }}-gitops
         sourcePath: ./gitops
         repoVisibility: public
-
-    - id: apply-namespace
-      name: Create Kubernetes Namespace
-      action: kubernetes:apply
-      input:
-        manifestPath: ./gitops/namespace.yaml
 
     - id: create-webhook-secret
       name: Create Kubernetes Webhook Secret
