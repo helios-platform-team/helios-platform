@@ -345,7 +345,7 @@ func TestReconcileInstances(t *testing.T) {
 		existingSts := &appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "api-server-db", Namespace: app.Namespace},
 			Spec: appsv1.StatefulSetSpec{
-				Replicas: func() *int32 { r := int32(1); return &r }(),
+				Replicas: func() *int32 { return new(int32(1)) }(),
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{{Name: "postgres", Image: "postgres:18.4"}},

@@ -237,7 +237,7 @@ func TestE2E_CueVsLegacy_TriggerBindingParams(t *testing.T) {
 }
 
 // TestE2E_CueVsLegacy_EventListenerInterceptors verifies the CUE EventListener
-// has GitHub interceptors (matching improved CUE design vs legacy).
+// has GitHub interceptors (matching improved CUE design vs. legacy).
 func TestE2E_CueVsLegacy_EventListenerInterceptors(t *testing.T) {
 	cuePath := getCuePath(t)
 	renderer, err := NewTektonRenderer(cuePath)
@@ -272,7 +272,7 @@ func TestE2E_CueVsLegacy_EventListenerInterceptors(t *testing.T) {
 				continue
 			}
 
-			// Verify the interceptor references GitHub
+			// Verify the interceptor references on GitHub
 			interceptor := interceptors[0].(map[string]any)
 			ref, ok := interceptor["ref"].(map[string]any)
 			if !ok {
@@ -318,7 +318,7 @@ func TestE2E_CueVsLegacy_PipelineTaskStructure(t *testing.T) {
 				return
 			}
 
-			// CUE pipeline may have more tasks than legacy (e.g. test step).
+			// CUE pipeline may have more tasks than legacy (e.g., test step).
 			// Verify at least 3 tasks (legacy minimum).
 			minTaskCount := 3
 			if len(tasks) < minTaskCount {
@@ -395,7 +395,7 @@ func TestE2E_CueRenderDeterministic(t *testing.T) {
 
 // TestE2E_NoLegacyFunctionReferences verifies that the old Generate* functions
 // for resources now handled by CUE are no longer present as exported functions.
-// This is a compile-time check that's validated here for documentation.
+// This is a compile-time check validated here for documentation.
 func TestE2E_NoLegacyFunctionReferences(t *testing.T) {
 	// This test validates that legacy functions have been removed by checking
 	// that tekton_resources.go does NOT export functions that CUE now handles.

@@ -7,7 +7,11 @@ export const UniqueNamePickerExtension: any = scaffolderPlugin.provide(
   createScaffolderFieldExtension({
     name: 'UniqueNamePicker',
     component: UniqueNamePicker,
-    validation: async (value: string | undefined, validation: any, { apiHolder }: any) => {
+    validation: async (
+      value: string | undefined,
+      validation: any,
+      { apiHolder }: any,
+    ) => {
       if (!value) {
         return;
       }
@@ -15,7 +19,7 @@ export const UniqueNamePickerExtension: any = scaffolderPlugin.provide(
       // Check if it's alphanumeric/lowercase/hyphens (standard Backstage entity name rule)
       if (!/^[a-z0-9-]+$/.test(value)) {
         validation.addError(
-          'Name must be lowercase and contain only alphanumeric characters and hyphens (no spaces or underscores).'
+          'Name must be lowercase and contain only alphanumeric characters and hyphens (no spaces or underscores).',
         );
         return;
       }
@@ -24,10 +28,12 @@ export const UniqueNamePickerExtension: any = scaffolderPlugin.provide(
         const catalogApi = apiHolder.get(catalogApiRef);
         if (catalogApi) {
           // Check if an entity with this name already exists in the catalog
-          const entity = await catalogApi.getEntityByRef(`component:default/${value}`);
+          const entity = await catalogApi.getEntityByRef(
+            `component:default/${value}`,
+          );
           if (entity) {
             validation.addError(
-              `A component named "${value}" already exists in the catalog. Please choose a unique name.`
+              `A component named "${value}" already exists in the catalog. Please choose a unique name.`,
             );
           }
         }
@@ -36,5 +42,5 @@ export const UniqueNamePickerExtension: any = scaffolderPlugin.provide(
         console.error('Failed to validate component name uniqueness:', error);
       }
     },
-  })
+  }),
 );

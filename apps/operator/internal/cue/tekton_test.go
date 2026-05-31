@@ -27,7 +27,7 @@ func TestNewTektonRenderer(t *testing.T) {
 	}
 }
 
-// validTektonInput returns a fully-populated TektonInput for testing.
+// validTektonInput returns a fully populated TektonInput for testing.
 func validTektonInput() TektonInput {
 	return TektonInput{
 		AppName:          "test-app",
@@ -261,7 +261,7 @@ func TestRenderTektonResources_BuildOnlyPipeline(t *testing.T) {
 		t.Fatalf("RenderTektonResources failed: %v", err)
 	}
 
-	// Verify the primary pipeline with name "build-only" exists among rendered pipelines.
+	// Verify the primary pipeline with the name "build-only" exists among rendered pipelines.
 	// Note: db-migrate pipeline is always rendered alongside the primary pipeline.
 	foundBuildOnly := false
 	for _, obj := range objects {

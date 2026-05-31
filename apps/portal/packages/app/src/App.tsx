@@ -39,7 +39,10 @@ import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/
 import { NotificationsPage } from '@backstage/plugin-notifications';
 import { SignalsDisplay } from '@backstage/plugin-signals';
 import { ScaffolderFieldExtensions } from '@backstage/plugin-scaffolder-react';
-import { DatabasePickerExtension, UniqueNamePickerExtension } from './scaffolder';
+import {
+  DatabasePickerExtension,
+  UniqueNamePickerExtension,
+} from './scaffolder';
 import { UnifiedThemeProvider } from '@backstage/theme';
 import { darkTheme, lightTheme } from './themes/heliosThemes';
 import './styles.css';

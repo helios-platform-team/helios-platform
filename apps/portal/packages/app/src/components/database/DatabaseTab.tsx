@@ -205,7 +205,9 @@ cursor = conn.cursor()`;
   if (hasDatabase === false || !databaseInfo) {
     return (
       <Box className={classes.root}>
-        <Alert severity="info">No database is associated with this component.</Alert>
+        <Alert severity="info">
+          No database is associated with this component.
+        </Alert>
       </Box>
     );
   }
@@ -240,12 +242,27 @@ cursor = conn.cursor()`;
             />
             <CardContent>
               <Alert severity="info" style={{ marginBottom: '16px' }}>
-                These connectivity details represent the internal cluster address. To connect from your local machine, you must port-forward the database service:
+                These connectivity details represent the internal cluster
+                address. To connect from your local machine, you must
+                port-forward the database service:
                 <br />
-                <code style={{ display: 'block', margin: '8px 0', padding: '8px', backgroundColor: 'rgba(0, 0, 0, 0.08)', borderRadius: '4px', fontFamily: 'monospace' }}>
-                  kubectl port-forward -n default svc/{databaseInfo.host} {databaseInfo.port}:{databaseInfo.port}
+                <code
+                  style={{
+                    display: 'block',
+                    margin: '8px 0',
+                    padding: '8px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+                    borderRadius: '4px',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  kubectl port-forward -n default svc/{databaseInfo.host}{' '}
+                  {databaseInfo.port}:{databaseInfo.port}
                 </code>
-                Once port-forwarded, you can use the connection snippets below by replacing the Host with <code>localhost</code> (or <code>127.0.0.1</code>) and Port with <code>{databaseInfo.port}</code>.
+                Once port-forwarded, you can use the connection snippets below
+                by replacing the Host with <code>localhost</code> (or{' '}
+                <code>127.0.0.1</code>) and Port with{' '}
+                <code>{databaseInfo.port}</code>.
               </Alert>
               <Grid container spacing={2} className={classes.connectivityGrid}>
                 {/* Host */}

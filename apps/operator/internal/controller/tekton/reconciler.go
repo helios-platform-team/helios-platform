@@ -103,7 +103,7 @@ func (r *Reconciler) ReconcileInitialPipelineRun(ctx context.Context, app *appv1
 		pipelineName = defaultPipelineName
 	}
 
-	// Only trigger if triggerType is not gitea-push or if we want to force initial build.
+	// Only trigger if triggerType is not gitea-push or if we want to force the initial build.
 	// If it's gitea-push, we only skip if a PipelineRun ALREADY exists (triggered by webhook).
 	// This prevents missing the initial build if the webhook fails or is delayed.
 	if app.Spec.TriggerType == "gitea-push" {
@@ -224,8 +224,7 @@ func (r *Reconciler) PrunePipelineRuns(ctx context.Context, namespace, appName s
 	// Sort oldest first
 	sort.Slice(prList.Items, func(i, j int) bool {
 		iTime := prList.Items[i].GetCreationTimestamp()
-		jTime := prList.Items[j].GetCreationTimestamp()
-		return iTime.Before(&jTime)
+		return iTime.Before(new(prList.Items[j].GetCreationTimestamp()))
 	})
 
 	toDelete := len(prList.Items) - keep
@@ -266,9 +265,8 @@ func (r *Reconciler) CancelOlderPipelineRuns(ctx context.Context, namespace, app
 
 	// Sort newest first (jTime before iTime means iTime is newer, so sorting newest first)
 	sort.Slice(prList.Items, func(i, j int) bool {
-		iTime := prList.Items[i].GetCreationTimestamp()
 		jTime := prList.Items[j].GetCreationTimestamp()
-		return jTime.Before(&iTime)
+		return jTime.Before(new(prList.Items[i].GetCreationTimestamp()))
 	})
 
 	// Find the most recent active/running PipelineRun to keep
@@ -313,7 +311,7 @@ func (r *Reconciler) CancelOlderPipelineRuns(ctx context.Context, namespace, app
 func isPipelineRunActive(pr *unstructured.Unstructured) bool {
 	conditions, found, _ := unstructured.NestedSlice(pr.Object, "status", "conditions")
 	if !found || len(conditions) == 0 {
-		return true // No conditions yet means it's newly created and active
+		return true // No conditions yet mean it's newly created and active
 	}
 
 	for _, condObj := range conditions {

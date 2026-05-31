@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // HeliosAppSpec defines the desired state of HeliosApp
@@ -175,10 +175,9 @@ type Trait struct {
 type HeliosAppPhase string
 
 const (
-	PhasePending  HeliosAppPhase = "Pending"
-	PhaseReady    HeliosAppPhase = "Ready"
-	PhaseFailed   HeliosAppPhase = "Failed"
-	PhaseDeleting HeliosAppPhase = "Deleting"
+	PhasePending HeliosAppPhase = "Pending"
+	PhaseReady   HeliosAppPhase = "Ready"
+	PhaseFailed  HeliosAppPhase = "Failed"
 )
 
 // HeliosAppStatus defines the observed state of HeliosApp
@@ -240,8 +239,4 @@ type HeliosAppList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []HeliosApp `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&HeliosApp{}, &HeliosAppList{})
 }

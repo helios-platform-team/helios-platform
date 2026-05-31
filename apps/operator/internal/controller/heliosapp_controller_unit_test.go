@@ -25,7 +25,7 @@ import (
 	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/tekton"
 )
 
-// FakeGitOpsClient is a mock implementation of GitOpsClientInterface for unit tests.
+// FakeGitOpsClient is a mock implementation of ClientInterface for unit tests.
 type FakeGitOpsClient struct {
 	SyncedFiles map[string]string
 }
@@ -38,7 +38,7 @@ func (m *FakeGitOpsClient) SyncManifest(ctx context.Context, filePath, content s
 	return nil
 }
 
-// FakeCueEngine is a mock implementation of CueEngineInterface.
+// FakeCueEngine is a mock implementation of EngineInterface.
 type FakeCueEngine struct{}
 
 func (f *FakeCueEngine) Render(app heliosCue.Application) ([]byte, error) {
@@ -63,7 +63,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 
-	// 2. Setup Mock Objects
+	// 2. Set up Mock Objects
 	heliosApp := &appv1alpha1.HeliosApp{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-app",
@@ -94,7 +94,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		},
 	}
 
-	// 3. Setup Fake Client
+	// 3. Set up Fake Client
 	// We init with the object existing
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -105,7 +105,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 	// 4. Setup Mock GitOps
 	mockGit := &FakeGitOpsClient{}
 
-	// 5. Setup Reconciler
+	// 5. Set up Reconciler
 	r := &HeliosAppReconciler{
 		Client:    fakeClient,
 		Scheme:    scheme,
@@ -113,7 +113,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		Tekton:    tekton.NewReconciler(fakeClient, scheme, &FakeTektonRenderer{}),
 		ArgoCD:    argocd.NewReconciler(fakeClient, scheme),
 		Database:  database.NewReconciler(fakeClient, scheme),
-		GitOps: gitopssync.NewReconciler(fakeClient, scheme, func(repo, user, token string) gitops.GitOpsClientInterface {
+		GitOps: gitopssync.NewReconciler(fakeClient, scheme, func(repo, user, token string) gitops.ClientInterface {
 			return mockGit
 		}),
 	}

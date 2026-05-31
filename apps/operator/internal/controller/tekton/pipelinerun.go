@@ -70,27 +70,7 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 	}
 	params = append(params, map[string]any{"name": "resources", "value": string(resourcesJSON)})
 
-	workspaceBindings := []any{
-		map[string]any{
-			"name": "source-workspace",
-			"volumeClaimTemplate": map[string]any{
-				"spec": map[string]any{
-					"accessModes": []any{"ReadWriteOnce"},
-					"resources":   map[string]any{"requests": map[string]any{"storage": "1Gi"}},
-				},
-			},
-		},
-		map[string]any{
-			"name": "gitops-workspace",
-			"volumeClaimTemplate": map[string]any{
-				"spec": map[string]any{
-					"accessModes": []any{"ReadWriteOnce"},
-					"resources":   map[string]any{"requests": map[string]any{"storage": "1Gi"}},
-				},
-			},
-		},
-	}
-
+	var workspaceBindings []any
 	if heliosApp.Spec.PVCName != "" {
 		workspaceBindings = []any{
 			map[string]any{
@@ -102,6 +82,27 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 				"name":                  "gitops-workspace",
 				"persistentVolumeClaim": map[string]any{"claimName": heliosApp.Spec.PVCName},
 				"subPath":               "gitops",
+			},
+		}
+	} else {
+		workspaceBindings = []any{
+			map[string]any{
+				"name": "source-workspace",
+				"volumeClaimTemplate": map[string]any{
+					"spec": map[string]any{
+						"accessModes": []any{"ReadWriteOnce"},
+						"resources":   map[string]any{"requests": map[string]any{"storage": "1Gi"}},
+					},
+				},
+			},
+			map[string]any{
+				"name": "gitops-workspace",
+				"volumeClaimTemplate": map[string]any{
+					"spec": map[string]any{
+						"accessModes": []any{"ReadWriteOnce"},
+						"resources":   map[string]any{"requests": map[string]any{"storage": "1Gi"}},
+					},
+				},
 			},
 		}
 	}

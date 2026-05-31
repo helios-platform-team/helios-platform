@@ -87,7 +87,7 @@ func TestGenerateDatabaseSecret(t *testing.T) {
 	dbName := "my-app-db"
 	port := int32(5432)
 
-	creds := &DatabaseCredentials{
+	creds := &Credentials{
 		Username: "testuser",
 		Password: "testpassword123",
 	}

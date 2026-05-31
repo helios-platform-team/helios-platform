@@ -48,7 +48,7 @@ import (
 type HeliosAppReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
-	CueEngine heliosCue.CueEngineInterface
+	CueEngine heliosCue.EngineInterface
 
 	Tekton   TektonReconciler
 	ArgoCD   ArgoCDReconciler
@@ -60,9 +60,9 @@ type HeliosAppReconciler struct {
 func NewHeliosAppReconciler(
 	c client.Client,
 	scheme *runtime.Scheme,
-	cueEngine heliosCue.CueEngineInterface,
+	cueEngine heliosCue.EngineInterface,
 	tektonRenderer heliosCue.TektonRendererInterface,
-	gitFactory func(string, string, string) gitops.GitOpsClientInterface,
+	gitFactory func(string, string, string) gitops.ClientInterface,
 ) *HeliosAppReconciler {
 	return &HeliosAppReconciler{
 		Client:    c,
