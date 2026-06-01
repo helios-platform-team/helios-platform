@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS public.posts CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
