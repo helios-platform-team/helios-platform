@@ -132,6 +132,12 @@ catalog:
       rules:
         - allow: [Template]
 
+    # Multi-Option React Scaffolder Template
+    - type: file
+      target: ../../examples/multi-option-react-template/template.yaml
+      rules:
+        - allow: [Template]
+
     # NestJS + Prisma Template
     - type: file
       target: ../../examples/nestjs-prisma-template/template.yaml
