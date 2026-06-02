@@ -2,9 +2,7 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: ${{ values.name | dump }}
-  {%- if values.description %}
-  description: ${{ values.description | dump }}
-  {%- endif %}
+  description: ${{ (values.description or "") | dump }}
   annotations:
     backstage.io/techdocs-ref: dir:.
 spec:

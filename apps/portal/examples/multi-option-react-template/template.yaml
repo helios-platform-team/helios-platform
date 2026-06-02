@@ -95,6 +95,7 @@ spec:
     - title: Choose a location
       required:
         - repoUrl
+        - webhookSecret
       properties:
         repoUrl:
           title: Repository Location
@@ -103,6 +104,11 @@ spec:
           ui:options:
             allowedHosts:
               - localhost:3030
+        webhookSecret:
+          title: Webhook Secret
+          type: string
+          description: A secure random secret to secure the Git webhook
+          ui:widget: password
 
   steps:
     # 1. Fetch Source Code Template
@@ -113,7 +119,7 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           description: ${{ parameters.description }}
           buildTool: ${{ parameters.buildTool }}
           styling: ${{ parameters.styling }}
@@ -128,14 +134,14 @@ spec:
       name: Configure Selected Stack
       action: fs:rename
       input:
-        files: '${{ [ { from: "./source/index." + parameters.buildTool + ".html", to: "./source/index.html" } ].concat( [ { from: "./source/src/store/reduxStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "redux" else ( [ { from: "./source/src/store/zustandStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "zustand" else [] ) ) }}'
+        files: '${{ [ { from: "./source/index." + parameters.buildTool + ".html", to: "./source/index.html" }, { from: "./source/src/index." + parameters.styling + ".css", to: "./source/src/index.css" } ].concat( [ { from: "./source/src/store/reduxStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "redux" else ( [ { from: "./source/src/store/zustandStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "zustand" else [] ) ) }}'
 
     # 3. Clean up Unused Files (Always run, dynamic list)
     - id: cleanup-files
       name: Clean up Unused Files
       action: fs:delete
       input:
-        files: '${{ ( [ "./source/index.webpack.html", "./source/webpack.config.js", "./source/babel.config.json" ] if parameters.buildTool == "vite" else [ "./source/index.vite.html", "./source/vite.config.js" ] ).concat( [ "./source/tailwind.config.cjs", "./source/postcss.config.cjs" ] if parameters.styling == "vanilla" else [] ).concat( [ "./source/src/store/zustandStore.js" ] if parameters.stateManagement == "redux" else ( [ "./source/src/store/reduxStore.js" ] if parameters.stateManagement == "zustand" else [ "./source/src/store" ] ) ) }}'
+        files: '${{ ( [ "./source/index.webpack.html", "./source/webpack.config.js", "./source/babel.config.json" ] if parameters.buildTool == "vite" else [ "./source/index.vite.html", "./source/vite.config.js" ] ).concat( [ "./source/tailwind.config.cjs", "./source/postcss.config.cjs" ] if parameters.styling == "vanilla" else [] ).concat( [ "./source/src/store/zustandStore.js" ] if parameters.stateManagement == "redux" else ( [ "./source/src/store/reduxStore.js" ] if parameters.stateManagement == "zustand" else [ "./source/src/store" ] ) ).concat( [ "./source/src/index.vanilla.css" ] if parameters.styling == "tailwind" else [ "./source/src/index.tailwind.css" ] ) }}'
 
     # 4. Publish Source Code to Gitea
     - id: publish-source
@@ -154,7 +160,7 @@ spec:
       input:
         repoUrl: ${{ parameters.repoUrl }}
         webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
-        webhookSecret: ${{ parameters.repoName }}
+        webhookSecret: ${{ parameters.webhookSecret }}
         events:
           - push
 
@@ -166,7 +172,7 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
@@ -194,7 +200,7 @@ spec:
         name: ${{ parameters.repoName }}
         namespace: default
         username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-        webhookSecret: ${{ parameters.repoName }}
+        webhookSecret: ${{ parameters.webhookSecret }}
 
     # 9. Deploy HeliosApp to Kubernetes
     - id: apply-helios

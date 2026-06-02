@@ -25,10 +25,13 @@ function App() {
   {% if values.dataFetching == 'react-query' -%}
   const { data, isLoading, error } = useQuery({
     queryKey: ['repoData'],
-    queryFn: () =>
-      fetch('https://api.github.com/repos/facebook/react').then((res) =>
-        res.json(),
-      ),
+    queryFn: async () => {
+      const res = await fetch('https://api.github.com/repos/facebook/react')
+      if (!res.ok) {
+        throw new Error('Network response was not ok')
+      }
+      return res.json()
+    },
   })
   {%- else -%}
   const [data, setData] = React.useState(null)

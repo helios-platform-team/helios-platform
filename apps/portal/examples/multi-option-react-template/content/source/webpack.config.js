@@ -25,13 +25,7 @@ module.exports = {
       },
       {
         test: /\.css$/,
-        use: [
-          'style-loader',
-          'css-loader',
-          {% if values.styling == 'tailwind' -%}
-          'postcss-loader',
-          {%- endif %}
-        ],
+        use: {% if values.styling == 'tailwind' %}['style-loader', 'css-loader', 'postcss-loader']{% else %}['style-loader', 'css-loader']{% endif %},
       },
     ],
   },

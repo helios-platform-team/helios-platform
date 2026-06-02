@@ -20,7 +20,7 @@ spec:
   - name: GITOPS_REPO_BRANCH
     value: main
   - name: MANIFEST_PATH
-    value: ./deployment.yaml
+    value: ./helios-app.yaml
   - name: docker-secret
     value: docker-credentials 
   - name: test-command
