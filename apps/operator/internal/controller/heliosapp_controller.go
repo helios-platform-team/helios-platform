@@ -79,7 +79,7 @@ func NewHeliosAppReconciler(
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings;clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=argoproj.io,resources=applications,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile handles the reconciliation loop for HeliosApp.
@@ -97,6 +97,12 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	log.Info("Reconciling HeliosApp", "name", heliosApp.Name, "namespace", heliosApp.Namespace)
+
+	// Handle deletion: Clean up cluster-scoped RBAC resources if needed
+	if !heliosApp.DeletionTimestamp.IsZero() {
+		log.Info("HeliosApp is being deleted, handling cleanup", "app", heliosApp.Name)
+		return r.handlePreSyncCleanup(ctx, &heliosApp)
+	}
 
 	// Pre-flight validation: Check if all referenced secrets exist
 	if err := r.validateSecretReferences(ctx, &heliosApp); err != nil {
@@ -127,6 +133,18 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err := r.Tekton.Reconcile(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile Tekton resources")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Tekton reconciliation failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.3: System Secrets Provisioning
+	// Copy system-level secrets (docker-credentials, etc.) from the default
+	// namespace to the app's namespace. This ensures Tekton tasks have access
+	// to required secrets for image building and pushing.
+	// ------------------------------------------------------------------
+	if err := r.Database.ReconcileSystemSecrets(ctx, &heliosApp); err != nil {
+		log.Error(err, "Failed to provision system secrets")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("System secret provisioning failed: %v", err))
 		return ctrl.Result{}, err
 	}
 
@@ -287,4 +305,33 @@ func (r *HeliosAppReconciler) validateSecretReferences(ctx context.Context, app 
 	}
 
 	return nil
+}
+
+// handlePreSyncCleanup handles cleanup of cluster-scoped resources when HeliosApp is deleted.
+// It removes the presync finalizer and triggers cleanup of ClusterRole and ClusterRoleBinding
+// resources that were created for database migration PreSync hooks.
+func (r *HeliosAppReconciler) handlePreSyncCleanup(ctx context.Context, heliosApp *appv1alpha1.HeliosApp) (ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	// Check if the presync cleanup finalizer is present
+	hasPreSyncFinalizer := false
+	for _, finalizer := range heliosApp.Finalizers {
+		if finalizer == argocd.GetPreSyncFinalizerKey() {
+			hasPreSyncFinalizer = true
+			break
+		}
+	}
+
+	if hasPreSyncFinalizer {
+		// Create a PreSyncReconciler to handle cleanup
+		preSyncReconciler := argocd.NewPreSyncReconciler(r.Client, r.Scheme)
+
+		// Clean up cluster-scoped RBAC resources
+		if err := preSyncReconciler.HandlePreSyncCleanup(ctx, heliosApp); err != nil {
+			log.Error(err, "Failed to cleanup presync resources")
+			return ctrl.Result{}, fmt.Errorf("failed to cleanup presync resources: %w", err)
+		}
+	}
+
+	return ctrl.Result{}, nil
 }
