@@ -14,7 +14,7 @@ spec:
   pipelineName: from-code-to-cluster
   webhookSecret: git-credentials-${{ values.name }}
   port: ${{ values.port }}
-  testCommand: "npm install && npm run build"
+  testCommand: ${{ values.testCommand }}
   components:
     - name: ${{ values.name }}
       type: web-service

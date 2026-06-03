@@ -108,7 +108,7 @@ spec:
           title: Webhook Secret
           type: string
           description: A secure random secret to secure the Git webhook
-          ui:widget: password
+          ui:field: Secret
 
   steps:
     # 1. Fetch Source Code Template
@@ -119,7 +119,7 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          name: ${{ parameters.name }}
+          name: ${{ parameters.repoName }}
           description: ${{ parameters.description }}
           buildTool: ${{ parameters.buildTool }}
           styling: ${{ parameters.styling }}
@@ -160,7 +160,7 @@ spec:
       input:
         repoUrl: ${{ parameters.repoUrl }}
         webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
-        webhookSecret: ${{ parameters.webhookSecret }}
+        webhookSecret: ${{ secrets.webhookSecret }}
         events:
           - push
 
@@ -172,7 +172,7 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.name }}
+          name: ${{ parameters.repoName }}
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
@@ -200,7 +200,7 @@ spec:
         name: ${{ parameters.repoName }}
         namespace: default
         username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-        webhookSecret: ${{ parameters.webhookSecret }}
+        webhookSecret: ${{ secrets.webhookSecret }}
 
     # 9. Deploy HeliosApp to Kubernetes
     - id: apply-helios
