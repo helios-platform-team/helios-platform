@@ -1,17 +1,17 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: ${{ values.name | dump }}
+  name: ${{ values.repoName | dump }}
   description: ${{ (values.description or "") | dump }}
   annotations:
-    gitea.org/repo-url: http://localhost:3030/${{ values.owner }}/${{ values.name }}
+    gitea.org/repo-url: http://localhost:3030/${{ values.owner }}/${{ values.repoName }}
     backstage.io/techdocs-ref: dir:.
-    backstage.io/kubernetes-id: ${{ values.name }}
-    backstage.io/kubernetes-label-selector: app.kubernetes.io/name=${{ values.name }}
+    backstage.io/kubernetes-id: ${{ values.repoName }}
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/name=${{ values.repoName }}
     backstage.io/kubernetes-namespace: default
-    janus-idp.io/tekton: ${{ values.name }}
+    janus-idp.io/tekton: ${{ values.repoName }}
     tekton.dev/ci-cd: "true"
-    argocd/app-name: ${{ values.name }}-argocd
+    argocd/app-name: ${{ values.repoName }}-argocd
 spec:
   type: website
   lifecycle: experimental

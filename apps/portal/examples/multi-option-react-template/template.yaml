@@ -119,14 +119,15 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
+          repoName: ${{ parameters.repoName }}
           description: ${{ parameters.description }}
           buildTool: ${{ parameters.buildTool }}
           styling: ${{ parameters.styling }}
           stateManagement: ${{ parameters.stateManagement }}
           dataFetching: ${{ parameters.dataFetching }}
           port: ${{ parameters.port }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
 
     # 2. Configure Selected Stack (Always run, dynamic list)
@@ -134,14 +135,14 @@ spec:
       name: Configure Selected Stack
       action: fs:rename
       input:
-        files: '${{ [ { from: "./source/index." + parameters.buildTool + ".html", to: "./source/index.html" }, { from: "./source/src/index." + parameters.styling + ".css", to: "./source/src/index.css" } ].concat( [ { from: "./source/src/store/reduxStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "redux" else ( [ { from: "./source/src/store/zustandStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "zustand" else [] ) ) }}'
+        files: '${{ [ { from: "./source/index." + parameters.buildTool + ".html", to: "./source/index.html" }, { from: "./source/src/index." + parameters.styling + ".css", to: "./source/src/index.css" } ].concat( [ { from: "./source/src/store/reduxStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "redux" else ( [ { from: "./source/src/store/zustandStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "zustand" else [] ) ).concat( [ { from: "./source/webpack.config.ejs", to: "./source/webpack.config.js" } ] if parameters.buildTool == "webpack" else [] ) }}'
 
     # 3. Clean up Unused Files (Always run, dynamic list)
     - id: cleanup-files
       name: Clean up Unused Files
       action: fs:delete
       input:
-        files: '${{ ( [ "./source/index.webpack.html", "./source/webpack.config.js", "./source/babel.config.json" ] if parameters.buildTool == "vite" else [ "./source/index.vite.html", "./source/vite.config.js" ] ).concat( [ "./source/tailwind.config.cjs", "./source/postcss.config.cjs" ] if parameters.styling == "vanilla" else [] ).concat( [ "./source/src/store/zustandStore.js" ] if parameters.stateManagement == "redux" else ( [ "./source/src/store/reduxStore.js" ] if parameters.stateManagement == "zustand" else [ "./source/src/store" ] ) ).concat( [ "./source/src/index.vanilla.css" ] if parameters.styling == "tailwind" else [ "./source/src/index.tailwind.css" ] ) }}'
+        files: '${{ ( [ "./source/index.webpack.html", "./source/webpack.config.ejs", "./source/babel.config.json" ] if parameters.buildTool == "vite" else [ "./source/index.vite.html", "./source/vite.config.js" ] ).concat( [ "./source/tailwind.config.cjs", "./source/postcss.config.cjs" ] if parameters.styling == "vanilla" else [] ).concat( [ "./source/src/store/zustandStore.js" ] if parameters.stateManagement == "redux" else ( [ "./source/src/store/reduxStore.js" ] if parameters.stateManagement == "zustand" else [ "./source/src/store" ] ) ).concat( [ "./source/src/index.vanilla.css" ] if parameters.styling == "tailwind" else [ "./source/src/index.tailwind.css" ] ) }}'
 
     # 4. Publish Source Code to Gitea
     - id: publish-source
@@ -172,12 +173,12 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
+          repoName: ${{ parameters.repoName }}
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
-          repoName: ${{ parameters.repoName }}
           port: ${{ parameters.port }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "npm install && npm run build"

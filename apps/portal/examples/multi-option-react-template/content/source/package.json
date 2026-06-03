@@ -1,5 +1,5 @@
 {
-  "name": "${{ values.name }}",
+  "name": "${{ values.repoName }}",
   "private": true,
   "version": "1.0.0",
   {% if values.buildTool == 'vite' -%}

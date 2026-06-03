@@ -1,9 +1,9 @@
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
-  name: ${{ values.name }}-pipeline-run
+  name: ${{ values.repoName }}-pipeline-run
   annotations:
-    janus-idp.io/tekton: ${{ values.name }}
+    janus-idp.io/tekton: ${{ values.repoName }}
 spec:
   serviceAccountName: pipeline
   pipelineRef:
@@ -28,7 +28,7 @@ spec:
   - name: argocd-namespace
     value: argocd
   - name: argocd-app-name
-    value: ${{ values.name }}-argocd
+    value: ${{ values.repoName }}-argocd
   workspaces:
   - name: source-workspace
     volumeClaimTemplate:

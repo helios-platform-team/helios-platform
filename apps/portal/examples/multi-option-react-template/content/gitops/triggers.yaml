@@ -1,7 +1,7 @@
 apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerBinding
 metadata:
-  name: ${{ values.name }}-git-binding
+  name: ${{ values.repoName }}-git-binding
 spec:
   params:
     - name: git-repo-url
@@ -17,16 +17,16 @@ spec:
 apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:
-  name: ${{ values.name }}-git-template
+  name: ${{ values.repoName }}-git-template
 spec:
   resourcetemplates:
     - apiVersion: tekton.dev/v1beta1
       kind: PipelineRun
       metadata:
-        generateName: ${{ values.name }}-run-
+        generateName: ${{ values.repoName }}-run-
         labels:
           tekton.dev/pipeline: from-code-to-cluster
-          app.kubernetes.io/instance: ${{ values.name }}
+          app.kubernetes.io/instance: ${{ values.repoName }}
       spec:
         serviceAccountName: pipeline
         pipelineRef:
@@ -46,47 +46,62 @@ spec:
             value: "helios-app.yaml"
           - name: docker-secret
             value: "docker-credentials"
+          - name: test-command
+            value: "${{ values.testCommand }}"
+          - name: argocd-namespace
+            value: "argocd"
+          - name: argocd-app-name
+            value: "${{ values.repoName }}-argocd"
+        workspaces:
+          - name: source-workspace
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi
 
 ---
 apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
-  name: ${{ values.name }}-listener
+  name: ${{ values.repoName }}-listener
 spec:
-  serviceAccountName: ${{ values.name }}-sa
+  serviceAccountName: ${{ values.repoName }}-sa
   triggers:
     - binding:
-        name: ${{ values.name }}-git-binding
+        name: ${{ values.repoName }}-git-binding
       template:
-        name: ${{ values.name }}-git-template
+        name: ${{ values.repoName }}-git-template
 
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: ${{ values.name }}-sa
+  name: ${{ values.repoName }}-sa
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: ${{ values.name }}-listener-binding
+  name: ${{ values.repoName }}-listener-binding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: tekton-triggers-eventlistener-roles
 subjects:
   - kind: ServiceAccount
-    name: ${{ values.name }}-sa
+    name: ${{ values.repoName }}-sa
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: ${{ values.name }}-listener-clusterbinding
+  name: ${{ values.repoName }}-listener-clusterbinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: tekton-triggers-eventlistener-clusterroles
 subjects:
   - kind: ServiceAccount
-    name: ${{ values.name }}-sa
+    name: ${{ values.repoName }}-sa
     namespace: default

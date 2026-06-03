@@ -1,7 +1,7 @@
 apiVersion: app.helios.io/v1alpha1
 kind: HeliosApp
 metadata:
-  name: ${{ values.name }}
+  name: ${{ values.repoName }}
   namespace: default
 spec:
   owner: ${{ values.owner }}
@@ -10,13 +10,13 @@ spec:
   gitBranch: main
   imageRepo: ${{ values.image }}
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: ${{ values.name }}
+  gitopsPath: ${{ values.repoName }}
   pipelineName: from-code-to-cluster
-  webhookSecret: git-credentials-${{ values.name }}
+  webhookSecret: git-credentials-${{ values.repoName }}
   port: ${{ values.port }}
   testCommand: ${{ values.testCommand }}
   components:
-    - name: ${{ values.name }}
+    - name: ${{ values.repoName }}
       type: web-service
       properties:
         image: ${{ values.image }}:latest
