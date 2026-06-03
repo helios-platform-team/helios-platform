@@ -35,6 +35,7 @@ spec:
           title: Docker Repository Name
           type: string
           description: The name of the repository (e.g. my-react-app)
+          pattern: "^(?:@[a-z0-9-~][a-z0-9-._~]*/)?[a-z0-9-~][a-z0-9-._~]*$"
         description:
           title: Description
           type: string
@@ -131,6 +132,11 @@ spec:
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
 
     # 2. Configure Selected Stack (Always run, dynamic list)
+    # File rename logic:
+    #   - index.{buildTool}.html -> index.html (vite or webpack)
+    #   - src/index.{styling}.css -> src/index.css (tailwind or vanilla)
+    #   - src/store/{redux|zustand}Store.js -> src/store/store.js (if not "none")
+    #   - webpack.config.ejs -> webpack.config.js (if webpack)
     - id: configure-files
       name: Configure Selected Stack
       action: fs:rename
