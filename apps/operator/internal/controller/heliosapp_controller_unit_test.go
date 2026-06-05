@@ -94,11 +94,36 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		},
 	}
 
+<<<<<<< users/hph/implement-terraform
 	// 3. Set up Fake Client
+=======
+	dockerCredentialsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "docker-credentials",
+			Namespace: "default",
+		},
+		Type: corev1.SecretTypeDockercfg,
+		Data: map[string][]byte{
+			".dockercfg": []byte(`{}`),
+		},
+	}
+
+	heliosGitopsBotSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "helios-gitops-bot",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"token": []byte("dummy-token"),
+		},
+	}
+
+	// 3. Setup Fake Client
+>>>>>>> main
 	// We init with the object existing
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(scheme).
-		WithObjects(heliosApp, gitOpsSecret).
+		WithObjects(heliosApp, gitOpsSecret, dockerCredentialsSecret, heliosGitopsBotSecret).
 		WithStatusSubresource(heliosApp).
 		Build()
 
@@ -178,7 +203,28 @@ func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 		},
 	}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(heliosApp).WithStatusSubresource(heliosApp).Build()
+	dockerCredentialsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "docker-credentials",
+			Namespace: "default",
+		},
+		Type: corev1.SecretTypeDockercfg,
+		Data: map[string][]byte{
+			".dockercfg": []byte(`{}`),
+		},
+	}
+
+	heliosGitopsBotSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "helios-gitops-bot",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"token": []byte("dummy-token"),
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(heliosApp, dockerCredentialsSecret, heliosGitopsBotSecret).WithStatusSubresource(heliosApp).Build()
 
 	r := &HeliosAppReconciler{
 		Client:    fakeClient,

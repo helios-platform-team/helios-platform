@@ -25,9 +25,16 @@ func NewReconciler(c client.Client, scheme *runtime.Scheme) *Reconciler {
 	return &Reconciler{Client: c, Scheme: scheme}
 }
 
-// Reconcile ensures the ArgoCD Application and sync RBAC exist.
+// Reconcile ensures the ArgoCD Application, PreSync resources, and sync RBAC exist.
 func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp) error {
 	log := logf.FromContext(ctx)
+
+	// Reconcile PreSync resources if database trait exists
+	preSyncReconciler := NewPreSyncReconciler(r.Client, r.Scheme)
+	if err := preSyncReconciler.ReconcilePreSyncResources(ctx, app); err != nil {
+		log.Error(err, "Failed to reconcile PreSync resources")
+		return fmt.Errorf("failed to reconcile PreSync resources: %w", err)
+	}
 
 	log.Info("Ensuring ArgoCD Application exists")
 	argoApp, err := GenerateArgoApplication(app)

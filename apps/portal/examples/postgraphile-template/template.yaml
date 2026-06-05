@@ -1,0 +1,136 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: postgraphile-template
+  title: PostGraphile GraphQL API Template
+  description: >-
+    Scaffolds an instant GraphQL API over a PostgreSQL database using PostGraphile.
+    The Helios Operator automatically provisions the database and injects the connection string (PGRST_DB_URI).
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Component Information
+      required: [name, port, dockerOrg, repoName]
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Unique name of the PostGraphile API service
+          ui:autofocus: true
+        port:
+          title: API Port
+          type: number
+          description: the port PostGraphile listens on
+          default: 5000
+        dockerOrg:
+          title: Docker Registry Org/User
+          type: string
+          description: Your Docker Hub username or Organization
+        repoName:
+          title: Docker Repository Name
+          type: string
+          description: The name of the Docker repository (e.g. my-graphql-api)
+
+    - title: Database Configuration
+      properties:
+        databaseConfig:
+          title: Database Settings
+          type: object
+          ui:field: DatabasePicker
+
+    - title: Repository & Webhook
+      required: [repoUrl]
+      properties:
+        repoUrl:
+          title: Source Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts: [localhost:3030]
+        namespace:
+          title: Kubernetes Namespace
+          type: string
+          description: Namespace where the service will be deployed
+          default: default
+
+  steps:
+    - id: fetch-source
+      name: Fetch Source Code
+      action: fetch:template
+      input:
+        url: ./content/source
+        targetPath: ./source
+        values:
+          name: ${{ parameters.repoName }}
+          port: ${{ parameters.port }}
+          namespace: ${{ parameters.namespace }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
+
+    - id: publish-source
+      name: Publish Source Code
+      action: publish:gitea
+      input:
+        description: PostGraphile Source for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}
+        sourcePath: ./source
+        repoVisibility: public
+
+    - id: create-webhook
+      name: Create Webhook for DB Migration Trigger
+      action: gitea:create-webhook
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        webhookUrl: http://el-${{ parameters.repoName }}-db-migrate-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookSecret: ${{ parameters.repoName }}
+        events:
+          - push
+
+    - id: fetch-gitops
+      name: Fetch GitOps Manifests
+      action: fetch:template
+      input:
+        url: ./content/gitops
+        targetPath: ./gitops
+        values:
+          name: ${{ parameters.repoName }}
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          port: ${{ parameters.port }}
+          namespace: ${{ parameters.namespace }}
+          databaseType: ${{ parameters.databaseConfig.dbType }}
+          databaseName: ${{ parameters.databaseConfig.dbName }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
+          sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
+          gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
+
+    - id: publish-gitops
+      name: Publish GitOps Manifests
+      action: publish:gitea
+      input:
+        description: GitOps Manifests for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}-gitops
+        sourcePath: ./gitops
+        repoVisibility: public
+
+    - id: create-webhook-secret
+      name: Create Kubernetes Webhook Secret
+      action: kubernetes:create-secret
+      input:
+        namespace: ${{ parameters.namespace }}
+        secretName: ${{ parameters.repoName }}-webhook-secret
+        data:
+          secret: ${{ parameters.repoName }}
+
+    - id: apply-heliosapp
+      name: Apply HeliosApp to Cluster
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/helios-app.yaml
+
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
+        catalogInfoPath: 'catalog-info.yaml'

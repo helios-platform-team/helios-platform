@@ -230,6 +230,31 @@ import "helios.io/cue/definitions/tekton"
 	}
 }
 
+// #BuildMigrateImagePattern - Build Docker image with database migration tool and scripts
+// Tags image as <registry>/<app-name>-migrate:latest for use by PreSync Jobs
+#BuildMigrateImagePattern: {
+	_name:     string | *"build-migrate-image"
+	_runAfter: [...string]
+
+	task: {
+		name: _name
+		taskRef: name: #TaskNames.kanikoBuild
+		runAfter: _runAfter
+		workspaces: [{
+			name:      "source"
+			workspace: #PipelineWorkspaces.source.name
+		}]
+		params: [
+			// Build migration image with :latest tag (will be pulled by PreSync Job)
+			{name: tekton.#CommonParams.image.name.name, value:        "$(params.\(#PipelineParams.imageRepo.name))-migrate:latest"},
+			{name: tekton.#CommonParams.image.contextSubpath.name, value: "."},
+			{name: tekton.#CommonParams.image.dockerSecret.name, value:  "$(params.\(#PipelineParams.dockerSecret.name))"},
+			// Override Dockerfile to use Dockerfile.migrate
+			{name: "DOCKERFILE", value: "./Dockerfile.migrate"},
+		]
+	}
+}
+
 // #UpdateGitOpsPattern
 #UpdateGitOpsPattern: {
 	_name:            string | *"update-gitops-manifest"
