@@ -1,12 +1,4 @@
-/*
-TektonRenderer - Go SDK for CUE Tekton Builder
-
-This renderer bridges the Go Operator with the CUE Tekton Builder.
-It takes a TektonInput (mapped from HeliosApp CRD) and produces
-Kubernetes unstructured objects via CUE evaluation.
-
-Flow: HeliosApp CR → TektonInput (Go) → CUE Engine → []Unstructured
-*/
+// Package cue /*
 package cue
 
 import (
@@ -67,6 +59,11 @@ type TektonInput struct {
 	// === ARGOCD ===
 	ArgoCDNamespace string `json:"argoCDNamespace,omitempty"`
 	ArgoCDProject   string `json:"argoCDProject,omitempty"`
+
+	// === BUILD CUSTOMIZATIONS ===
+	StorageDriver    string `json:"storageDriver,omitempty"`
+	BuildahIsolation string `json:"buildahIsolation,omitempty"`
+	BuildPlatforms   string `json:"buildPlatforms,omitempty"`
 }
 
 // TektonRendererInterface defines methods for Tekton CUE rendering.

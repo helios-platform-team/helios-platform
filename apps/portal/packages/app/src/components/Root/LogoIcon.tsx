@@ -1,50 +1,50 @@
-import { styled, alpha } from '@mui/material/styles';
+import { makeStyles } from '@material-ui/core/styles';
 import { Sun } from 'lucide-react';
-import Box from '@mui/material/Box';
+import Box from '@material-ui/core/Box';
 
-// Reusing the same styled components for consistency
-const Wrapper = styled('div')(({ theme }) => ({
-  position: 'relative',
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  '&:hover .glow-effect': {
-    opacity: theme.palette.mode === 'dark' ? 0.6 : 0.4,
+const useStyles = makeStyles(theme => ({
+  wrapper: {
+    position: 'relative',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    '&:hover $glow': {
+      opacity: theme.palette.type === 'dark' ? 0.6 : 0.4,
+    },
+  },
+  glow: {
+    position: 'absolute',
+    inset: -4,
+    backgroundColor: theme.palette.primary.main,
+    filter: 'blur(12px)',
+    opacity: theme.palette.type === 'dark' ? 0.4 : 0.2,
+    transition: 'opacity 0.3s ease',
+    borderRadius: '50%',
+  },
+  logoContainer: {
+    position: 'relative',
+    display: 'flex',
+    zIndex: 1,
   },
 }));
 
-const Glow = styled('div')(({ theme }) => ({
-  position: 'absolute',
-  inset: -4, // Slightly negative inset makes the glow expand beyond the icon boundaries
-  backgroundColor: theme.palette.primary.main,
-  filter: 'blur(12px)', // Adjusted blur for a smaller icon
-  opacity: theme.palette.mode === 'dark' ? 0.4 : 0.2,
-  transition: 'opacity 0.3s ease',
-  borderRadius: '50%',
-}));
-
 const LogoIcon = () => {
+  const classes = useStyles();
   return (
-    <Wrapper>
-      <Glow className="glow-effect" />
-      <Box
-        sx={{
-          position: 'relative',
-          display: 'flex',
-          zIndex: 1,
-        }}
-      >
+    <div className={classes.wrapper}>
+      <div className={`${classes.glow} glow-effect`} />
+      <Box className={classes.logoContainer}>
         <Sun
           size={28}
           stroke="currentColor"
           style={{
             color: 'var(--mui-palette-primary-main)',
-            fill: alpha('#EDB506', 0.2),
+            fill: 'rgba(237, 181, 6, 0.2)',
           }}
         />
       </Box>
-    </Wrapper>
+    </div>
   );
 };
 

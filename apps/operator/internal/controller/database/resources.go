@@ -33,7 +33,7 @@ func formatPostgresURI(username, password, host, dbName string, port int32) stri
 
 // GenerateDatabaseSecret creates a Kubernetes Secret containing database credentials.
 // Parameters: namespace, secretName, componentName, credentials, dbHost, dbName, port.
-func GenerateDatabaseSecret(namespace, secretName, componentName string, creds *DatabaseCredentials, dbHost, dbName string, port int32) *corev1.Secret {
+func GenerateDatabaseSecret(namespace, secretName, componentName string, creds *Credentials, dbHost, dbName string, port int32) *corev1.Secret {
 	// Compute the PostgreSQL connection URI
 	pgrstURI := formatPostgresURI(creds.Username, creds.Password, dbHost, dbName, port)
 
@@ -90,7 +90,6 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 		return nil, fmt.Errorf("invalid storage size format %q: %w", storage, err)
 	}
 
-	replicas := int32(1)
 	labels := map[string]string{
 		"app":                  name,
 		"helios.io/managed-by": "operator",
@@ -108,7 +107,7 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 		},
 		Spec: appsv1.StatefulSetSpec{
 			ServiceName: name,
-			Replicas:    &replicas,
+			Replicas:    new(int32(1)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": name},
 			},
@@ -209,7 +208,8 @@ func GenerateDatabaseStatefulSet(namespace, name, secretName, dbName, version, s
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "data",
+						Name:   "data",
+						Labels: labels,
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{

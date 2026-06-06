@@ -26,14 +26,20 @@ import "helios.io/cue/definitions/tekton"
 			script: """
 				#!/bin/sh
 				set -e
-				
-				# Clean the workspace if it exists
-				echo "Cleaning workspace: $(workspaces.output.path)"
-				rm -rf $(workspaces.output.path)/*
-				rm -rf $(workspaces.output.path)/.[!.]*
-				
+				if ! command -v git >/dev/null 2>&1; then
+					apk add --no-cache git
+				fi
+
 				# Transform localhost URLs for in-cluster access
 				GIT_URL="$(params.url)"
+				WORKSPACE_PATH="$(workspaces.output.path)"
+
+				# Tekton PVCs can be owned by a different UID/GID than the step user.
+				# Force git to trust this workspace path to avoid "dubious ownership".
+				git_safe() {
+					git -c safe.directory="$WORKSPACE_PATH" "$@"
+				}
+
 				case "$GIT_URL" in
 					*localhost:3030*)
 						echo "Transforming localhost URL to in-cluster address"
@@ -45,14 +51,23 @@ import "helios.io/cue/definitions/tekton"
 						;;
 				esac
 				
-				# Clone the repository
-				echo "Cloning $GIT_URL to $(workspaces.output.path)"
-				git clone "$GIT_URL" $(workspaces.output.path)
+				# Prepare workspace without relying on external rm binary.
+				# Some minimal git images used in Tekton don't include coreutils.
+				cd "$WORKSPACE_PATH"
+				echo "Preparing workspace with git primitives: $WORKSPACE_PATH"
+				if [ -d .git ]; then
+					git_safe remote remove origin || true
+				else
+					git_safe init
+				fi
 				
-				# Checkout the specified revision
-				cd $(workspaces.output.path)
+				# Fetch and checkout the specified revision
+				git_safe remote add origin "$GIT_URL"
+				git_safe fetch --depth=1 origin "$(params.revision)"
+				git_safe checkout -B helios-build FETCH_HEAD
 				echo "Checking out $(params.revision)"
-				git checkout $(params.revision)
+				git_safe reset --hard FETCH_HEAD
+				git_safe clean -fdx
 				
 				echo "Git clone completed successfully"
 				"""

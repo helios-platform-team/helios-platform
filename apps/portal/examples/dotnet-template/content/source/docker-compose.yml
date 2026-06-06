@@ -8,15 +8,18 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:${{ values.port }}
       ASPNETCORE_ENVIRONMENT: Development
+{% if values.hasDatabase %}
       DB_HOST: db
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: ${{ values.name }}-db
     depends_on:
       - db
+{% endif %}
 
+{% if values.hasDatabase %}
   db:
-    image: postgres:18.3-alpine
+    image: postgres:18.4-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -24,6 +27,9 @@ services:
       POSTGRES_DB: ${{ values.name }}-db
     volumes:
       - postgres_data:/var/lib/postgresql/data
+{% endif %}
 
+{% if values.hasDatabase %}
 volumes:
   postgres_data:
+{% endif %}

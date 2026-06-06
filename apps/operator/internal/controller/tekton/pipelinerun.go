@@ -41,13 +41,13 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 		map[string]any{"name": "app-repo-url", "value": shared.RewriteGiteaURL(heliosApp.Spec.GitRepo)},
 		map[string]any{"name": "app-repo-revision", "value": appRepoRevision},
 		map[string]any{"name": "image-repo", "value": heliosApp.Spec.ImageRepo},
-		map[string]any{"name": "GITOPS_REPO_URL", "value": shared.RewriteGiteaURL(heliosApp.Spec.GitOpsRepo)},
-		map[string]any{"name": "MANIFEST_PATH", "value": heliosApp.Spec.GitOpsPath},
-		map[string]any{"name": "GITOPS_REPO_BRANCH", "value": gitOpsBranch},
-		map[string]any{"name": "GITOPS_SECRET_REF", "value": gitOpsSecretRef},
-		map[string]any{"name": "GITOPS_AUTHOR_NAME", "value": "Helios Bot"},
-		map[string]any{"name": "GITOPS_AUTHOR_EMAIL", "value": "helios-bot@helios.local"},
-		map[string]any{"name": "CONTEXT_SUBPATH", "value": contextSubpath},
+		map[string]any{"name": "gitops-repo-url", "value": shared.RewriteGiteaURL(heliosApp.Spec.GitOpsRepo)},
+		map[string]any{"name": "manifest-path", "value": heliosApp.Spec.GitOpsPath},
+		map[string]any{"name": "gitops-repo-branch", "value": gitOpsBranch},
+		map[string]any{"name": "gitops-secret-ref", "value": gitOpsSecretRef},
+		map[string]any{"name": "gitops-author-name", "value": "Helios Bot"},
+		map[string]any{"name": "gitops-author-email", "value": "helios-bot@helios.local"},
+		map[string]any{"name": "context-subpath", "value": contextSubpath},
 		map[string]any{"name": "replicas", "value": fmt.Sprintf("%d", replicas)},
 		map[string]any{"name": "port", "value": fmt.Sprintf("%d", port)},
 		map[string]any{"name": "test-command", "value": heliosApp.Spec.TestCommand},
@@ -70,27 +70,7 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 	}
 	params = append(params, map[string]any{"name": "resources", "value": string(resourcesJSON)})
 
-	workspaceBindings := []any{
-		map[string]any{
-			"name": "source-workspace",
-			"volumeClaimTemplate": map[string]any{
-				"spec": map[string]any{
-					"accessModes": []any{"ReadWriteOnce"},
-					"resources":   map[string]any{"requests": map[string]any{"storage": "1Gi"}},
-				},
-			},
-		},
-		map[string]any{
-			"name": "gitops-workspace",
-			"volumeClaimTemplate": map[string]any{
-				"spec": map[string]any{
-					"accessModes": []any{"ReadWriteOnce"},
-					"resources":   map[string]any{"requests": map[string]any{"storage": "1Gi"}},
-				},
-			},
-		},
-	}
-
+	var workspaceBindings []any
 	if heliosApp.Spec.PVCName != "" {
 		workspaceBindings = []any{
 			map[string]any{
@@ -102,6 +82,27 @@ func GeneratePipelineRun(heliosApp *appv1alpha1.HeliosApp, pipelineName string) 
 				"name":                  "gitops-workspace",
 				"persistentVolumeClaim": map[string]any{"claimName": heliosApp.Spec.PVCName},
 				"subPath":               "gitops",
+			},
+		}
+	} else {
+		workspaceBindings = []any{
+			map[string]any{
+				"name": "source-workspace",
+				"volumeClaimTemplate": map[string]any{
+					"spec": map[string]any{
+						"accessModes": []any{"ReadWriteOnce"},
+						"resources":   map[string]any{"requests": map[string]any{"storage": "1Gi"}},
+					},
+				},
+			},
+			map[string]any{
+				"name": "gitops-workspace",
+				"volumeClaimTemplate": map[string]any{
+					"spec": map[string]any{
+						"accessModes": []any{"ReadWriteOnce"},
+						"resources":   map[string]any{"requests": map[string]any{"storage": "1Gi"}},
+					},
+				},
 			},
 		}
 	}

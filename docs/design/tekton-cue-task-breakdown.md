@@ -88,7 +88,7 @@
    - Use `#TektonTask` base
    - Match current implementation logic
 
-3. **kaniko-build task** (`tasks/kaniko-build.cue`)
+3. **buildah-build task** (`tasks/buildah-build.cue`)
    - Docker config volume management
    - Results definition
 

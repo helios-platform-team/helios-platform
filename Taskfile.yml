@@ -10,6 +10,7 @@
 #
 # First-time setup:
 #   cp .env.example .env   # fill in your credentials
+#   task check             # make sure every tools are installed and .env is configured
 #   task setup             # ~5-10 minutes
 #   task dev               # opens operator + portal
 #
@@ -28,6 +29,9 @@ vars:
   GITEA_PORT: "3030"
   GITEA_INTERNAL_HOST: gitea-http.gitea.svc.cluster.local:3000
   GITOPS_SECRET_NAME: helios-gitops-bot
+  # Local pull-through cache registry — persists across task clean cycles
+  REGISTRY_NAME: helios-registry
+  REGISTRY_PORT: "5001"
   # Cap Tekton resource usage during local builds/tests to avoid host lockups.
   TEKTON_LIMIT_NAMESPACE: default
   TEKTON_LIMIT_CPU: "2"
@@ -41,7 +45,50 @@ set: [errexit, pipefail]
 # Prerequisite Checking
 # =============================================================================
 tasks:
+  # ===========================================================================
+  # Workflow Shortcuts
+  # ===========================================================================
+  default:
+    desc: Show common commands
+    cmds:
+      - task: help
+
+  help:
+    desc: Print recommended workflows
+    silent: true
+    cmds:
+      - echo ""
+      - echo "Helios common workflows:"
+      - echo "  task check                        Verify prerequisites"
+      - echo "  task setup                        First-time bootstrap (cluster + deps)"
+      - echo "  task dev                          Run operator + portal"
+      - echo "  task dev:refresh APP=name(s)      Reset generated state then run dev"
+      - echo "  task test                         Run operator + portal tests"
+      - echo "  task clean                        Destroy cluster (keeps registry cache)"
+      - echo ""
+      - echo "Useful targeted commands:"
+      - echo "  task setup:terraform             Recreate cluster/apps from Terraform"
+      - echo "  task reset:generated APP=name(s) Remove generated runtime state"
+      - echo "  task reset:gitea-repo APP=name(s) Delete generated Gitea repos"
+      - echo "  task clean:registry              Remove local registry cache"
+      - echo ""
+      - echo "APP=name(s) can be a single app, comma-separated (APP=app1,app2), or"
+      - echo "'all' to discover and reset every generated app."
+      - echo ""
+      - echo "See 'task help:all' for the full task list."
+
+  help:all:
+    desc: Print all available tasks with descriptions
+    cmds:
+      - task --list-all
+
   check:
+    desc: Verify all development prerequisites are installed and .env is configured
+    cmds:
+      - task: check:env
+      - task: check:tools
+
+  check:tools:
     desc: Verify all development prerequisites are installed
     cmds:
       - cmd: bash scripts/check-prereqs.sh
@@ -61,28 +108,128 @@ tasks:
   # Setup Tasks
   # ===========================================================================
   setup:
-    desc: Bootstrap the full local development environment
+    desc: Bootstrap the full local development environment using Terraform
     deps: [check:env]
     cmds:
-      - task: setup:cluster
-      - task: setup:coredns
-      - task: setup:tekton
-      - task: setup:tekton-pruner
-      - task: setup:argocd
-      - task: setup:gitea
-      - task: setup:gitea-token
-      - task: setup:gitea-gitops-secret
-      - task: setup:argocd-gitea
-      - task: setup:crds
-      - task: setup:tekton-rbac
-      - task: setup:credentials
-      - task: setup:portal-deps
+      - task: setup:all
       - echo ""
       - echo "============================================="
       - echo "  Helios local environment is ready!"
       - echo "  Gitea is available at http://localhost:{{.GITEA_PORT}}"
+      - echo "  Registry cache at localhost:{{.REGISTRY_PORT}} (persists across clean)"
       - echo "  Run 'task dev' to start developing."
       - echo "============================================="
+
+  setup:all:
+    desc: Run full setup sequence (registry + infra + tekton + portal deps)
+    cmds:
+      - task: setup:registry
+      - task: setup:terraform
+      - task: setup:tekton
+      - task: setup:portal-deps
+
+  setup:registry:
+    desc: Create a persistent local pull-through cache registry (survives task clean)
+    cmds:
+      - cmd: |
+          REGISTRY_NAME="{{.REGISTRY_NAME}}"
+          REGISTRY_PORT="{{.REGISTRY_PORT}}"
+
+          if k3d registry list "k3d-${REGISTRY_NAME}" > /dev/null 2>&1; then
+            echo "Registry 'k3d-${REGISTRY_NAME}' already exists on port ${REGISTRY_PORT}. Skipping."
+          else
+            echo "Creating local pull-through cache registry 'k3d-${REGISTRY_NAME}' on port ${REGISTRY_PORT}..."
+            k3d registry create "${REGISTRY_NAME}" \
+              --port "${REGISTRY_PORT}" \
+              --proxy-remote-url "https://registry-1.docker.io" \
+              --proxy-username "${DOCKER_USERNAME:-}" \
+              --proxy-password "${DOCKER_TOKEN:-}"
+            echo "Registry created. Docker Hub pulls will now be cached locally."
+          fi
+        platforms: [linux, darwin]
+
+  setup:terraform:
+    desc: Bootstrap the local environment (cluster + apps) using Terraform
+    dir: infrastructure/environments/local-dev
+    cmds:
+      - |
+        echo "Ensuring k3d cluster '{{.CLUSTER_NAME}}' exists..."
+        mkdir -p ~/.kube
+        touch ~/.kube/config
+        if ! k3d cluster list {{.CLUSTER_NAME}} > /dev/null 2>&1; then
+          echo "Creating k3d cluster '{{.CLUSTER_NAME}}'..."
+          # Render the registry mirror config from the committed template
+          mkdir -p ~/.k3d
+          sed \
+            -e "s/REGISTRY_NAME/{{.REGISTRY_NAME}}/g" \
+            -e "s/REGISTRY_PORT/{{.REGISTRY_PORT}}/g" \
+            "$(pwd)/../../modules/cluster-k3d/registries.yaml.tpl" \
+            > ~/.k3d/helios-registries.yaml
+          k3d cluster create {{.CLUSTER_NAME}} \
+            --image rancher/k3s:v1.36.1-k3s1 \
+            --agents 1 \
+            --wait \
+            --api-port 127.0.0.1:6550 \
+            --k3s-arg "--disable=traefik@server:0" \
+            --k3s-arg "--disable=metrics-server@server:0" \
+            --registry-use "k3d-{{.REGISTRY_NAME}}:{{.REGISTRY_PORT}}" \
+            --registry-config ~/.k3d/helios-registries.yaml
+        fi
+        echo "Merging kubeconfig context..."
+        k3d kubeconfig merge {{.CLUSTER_NAME}} -d -s > /dev/null 2>&1 || true
+      - terraform init
+      - cmd: |
+          STATE_LIST="$(terraform state list 2>/dev/null || true)"
+          GITEA_IN_STATE="false"
+          if echo "$STATE_LIST" | grep -q "module.gitea.helm_release.gitea"; then
+            GITEA_IN_STATE="true"
+          fi
+
+          GITEA_RELEASE_EXISTS="false"
+          if helm status gitea -n gitea >/dev/null 2>&1; then
+            GITEA_RELEASE_EXISTS="true"
+          fi
+
+          # If a previous Gitea Helm release exists but isn't in Terraform state,
+          # try to import it to avoid slow re-installs.
+          if [ "$GITEA_RELEASE_EXISTS" = "true" ] && [ "$GITEA_IN_STATE" = "false" ]; then
+            echo "Found existing Gitea Helm release not tracked by Terraform. Importing..."
+            if terraform import module.gitea.helm_release.gitea gitea/gitea >/dev/null 2>&1 || \
+               terraform import module.gitea.helm_release.gitea gitea >/dev/null 2>&1; then
+              echo "Imported Gitea Helm release into Terraform state."
+              if kubectl -n argocd get secret gitea-repo-creds >/dev/null 2>&1; then
+                terraform import module.gitea.kubernetes_secret_v1.gitea_repo_creds argocd/gitea-repo-creds >/dev/null 2>&1 || true
+              fi
+              if kubectl -n default get secret helios-gitops-bot >/dev/null 2>&1; then
+                terraform import module.gitea.kubernetes_secret_v1.gitea_gitops_secret default/helios-gitops-bot >/dev/null 2>&1 || true
+              fi
+            else
+              echo "Import failed; uninstalling Gitea release to allow Terraform to recreate."
+              helm uninstall gitea -n gitea || true
+              GITEA_RELEASE_EXISTS="false"
+            fi
+          fi
+
+          GITEA_CONFIGURE_FLAG="${GITEA_CONFIGURE:-}"
+          if [ -z "$GITEA_CONFIGURE_FLAG" ]; then
+            GITEA_READY="false"
+            if kubectl -n gitea get deployment/gitea >/dev/null 2>&1; then
+              if kubectl -n gitea rollout status deployment/gitea --timeout=5s >/dev/null 2>&1; then
+                GITEA_READY="true"
+              fi
+            fi
+
+            if [ -n "${GITEA_TOKEN:-}" ] && [ "$GITEA_READY" = "true" ]; then
+              GITEA_CONFIGURE_FLAG="false"
+            else
+              GITEA_CONFIGURE_FLAG="true"
+            fi
+          fi
+
+          terraform apply -auto-approve \
+            -var="docker_username=${DOCKER_USERNAME:-}" \
+            -var="docker_password=${DOCKER_TOKEN:-}" \
+            -var="gitea_configure=${GITEA_CONFIGURE_FLAG}"
 
   setup:cluster:
     desc: Create a k3d cluster (idempotent)
@@ -90,7 +237,7 @@ tasks:
       - k3d kubeconfig get {{.CLUSTER_NAME}}
     cmds:
       - echo "Creating k3d cluster '{{.CLUSTER_NAME}}'..."
-      - k3d cluster create {{.CLUSTER_NAME}} --agents 1 --wait --api-port 127.0.0.1:6550 --k3s-arg "--disable=traefik@server:0"
+      - k3d cluster create {{.CLUSTER_NAME}} --image rancher/k3s:v1.36.1-k3s1 --agents 1 --wait --api-port 127.0.0.1:6550 --k3s-arg "--disable=traefik@server:0"
       - kubectl config set-cluster k3d-{{.CLUSTER_NAME}} --server=https://localhost:6550
       - kubectl cluster-info
 
@@ -113,11 +260,25 @@ tasks:
     desc: Install Tekton Pipeline, Triggers, and Interceptors
     status:
       - kubectl get namespace tekton-pipelines
-      - kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines
-      - kubectl get deployment/tekton-pipelines-webhook -n tekton-pipelines
+      - kubectl get deployment/tekton-triggers-controller -n tekton-pipelines
+      - kubectl get deployment/tekton-triggers-webhook -n tekton-pipelines
     cmds:
-      - echo "Installing Tekton Pipeline..."
-      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml --request-timeout=120s
+      - echo "Waiting for ArgoCD to deploy Tekton Pipelines..."
+      - cmd: |
+          for i in {1..120}; do
+            if kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines >/dev/null 2>&1; then
+              echo "Tekton Pipelines controller deployment found."
+              exit 0
+            fi
+            echo "Waiting for deployment to be created..."
+            sleep 5
+          done
+          echo "Timeout waiting for Tekton Pipelines deployment"
+          exit 1
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -ExecutionPolicy Bypass -Command "for ($i=1; $i -le 120; $i++) { if (kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines 2>$null) { echo 'Tekton Pipelines controller deployment found.'; exit 0 }; echo 'Waiting for deployment to be created...'; Start-Sleep -Seconds 5 }; echo 'Timeout waiting for Tekton Pipelines deployment'; exit 1"
+        platforms: [windows]
       - echo "Installing Tekton Triggers..."
       - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml --request-timeout=120s
       - echo "Installing Tekton Interceptors..."
@@ -435,6 +596,7 @@ tasks:
           else
             echo "pipeline ServiceAccount not found yet; skipping patch (will be created by Tekton)"
           fi
+          kubectl patch sa default -p '{"imagePullSecrets": [{"name": "docker-credentials"}]}'
         platforms: [linux, darwin]
       - cmd: powershell -ExecutionPolicy Bypass -File scripts/setup-credentials.ps1
         platforms: [windows]
@@ -452,11 +614,6 @@ tasks:
     desc: Run operator and portal concurrently
     deps: [dev:operator, dev:portal]
 
-  operator:
-    desc: Alias for running the Helios operator
-    cmds:
-      - task: dev:operator
-
   dev:operator:
     desc: Run the Helios operator locally
     dir: apps/operator
@@ -468,19 +625,270 @@ tasks:
       - cmd: go run ./cmd/main.go
         platforms: [windows]
 
-  portal:
-    desc: Alias for running the Backstage portal
-    cmds:
-      - task: dev:portal
-
   dev:portal:
     desc: Run the Backstage portal with ArgoCD + kubectl proxy
     dir: apps/portal
     cmds:
+      - task: dev:free-ports
       - cmd: ./start-dev.sh
         platforms: [linux, darwin]
       - cmd: powershell -ExecutionPolicy Bypass -File ../../scripts/start-portal.ps1 -ArgocdPort {{.ARGOCD_PORT}}
         platforms: [windows]
+
+  dev:free-ports:
+    desc: Ensure common dev ports are free (override with PORTS=7007,8080,...)
+    cmds:
+      - cmd: |
+          PORTS_RAW="{{.PORTS}}"
+          if [ -z "$PORTS_RAW" ]; then
+            PORTS_RAW="7007,8080,8001,3030"
+          fi
+
+          if ! command -v lsof >/dev/null 2>&1; then
+            echo "lsof not found; skipping port cleanup on linux/darwin."
+            exit 0
+          fi
+
+          PORTS=$(echo "$PORTS_RAW" | tr ',' ' ')
+          for PORT in $PORTS; do
+            PIDS="$(lsof -t -iTCP:${PORT} -sTCP:LISTEN || true)"
+            if [ -n "$PIDS" ]; then
+              echo "Port ${PORT} busy. Stopping process(es): $PIDS"
+              for PID in $PIDS; do
+                /bin/kill -9 "$PID" 2>/dev/null || command kill -9 "$PID" 2>/dev/null || true
+              done
+            fi
+          done
+          sleep 1
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -ExecutionPolicy Bypass -Command "$portsRaw='{{.PORTS}}'; if ([string]::IsNullOrWhiteSpace($portsRaw)) { $portsRaw='7007,8080,8001,3030' }; $ports = $portsRaw -split '[,\s]+' | Where-Object { $_ -ne '' }; foreach ($port in $ports) { $connections = Get-NetTCPConnection -LocalPort ([int]$port) -State Listen -ErrorAction SilentlyContinue; if ($connections) { $pids = $connections | Select-Object -ExpandProperty OwningProcess -Unique; Write-Host ('Port ' + $port + ' busy. Stopping process(es): ' + ($pids -join ', ')); foreach ($pid in $pids) { Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue } } }"
+        platforms: [windows]
+
+  dev:refresh:
+    desc: Reset generated state (APP optional) then run dev
+    cmds:
+      - task: reset:generated
+        vars:
+          APP: "{{.APP}}"
+      - task: dev
+
+  # ===========================================================================
+  # Fast Reset Tasks (without recreating cluster)
+  # ===========================================================================
+  reset:generated:
+    desc: "Remove generated state (APP optional — single, comma-sep, or all)"
+    cmds:
+      - task: reset:k8s
+      - task: reset:tekton-runs
+      - cmd: |
+          APPS_RAW="{{.APP}}"
+          if [ -z "$APPS_RAW" ]; then
+            echo "APP is empty, skipping repo cleanup. Use: task reset:generated APP=<repo-name>"
+            echo "  Single:   APP=nestjs-prisma"
+            echo "  Multiple: APP=nestjs-prisma,express-api"
+            echo "  All:      APP=all"
+            exit 0
+          fi
+
+          if [ "$APPS_RAW" = "all" ]; then
+            task reset:gitea-repo APP="all"
+            task reset:portal-db
+            # Clean DB state from any remaining k8s secrets
+            APPS=$(kubectl get secrets -n default -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | sed -n 's/-db-secret$//p' | sort -u)
+            for a in $APPS; do
+              task reset:db-state APP="$a"
+            done
+          else
+            OLD_IFS="$IFS"; IFS=','
+            for a in $APPS_RAW; do
+              IFS="$OLD_IFS"
+              a="$(echo "$a" | xargs)"
+              [ -z "$a" ] && continue
+              task reset:db-state APP="$a"
+              task reset:gitea-repo APP="$a"
+              # Clean from Backstage Catalog
+              curl -s -X DELETE "http://localhost:7007/api/catalog/entities/by-name/component/default/${a}" >/dev/null 2>&1 || true
+            done
+            IFS="$OLD_IFS"
+          fi
+        platforms: [linux, darwin]
+
+  reset:k8s:
+    desc: Delete generated Helios apps in cluster (keeps infra, ArgoCD, Tekton, Gitea)
+    cmds:
+      - cmd: |
+          # Patch finalizers to empty to prevent hanging if operator is offline
+          APPS_TO_PATCH=$(kubectl get heliosapp -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{" "}{end}' 2>/dev/null || true)
+          for APP in $APPS_TO_PATCH; do
+            if [ -n "$APP" ]; then
+              NS=${APP%/*}
+              NAME=${APP#*/}
+              kubectl patch heliosapp "$NAME" -n "$NS" -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+            fi
+          done
+          kubectl delete heliosapp --all -A --ignore-not-found=true || true
+          APPS=$(kubectl get application -n argocd -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+          for APP_NAME in $APPS; do
+            if [ "$APP_NAME" != "helios-bootstrap" ]; then
+              kubectl delete application "$APP_NAME" -n argocd --ignore-not-found=true || true
+            fi
+          done
+          kubectl delete deployment,statefulset,service,configmap,secret,pvc -n default -l helios.io/managed-by=operator --ignore-not-found=true || true
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -ExecutionPolicy Bypass -Command "$heliosApps = kubectl get heliosapp -A -o jsonpath='{range .items[*]}{.metadata.namespace}{\" \"}{.metadata.name}{\"`n\"}{end}' 2>$null; foreach ($appLine in $heliosApps -split \"`n\") { if ($appLine) { $parts = $appLine -split ' '; if ($parts.Length -eq 2) { kubectl patch heliosapp $parts[1] -n $parts[0] -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge } } }; kubectl delete heliosapp --all -A --ignore-not-found=true; $apps = kubectl get application -n argocd -o jsonpath='{range .items[*]}{.metadata.name}{\"`n\"}{end}' 2>$null; foreach ($app in $apps -split \"`n\") { if ($app -and $app -ne 'helios-bootstrap') { kubectl delete application $app -n argocd --ignore-not-found=true } }; kubectl delete deployment,statefulset,service,configmap,secret,pvc -n default -l helios.io/managed-by=operator --ignore-not-found=true"
+        platforms: [windows]
+
+  reset:tekton-runs:
+    desc: Delete all PipelineRuns and TaskRuns from local namespace
+    cmds:
+      - cmd: |
+          kubectl delete pipelinerun --all -n default --ignore-not-found=true || true
+          kubectl delete taskrun --all -n default --ignore-not-found=true || true
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -ExecutionPolicy Bypass -Command "kubectl delete pipelinerun --all -n default --ignore-not-found=true; kubectl delete taskrun --all -n default --ignore-not-found=true"
+        platforms: [windows]
+
+  reset:db-state:
+    desc: "Delete DB secrets/PVCs (APP: single, comma-sep, or all)"
+    cmds:
+      - cmd: |
+          APP_RAW="{{.APP}}"
+          if [ -z "$APP_RAW" ]; then
+            echo "APP is required. Examples:"
+            echo "  Single:   APP=nestjs-prisma"
+            echo "  Multiple: APP=nestjs-prisma,express-api"
+            echo "  All:      APP=all"
+            exit 1
+          fi
+
+          if [ "$APP_RAW" = "all" ]; then
+            APPS=$(kubectl get secrets -n default -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | sed -n 's/-db-secret$//p' | sort -u)
+            if [ -z "$APPS" ]; then
+              echo "No app database secrets found in default namespace."
+              exit 0
+            fi
+          else
+            APPS=$(echo "$APP_RAW" | tr ',' '\n')
+          fi
+
+          OLD_IFS="$IFS"; IFS="$(printf '\n ')"; set -f
+          for a in $APPS; do
+            set +f; IFS="$OLD_IFS"
+            a="$(echo "$a" | xargs)"
+            [ -z "$a" ] && continue
+            echo "Cleaning DB state for: $a"
+            kubectl delete secret "${a}-db-secret" -n default --ignore-not-found=true || true
+            kubectl delete pvc "data-${a}-db-0" -n default --ignore-not-found=true || true
+          done
+          IFS="$OLD_IFS"; set +f
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -ExecutionPolicy Bypass -Command "$app='{{.APP}}'; if (-not $app) { Write-Host 'APP is required. Example: task reset:db-state APP=nestjs-prisma'; exit 1 }; kubectl delete secret ($app + '-db-secret') -n default --ignore-not-found=true; kubectl delete pvc ('data-' + $app + '-db-0') -n default --ignore-not-found=true"
+        platforms: [windows]
+
+  reset:portal-db:
+    desc: Reset the local persistent SQLite database of the Backstage portal
+    cmds:
+      - cmd: rm -rf apps/portal/packages/backend/.database
+        platforms: [linux, darwin]
+      - cmd: powershell -ExecutionPolicy Bypass -Command "Remove-Item -Recurse -Force -Path apps/portal/packages/backend/.database -ErrorAction SilentlyContinue"
+        platforms: [windows]
+
+  reset:gitea-repo:
+    desc: "Delete Gitea repos (APP: single, comma-sep, or all)"
+    cmds:
+      - cmd: |
+          APP_RAW="{{.APP}}"
+          if [ -z "$APP_RAW" ]; then
+            echo "APP is required. Examples:"
+            echo "  Single:   APP=nestjs-prisma"
+            echo "  Multiple: APP=nestjs-prisma,express-api"
+            echo "  All:      APP=all"
+            exit 1
+          fi
+
+          GITEA_BASE="${GITEA_URL:-http://localhost:{{.GITEA_PORT}}}"
+          GITEA_USER="${GITEA_USER:-${GITEA_ADMIN_USER:-helios}}"
+          GITEA_PASS="${GITEA_ADMIN_PASS:-helios123}"
+
+          PF_PID=0
+          # If Gitea is unreachable on localhost, try to start a temporary port-forward
+          HEALTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -u "${GITEA_USER}:${GITEA_PASS}" \
+            "${GITEA_BASE}/api/v1/version" || true)
+
+          if [ "$HEALTH_CODE" = "000" ] || [ -z "$HEALTH_CODE" ]; then
+            echo "Gitea unreachable on localhost. Attempting temporary port-forward..."
+            kubectl port-forward -n gitea svc/gitea-http 3030:3000 >/dev/null 2>&1 &
+            PF_PID=$!
+            # Give it a few seconds to start
+            for i in {1..10}; do
+              if curl -s -o /dev/null -w "%{http_code}" "http://localhost:3030/api/v1/version" | grep -q "200"; then
+                HEALTH_CODE="200"
+                GITEA_BASE="http://localhost:3030"
+                echo "Port-forward established."
+                break
+              fi
+              sleep 1
+            done
+          fi
+
+          if [ "$HEALTH_CODE" = "000" ] || [ -z "$HEALTH_CODE" ]; then
+            [ $PF_PID -ne 0 ] && kill $PF_PID 2>/dev/null || true
+            echo "Gitea is unreachable at ${GITEA_BASE}. Skipping repo cleanup."
+            exit 0
+          fi
+
+          delete_repo() {
+            REPO_FULL_NAME="$1"
+            [ -z "$REPO_FULL_NAME" ] && return 0
+
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X DELETE \
+              -u "${GITEA_USER}:${GITEA_PASS}" \
+              "${GITEA_BASE}/api/v1/repos/${REPO_FULL_NAME}" || true)
+            if [ "$CODE" = "204" ]; then
+              echo "Deleted: ${REPO_FULL_NAME}"
+            fi
+          }
+
+          if [ "$APP_RAW" = "all" ]; then
+            # Delete every repo visible to the authenticated user so a refresh
+            # starts from a true clean slate, regardless of owner or org.
+            REPOS_JSON=$(curl -s -u "${GITEA_USER}:${GITEA_PASS}" \
+              "${GITEA_BASE}/api/v1/user/repos?limit=1000" 2>/dev/null || echo "[]")
+            REPO_FULL_NAMES=$(echo "$REPOS_JSON" | grep -o '"full_name":"[^"]*"' | sed 's/"full_name":"//;s/"//' || true)
+            for REPO_FULL_NAME in $REPO_FULL_NAMES; do
+              delete_repo "$REPO_FULL_NAME"
+            done
+          else
+            APPS=$(echo "$APP_RAW" | tr ',' '\n')
+            OLD_IFS="$IFS"; IFS="$(printf '\n ')"; set -f
+            for a in $APPS; do
+              set +f; IFS="$OLD_IFS"
+              a="$(echo "$a" | xargs)"
+              [ -z "$a" ] && continue
+              CANDIDATES="$a ${a}-gitops"
+              for REPO in $CANDIDATES; do
+                for OWNER in "$GITEA_USER" "helios-platform"; do
+                  CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                    -X DELETE \
+                    -u "${GITEA_USER}:${GITEA_PASS}" \
+                    "${GITEA_BASE}/api/v1/repos/${OWNER}/${REPO}" || true)
+                  if [ "$CODE" = "204" ]; then
+                    echo "Deleted: ${OWNER}/${REPO}"
+                  fi
+                done
+              done
+            done
+            IFS="$OLD_IFS"; set +f
+          fi
+
+          [ $PF_PID -ne 0 ] && kill $PF_PID 2>/dev/null || true
+        platforms: [linux, darwin]
 
   # ===========================================================================
   # Testing Tasks
@@ -501,18 +909,65 @@ tasks:
     desc: Run portal tests
     dir: apps/portal
     cmds:
-      - yarn test
+      - yarn test --watchAll=false
 
   # ===========================================================================
   # Teardown Tasks
   # ===========================================================================
   clean:
-    desc: Delete the k3d cluster and clean up
+    desc: Delete the k3d cluster and clean up (registry cache is preserved)
     cmds:
       - task: clean:cluster
+      - task: reset:portal-db
+
+  clean:all:
+    desc: Delete the k3d cluster and all resources
+    cmds:
+      - task: clean:cluster
+      - task: clean:registry
 
   clean:cluster:
-    desc: Delete the k3d cluster
+    desc: Delete the k3d cluster and all resources using Terraform
+    dir: infrastructure/environments/local-dev
     cmds:
-      - k3d cluster delete {{.CLUSTER_NAME}}
-      - echo "Cluster '{{.CLUSTER_NAME}}' deleted."
+      - cmd: |
+          if [ ! -d ".terraform" ]; then
+            echo "Terraform not initialized. Checking if cluster exists via k3d..."
+            if k3d cluster list {{.CLUSTER_NAME}} >/dev/null 2>&1; then
+              echo "Cluster '{{.CLUSTER_NAME}}' exists but Terraform is not initialized. Please run 'terraform init' or delete manually with 'k3d cluster delete {{.CLUSTER_NAME}}'."
+              exit 1
+            else
+              echo "No cluster '{{.CLUSTER_NAME}}' found and Terraform is not initialized. Nothing to clean."
+              exit 0
+            fi
+          fi
+
+          if ! terraform state list >/dev/null 2>&1; then
+             echo "Terraform state is empty. Checking if cluster exists via k3d..."
+             if k3d cluster list {{.CLUSTER_NAME}} >/dev/null 2>&1; then
+               echo "Cluster '{{.CLUSTER_NAME}}' exists but is not tracked by Terraform. Please delete manually with 'k3d cluster delete {{.CLUSTER_NAME}}'."
+               exit 1
+             else
+               echo "No resources tracked by Terraform and no cluster '{{.CLUSTER_NAME}}' found. Nothing to clean."
+               exit 0
+             fi
+          fi
+
+          terraform destroy -refresh=false -auto-approve \
+            -var="docker_username=${DOCKER_USERNAME:-}" \
+            -var="docker_password=${DOCKER_TOKEN:-}"
+          echo "Cluster '{{.CLUSTER_NAME}}' and all resources deleted."
+        platforms: [linux, darwin]
+
+  clean:registry:
+    desc: Delete the local pull-through cache registry (also wipes its image cache)
+    cmds:
+      - cmd: |
+          if k3d registry list "k3d-{{.REGISTRY_NAME}}" > /dev/null 2>&1; then
+            echo "Deleting local registry 'k3d-{{.REGISTRY_NAME}}'..."
+            k3d registry delete "k3d-{{.REGISTRY_NAME}}"
+            echo "Registry deleted."
+          else
+            echo "Registry 'k3d-{{.REGISTRY_NAME}}' not found. Nothing to delete."
+          fi
+        platforms: [linux, darwin]

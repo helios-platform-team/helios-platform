@@ -16,6 +16,17 @@ package bases
 			value?: string
 			valueFrom?: {...}
 		}] | *[]
+
+		initContainers?: [...{
+			name: string
+			image: string
+			command?: [...string]
+			env?: [...{
+				name: string
+				value?: string
+				valueFrom?: {...}
+			}]
+		}]
 	}
 
 	output: {
@@ -24,27 +35,40 @@ package bases
 		metadata: {
 			name: parameter.name
 			labels: {
-				app:                    parameter.name
-				"helios.io/managed-by": "operator"
+				app:                      parameter.name
+				"app.kubernetes.io/name": parameter.name
+				"helios.io/managed-by":   "operator"
 			}
 		}
 		spec: {
 			replicas: parameter.replicas
-			selector: matchLabels: app: parameter.name
+			revisionHistoryLimit: 2
+			selector: matchLabels: {
+				app:                      parameter.name
+				"app.kubernetes.io/name": parameter.name
+			}
 			template: {
-				metadata: labels: app: parameter.name
-				spec: containers: [{
-					name:  parameter.name
-					image: parameter.image
-					ports: [{containerPort: parameter.port}]
-					if len(parameter.env) > 0 {
-						env: parameter.env
+				metadata: labels: {
+					app:                      parameter.name
+					"app.kubernetes.io/name": parameter.name
+				}
+				spec: {
+					if parameter.initContainers != _|_ {
+						initContainers: parameter.initContainers
 					}
-					resources: {
-						requests: {cpu: "100m", memory: "128Mi"}
-						limits: {cpu: "500m", memory: "512Mi"}
-					}
-				}]
+					containers: [{
+						name:  parameter.name
+						image: parameter.image
+						ports: [{containerPort: parameter.port}]
+						if len(parameter.env) > 0 {
+							env: parameter.env
+						}
+						resources: {
+							requests: {cpu: "100m", memory: "128Mi"}
+							limits: {cpu: "500m", memory: "512Mi"}
+						}
+					}]
+				}
 			}
 		}
 	}

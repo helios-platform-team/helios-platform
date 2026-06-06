@@ -37,7 +37,6 @@ Fetches database information for a specified component.
 The plugin expects the following Kubernetes resources:
 
 1. **Secret**: Named `{componentName}-backend-db-secret`
-
    - Should contain:
      - `host`: Database host
      - `port`: Database port

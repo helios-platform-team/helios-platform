@@ -1,67 +1,68 @@
-import { styled } from '@mui/material/styles';
-import { alpha } from '@mui/material/styles';
+import { makeStyles } from '@material-ui/core/styles';
 import { Sun } from 'lucide-react';
-import Box from '@mui/material/Box';
+import Box from '@material-ui/core/Box';
 
-const Wrapper = styled('div')(({ theme }) => ({
-  position: 'relative',
-  cursor: 'pointer',
-  display: 'inline-flex', // Keeps the wrapper tight around the content
-  alignItems: 'center',
-  '&:hover .glow-effect': {
-    opacity: theme.palette.mode === 'dark' ? 0.6 : 0.4,
+const useStyles = makeStyles(theme => ({
+  wrapper: {
+    position: 'relative',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    '&:hover $glow': {
+      opacity: theme.palette.type === 'dark' ? 0.6 : 0.4,
+    },
+  },
+  glow: {
+    position: 'absolute',
+    inset: 0,
+    backgroundColor: theme.palette.primary.main,
+    filter: 'blur(16px)',
+    opacity: theme.palette.type === 'dark' ? 0.4 : 0.2,
+    transition: 'opacity 0.3s ease',
+    borderRadius: '50%',
+  },
+  logoContainer: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    zIndex: 1,
+  },
+  logoText: {
+    display: 'none',
+    [theme.breakpoints.up('lg')]: {
+      display: 'block',
+    },
+    fontSize: '1.5rem',
+    fontWeight: 'bold',
+    letterSpacing: '-0.05em',
+    color: theme.palette.text.primary,
+  },
+  logoHighlight: {
+    color: theme.palette.primary.main,
   },
 }));
 
-const Glow = styled('div')(({ theme }) => ({
-  position: 'absolute',
-  inset: 0,
-  backgroundColor: theme.palette.primary.main,
-  filter: 'blur(16px)',
-  opacity: theme.palette.mode === 'dark' ? 0.4 : 0.2,
-  transition: 'opacity 0.3s ease',
-  borderRadius: '50%', // Helps contain the glow
-}));
-
 const LogoFull = () => {
+  const classes = useStyles();
   return (
-    <Wrapper>
-      <Glow className="glow-effect" />
-      <Box
-        sx={{
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          zIndex: 1,
-        }}
-      >
+    <div className={classes.wrapper}>
+      <div className={`${classes.glow} glow-effect`} />
+      <Box className={classes.logoContainer}>
         <Sun
           size={28}
-          stroke={'currentColor'}
+          stroke="currentColor"
           style={{
             color: 'var(--mui-palette-primary-main)',
-            fill: alpha('#EDB506', 0.2),
+            fill: 'rgba(237, 181, 6, 0.2)',
           }}
         />
-
-        <Box
-          component="span"
-          sx={{
-            display: { xs: 'none', lg: 'block' },
-            fontSize: '1.5rem',
-            fontWeight: 'bold',
-            letterSpacing: '-0.05em',
-            color: 'text.primary',
-          }}
-        >
+        <span className={classes.logoText}>
           HELIOS
-          <Box component="span" sx={{ color: 'primary.main' }}>
-            .IDP
-          </Box>
-        </Box>
+          <span className={classes.logoHighlight}>.IDP</span>
+        </span>
       </Box>
-    </Wrapper>
+    </div>
   );
 };
 

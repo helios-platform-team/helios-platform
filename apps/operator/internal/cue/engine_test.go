@@ -174,7 +174,7 @@ func TestEngine_RenderWithDatabaseTrait(t *testing.T) {
 							Properties: map[string]any{
 								"dbType":  "postgres",
 								"dbName":  "my_custom_db",
-								"version": "18.3",
+								"version": "18.4",
 							},
 						},
 					},
