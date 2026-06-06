@@ -718,6 +718,15 @@ tasks:
     desc: Delete generated Helios apps in cluster (keeps infra, ArgoCD, Tekton, Gitea)
     cmds:
       - cmd: |
+          # Patch finalizers to empty to prevent hanging if operator is offline
+          APPS_TO_PATCH=$(kubectl get heliosapp -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{" "}{end}' 2>/dev/null || true)
+          for APP in $APPS_TO_PATCH; do
+            if [ -n "$APP" ]; then
+              NS=${APP%/*}
+              NAME=${APP#*/}
+              kubectl patch heliosapp "$NAME" -n "$NS" -p '{"metadata":{"finalizers":[]}}' --type=merge || true
+            fi
+          done
           kubectl delete heliosapp --all -A --ignore-not-found=true || true
           APPS=$(kubectl get application -n argocd -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
           for APP_NAME in $APPS; do
@@ -728,7 +737,7 @@ tasks:
           kubectl delete deployment,statefulset,service,configmap,secret,pvc -n default -l helios.io/managed-by=operator --ignore-not-found=true || true
         platforms: [linux, darwin]
       - cmd: |
-          powershell -ExecutionPolicy Bypass -Command "kubectl delete heliosapp --all -A --ignore-not-found=true; $apps = kubectl get application -n argocd -o jsonpath='{range .items[*]}{.metadata.name}{\"`n\"}{end}' 2>$null; foreach ($app in $apps -split \"`n\") { if ($app -and $app -ne 'helios-bootstrap') { kubectl delete application $app -n argocd --ignore-not-found=true } }; kubectl delete deployment,statefulset,service,configmap,secret,pvc -n default -l helios.io/managed-by=operator --ignore-not-found=true"
+          powershell -ExecutionPolicy Bypass -Command "$heliosApps = kubectl get heliosapp -A -o jsonpath='{range .items[*]}{.metadata.namespace}{\" \"}{.metadata.name}{\"`n\"}{end}' 2>$null; foreach ($appLine in $heliosApps -split \"`n\") { if ($appLine) { $parts = $appLine -split ' '; if ($parts.Length -eq 2) { kubectl patch heliosapp $parts[1] -n $parts[0] -p '{\"metadata\":{\"finalizers\":[]}}' --type=merge } } }; kubectl delete heliosapp --all -A --ignore-not-found=true; $apps = kubectl get application -n argocd -o jsonpath='{range .items[*]}{.metadata.name}{\"`n\"}{end}' 2>$null; foreach ($app in $apps -split \"`n\") { if ($app -and $app -ne 'helios-bootstrap') { kubectl delete application $app -n argocd --ignore-not-found=true } }; kubectl delete deployment,statefulset,service,configmap,secret,pvc -n default -l helios.io/managed-by=operator --ignore-not-found=true"
         platforms: [windows]
 
   reset:tekton-runs:
