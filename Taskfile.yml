@@ -944,7 +944,7 @@ tasks:
              fi
           fi
 
-          terraform destroy -auto-approve \
+          terraform destroy -refresh=false -auto-approve \
             -var="docker_username=${DOCKER_USERNAME:-}" \
             -var="docker_password=${DOCKER_TOKEN:-}"
           echo "Cluster '{{.CLUSTER_NAME}}' and all resources deleted."
