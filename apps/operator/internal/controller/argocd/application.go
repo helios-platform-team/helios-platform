@@ -41,7 +41,7 @@ func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Un
 				"group": "apps",
 				"kind":  "Deployment",
 				"jqPathExpressions": []any{
-					`.spec.template.spec.containers[].env[]? | select(.name | test("^DB_"))`,
+					`.spec.template.spec.containers[].env[]? | select(.name | test("^(DB_|DATABASE_URL$)"))`,
 				},
 			},
 		},
@@ -81,40 +81,7 @@ func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Un
 				"app.kubernetes.io/managed-by": "helios-operator",
 			},
 		},
-<<<<<<< users/hph/implement-terraform
-		"spec": map[string]any{
-			"project": project,
-			"source": map[string]any{
-				"repoURL":        shared.RewriteGiteaURL(heliosApp.Spec.GitOpsRepo),
-				"targetRevision": gitOpsBranch,
-				"path":           heliosApp.Spec.GitOpsPath,
-			},
-			"destination": map[string]any{
-				"server":    "https://kubernetes.default.svc",
-				"namespace": heliosApp.Namespace,
-			},
-			"syncPolicy": map[string]any{
-				"automated": map[string]any{
-					"prune":    true,
-					"selfHeal": true,
-				},
-				"syncOptions": []any{
-					"CreateNamespace=true",
-				},
-			},
-			"ignoreDifferences": []any{
-				map[string]any{
-					"group": "apps",
-					"kind":  "Deployment",
-					"jqPathExpressions": []any{
-						`.spec.template.spec.containers[].env[]? | select(.name | test("^(DB_|DATABASE_URL$)"))`,
-					},
-				},
-			},
-		},
-=======
 		"spec": spec,
->>>>>>> main
 	}
 
 	return &unstructured.Unstructured{Object: app}, nil

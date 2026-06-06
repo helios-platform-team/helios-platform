@@ -141,11 +141,7 @@ spec:
         targetPath: ./gitops
         values:
           name: ${{ parameters.name }}
-<<<<<<< users/hph/implement-terraform
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
-=======
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.name }}
->>>>>>> main
           dockerOrg: ${{ parameters.dockerOrg }}
           port: ${{ parameters.port }}
           namespace: ${{ parameters.namespace }}

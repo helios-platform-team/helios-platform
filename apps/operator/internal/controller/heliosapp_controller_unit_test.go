@@ -94,9 +94,6 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		},
 	}
 
-<<<<<<< users/hph/implement-terraform
-	// 3. Set up Fake Client
-=======
 	dockerCredentialsSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "docker-credentials",
@@ -119,7 +116,6 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 	}
 
 	// 3. Setup Fake Client
->>>>>>> main
 	// We init with the object existing
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(scheme).
