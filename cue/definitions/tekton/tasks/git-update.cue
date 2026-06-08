@@ -27,6 +27,10 @@ import "helios.io/cue/definitions/tekton"
 			name:    "port"
 			default: "8080"
 			type:    "string"
+		}, {
+			name:    "image-type"
+			default: "app"
+			type:    "string"
 		}]
 		workspaces: [{
 			name: "gitops-repo"
@@ -85,6 +89,7 @@ import "helios.io/cue/definitions/tekton"
 				export IMAGE_URL="$(params.new-image-url)"
 				export REPLICAS="$(params.replicas)"
 				export PORT="$(params.port)"
+				export IMAGE_TYPE="$(params.image-type)"
 
 				# Defensive defaults: avoid generating invalid manifests when inputs are empty/0
 				if [ -z "${REPLICAS}" ] || [ "${REPLICAS}" = "0" ]; then
@@ -103,20 +108,26 @@ import "helios.io/cue/definitions/tekton"
 				    # If the operator already renders a combined manifest.yaml in this directory,
 				    # prefer updating that file rather than creating separate default manifests.
 				    COMBINED_FILE="$MANIFEST_PATH/manifest.yaml"
-				    if [ -f "$COMBINED_FILE" ]; then
+				    if [ "$IMAGE_TYPE" = "migrate" ]; then
+				        if [ -f "presync-job.yaml" ]; then
+				            MANIFEST_FILES="presync-job.yaml"
+				        else
+				            MANIFEST_FILES="$MANIFEST_PATH/presync-job.yaml"
+				        fi
+				    elif [ -f "$COMBINED_FILE" ]; then
 				        MANIFEST_FILES="$COMBINED_FILE"
 				    else
 				        DEP_FILE="$MANIFEST_PATH/deployment.yaml"
-				        SVC_FILE="$MANIFEST_PATH/service.yaml"
-				        MANIFEST_FILES="$DEP_FILE $SVC_FILE"
-				        APP_NAME=$(basename "$MANIFEST_PATH")
+				            SVC_FILE="$MANIFEST_PATH/service.yaml"
+				            MANIFEST_FILES="$DEP_FILE $SVC_FILE"
+				            APP_NAME=$(basename "$MANIFEST_PATH")
 
-				        if [ ! -f "$DEP_FILE" ]; then
-				            echo "Creating default manifests..."
-				            printf "apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  replicas: ${REPLICAS}\\n  selector:\\n    matchLabels:\\n      app: ${APP_NAME}\\n  template:\\n    metadata:\\n      labels:\\n        app: ${APP_NAME}\\n    spec:\\n      containers:\\n        - name: app\\n          image: ${IMAGE_URL}\\n          ports:\\n            - containerPort: ${PORT}\\n" > "$DEP_FILE"
+				            if [ ! -f "$DEP_FILE" ]; then
+				                echo "Creating default manifests..."
+				                printf "apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  replicas: ${REPLICAS}\\n  selector:\\n    matchLabels:\\n      app: ${APP_NAME}\\n  template:\\n    metadata:\\n      labels:\\n        app: ${APP_NAME}\\n    spec:\\n      containers:\\n        - name: app\\n          image: ${IMAGE_URL}\\n          ports:\\n            - containerPort: ${PORT}\\n" > "$DEP_FILE"
 
-				            printf "apiVersion: v1\\nkind: Service\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  selector:\\n    app: ${APP_NAME}\\n  ports:\\n    - protocol: TCP\\n      port: ${PORT}\\n      targetPort: ${PORT}\\n  type: ClusterIP\\n" > "$SVC_FILE"
-				        fi
+				                printf "apiVersion: v1\\nkind: Service\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  selector:\\n    app: ${APP_NAME}\\n  ports:\\n    - protocol: TCP\\n      port: ${PORT}\\n      targetPort: ${PORT}\\n  type: ClusterIP\\n" > "$SVC_FILE"
+				            fi
 				    fi
 				else
 				    echo "Path '$MANIFEST_PATH' treated as FILE."
@@ -134,11 +145,21 @@ import "helios.io/cue/definitions/tekton"
 				for FILE in $MANIFEST_FILES; do
 				  if [ -f "$FILE" ]; then
 				      echo "Updating $FILE..."
-				      yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].image = env(IMAGE_URL)' "$FILE"
-				      yq -i 'select(.kind == "Deployment") .spec.replicas = env(REPLICAS)' "$FILE"
-				      yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].ports[0].containerPort = env(PORT)' "$FILE"
-				      yq -i 'select(.kind == "Service") .spec.ports[0].port = env(PORT)' "$FILE"
-				      yq -i 'select(.kind == "Service") .spec.ports[0].targetPort = env(PORT)' "$FILE"
+				      if [ "$IMAGE_TYPE" = "migrate" ]; then
+				          yq -i 'select(.kind == "Job") .spec.template.spec.containers[0].image = env(IMAGE_URL)' "$FILE"
+				          # Force ArgoCD out-of-sync by adding an annotation to the Deployment
+				          if [ -f "$MANIFEST_PATH/manifest.yaml" ]; then
+				              yq -i 'select(.kind == "Deployment") .metadata.annotations["helios.dev/last-migration"] = env(IMAGE_URL)' "$MANIFEST_PATH/manifest.yaml"
+				          elif [ -f "$MANIFEST_PATH/deployment.yaml" ]; then
+				              yq -i 'select(.kind == "Deployment") .metadata.annotations["helios.dev/last-migration"] = env(IMAGE_URL)' "$MANIFEST_PATH/deployment.yaml"
+				          fi
+				      else
+				          yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].image = env(IMAGE_URL)' "$FILE"
+				          yq -i 'select(.kind == "Deployment") .spec.replicas = env(REPLICAS)' "$FILE"
+				          yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].ports[0].containerPort = env(PORT)' "$FILE"
+				          yq -i 'select(.kind == "Service") .spec.ports[0].port = env(PORT)' "$FILE"
+				          yq -i 'select(.kind == "Service") .spec.ports[0].targetPort = env(PORT)' "$FILE"
+				      fi
 				  fi
 				done
 				"""
