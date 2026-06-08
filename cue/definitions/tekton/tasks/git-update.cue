@@ -109,10 +109,15 @@ import "helios.io/cue/definitions/tekton"
 				    # prefer updating that file rather than creating separate default manifests.
 				    COMBINED_FILE="$MANIFEST_PATH/manifest.yaml"
 				    if [ "$IMAGE_TYPE" = "migrate" ]; then
-				        if [ -f "presync-job.yaml" ]; then
-				            MANIFEST_FILES="presync-job.yaml"
-				        else
+				        # Ensure presync-job is inside MANIFEST_PATH so ArgoCD can sync it
+				        if [ -f "presync-job.yaml" ] && [ ! -f "$MANIFEST_PATH/presync-job.yaml" ]; then
+				            mkdir -p "$MANIFEST_PATH"
+				            git mv "presync-job.yaml" "$MANIFEST_PATH/presync-job.yaml" || mv "presync-job.yaml" "$MANIFEST_PATH/presync-job.yaml"
+				        fi
+				        if [ -f "$MANIFEST_PATH/presync-job.yaml" ]; then
 				            MANIFEST_FILES="$MANIFEST_PATH/presync-job.yaml"
+				        else
+				            MANIFEST_FILES="presync-job.yaml"
 				        fi
 				    elif [ -f "$COMBINED_FILE" ]; then
 				        MANIFEST_FILES="$COMBINED_FILE"
