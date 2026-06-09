@@ -160,7 +160,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 
 	// Verify GitOps was called
 	// SyncManifest(ctx, targetPath, content)
-	expectedPath := "apps/test-app/manifest.yaml"
+	expectedPath := "apps/test-app/helios-app.yaml"
 	found := false
 	for path := range mockGit.SyncedFiles {
 		if strings.Contains(path, expectedPath) {

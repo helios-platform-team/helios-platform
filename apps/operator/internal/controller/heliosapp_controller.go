@@ -122,6 +122,7 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// 3. Render via CUE Engine
 	manifestBytes, err := r.CueEngine.Render(appModel)
+	_ = manifestBytes // TODO: Use for direct cluster application in Phase 1.0
 	if err != nil {
 		log.Error(err, "Failed to render application via CUE")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("CUE rendering failed: %v", err))
@@ -210,10 +211,18 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// ------------------------------------------------------------------
-	// PHASE 1: Render & GitOps
+	// PHASE 1: Serialize CR & GitOps
 	// ------------------------------------------------------------------
 
-	if err := r.GitOps.Reconcile(ctx, &heliosApp, manifestBytes); err != nil {
+	// Serialize clean CR YAML for GitOps repository
+	crYAML, err := gitopssync.SerializeHeliosApp(&heliosApp)
+	if err != nil {
+		log.Error(err, "Failed to serialize HeliosApp to YAML")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("CR serialization failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	if err := r.GitOps.Reconcile(ctx, &heliosApp, crYAML); err != nil {
 		log.Error(err, "GitOps sync failed")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("GitOps sync failed: %v", err))
 		return ctrl.Result{}, err
