@@ -103,6 +103,7 @@ spec:
           owner: ${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
+          migrateImage: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}-migrate:latest
 
     - id: publish-gitops
       name: Publish GitOps Manifests
@@ -121,6 +122,18 @@ spec:
         secretName: ${{ parameters.repoName }}-webhook-secret
         data:
           secret: ${{ parameters.repoName }}
+
+    - id: apply-rbac
+      name: Apply RBAC for Migration
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/serviceaccount.yaml
+
+    - id: apply-presync
+      name: Run Initial Database Migration
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/presync-job.yaml
 
     - id: apply-heliosapp
       name: Apply HeliosApp to Cluster
