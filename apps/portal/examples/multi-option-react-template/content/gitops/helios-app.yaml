@@ -2,7 +2,7 @@ apiVersion: app.helios.io/v1alpha1
 kind: HeliosApp
 metadata:
   name: ${{ values.repoName }}
-  namespace: default
+  namespace: ${{ values.namespace }}
 spec:
   owner: ${{ values.owner }}
   description: "React application: ${{ values.name }}"

@@ -74,6 +74,18 @@ spec:
         name: ${{ values.repoName }}-git-binding
       template:
         name: ${{ values.repoName }}-git-template
+      interceptors:
+        - ref:
+            name: github
+            kind: ClusterInterceptor
+          params:
+            - name: secretRef
+              value:
+                secretName: git-credentials-${{ values.repoName }}
+                secretKey: secret
+            - name: eventTypes
+              value:
+                - push
 
 ---
 apiVersion: v1
@@ -104,4 +116,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: ${{ values.repoName }}-sa
-    namespace: default
+    namespace: ${{ values.namespace }}

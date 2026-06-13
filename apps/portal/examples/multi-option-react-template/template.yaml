@@ -35,7 +35,7 @@ spec:
           title: Docker Repository Name
           type: string
           description: The name of the repository (e.g. my-react-app)
-          pattern: "^(?:@[a-z0-9-~][a-z0-9-._~]*/)?[a-z0-9-~][a-z0-9-._~]*$"
+          pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
         description:
           title: Description
           type: string
@@ -181,6 +181,7 @@ spec:
         values:
           name: ${{ parameters.name }}
           repoName: ${{ parameters.repoName }}
+          namespace: default
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
           port: ${{ parameters.port }}
