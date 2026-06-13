@@ -1,0 +1,97 @@
+diff --git a/dist/actions/gitea.cjs.js b/dist/actions/gitea.cjs.js
+index 075dadac7f7c72e49dba1dd7d8e08037fe9d1ecd..1074c2a7ddd21bec9edbb8a98c78afc4fcd560cd 100644
+--- a/dist/actions/gitea.cjs.js
++++ b/dist/actions/gitea.cjs.js
+@@ -30,7 +30,6 @@ const checkGiteaContentUrl = async (config, options) => {
+ };
+ const checkGiteaOrg = async (config, options) => {
+   const { owner } = options;
+-  let response;
+   const getOptions = {
+     method: "GET",
+     headers: {
+@@ -38,25 +37,57 @@ const checkGiteaOrg = async (config, options) => {
+       "Content-Type": "application/json"
+     }
+   };
++  let orgResponse;
+   try {
+-    response = await fetch(
++    orgResponse = await fetch(
+       `${config.baseUrl}/api/v1/orgs/${owner}`,
+       getOptions
+     );
+   } catch (e) {
+     throw new Error(
+-      `Unable to get the Organization: ${owner}; Error cause: ${e.message}, code: ${e.cause.code}`
++      `Unable to get the Organization: ${owner}; Error cause: ${e.message}`
+     );
+   }
+-  if (response.status !== 200) {
++  if (orgResponse.status === 200) {
++    return;
++  }
++  let userResponse;
++  try {
++    userResponse = await fetch(
++      `${config.baseUrl}/api/v1/users/${owner}`,
++      getOptions
++    );
++  } catch (e) {
+     throw new Error(
+-      `Organization ${owner} do not exist. Please create it first !`
++      `Unable to get the User: ${owner}; Error cause: ${e.message}`
+     );
+   }
++  if (userResponse.status === 200) {
++    return;
++  }
++  throw new Error(
++    `Organization or User ${owner} do not exist. Please create it first !`
++  );
+ };
+ const createGiteaProject = async (config, options) => {
+   const { projectName, description, owner, repoVisibility } = options;
+-  let response;
++  const getOptions = {
++    method: "GET",
++    headers: {
++      ...integration.getGiteaRequestOptions(config).headers,
++      "Content-Type": "application/json"
++    }
++  };
++  let isOrg = false;
++  try {
++    const orgResponse = await fetch(
++      `${config.baseUrl}/api/v1/orgs/${owner}`,
++      getOptions
++    );
++    if (orgResponse.status === 200) {
++      isOrg = true;
++    }
++  } catch (e) {}
+   let isPrivate;
+   if (repoVisibility === "private") {
+     isPrivate = true;
+@@ -77,11 +108,17 @@ const createGiteaProject = async (config, options) => {
+       "Content-Type": "application/json"
+     }
+   };
++  let createUrl;
++  if (isOrg) {
++    createUrl = `${config.baseUrl}/api/v1/orgs/${owner}/repos`;
++  } else if (config.username && owner.toLowerCase() === config.username.toLowerCase()) {
++    createUrl = `${config.baseUrl}/api/v1/user/repos`;
++  } else {
++    createUrl = `${config.baseUrl}/api/v1/admin/users/${owner}/repos`;
++  }
++  let response;
+   try {
+-    response = await fetch(
+-      `${config.baseUrl}/api/v1/orgs/${owner}/repos`,
+-      postOptions
+-    );
++    response = await fetch(createUrl, postOptions);
+   } catch (e) {
+     throw new Error(`Unable to create repository, ${e}`);
+   }

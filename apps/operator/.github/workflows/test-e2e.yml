@@ -8,6 +8,9 @@ jobs:
   test-e2e:
     name: Run on Ubuntu
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/operator
     steps:
       - name: Clone the code
         uses: actions/checkout@v6
@@ -15,16 +18,14 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: apps/operator/go.mod
 
-      - name: Install the latest version of kind
+      - name: Install the latest version of k3d
         run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
-          chmod +x ./kind
-          sudo mv ./kind /usr/local/bin/kind
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
-      - name: Verify kind installation
-        run: kind version
+      - name: Verify k3d installation
+        run: k3d version
 
       - name: Running Test e2e
         run: |

@@ -15,10 +15,16 @@ package bases
 		kind:       "Service"
 		metadata: {
 			name: parameter.name
-			labels: app: parameter.name
+			labels: {
+				app:                      parameter.name
+				"app.kubernetes.io/name": parameter.name
+			}
 		}
 		spec: {
-			selector: app: parameter.name
+			selector: {
+				app:                      parameter.name
+				"app.kubernetes.io/name": parameter.name
+			}
 			ports: [{
 				port:       parameter.port
 				targetPort: parameter.targetPort

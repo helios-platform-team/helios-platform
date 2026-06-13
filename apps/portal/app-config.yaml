@@ -32,7 +32,7 @@ backend:
   database:
     client: better-sqlite3
     connection:
-      filename: ':memory:'
+      directory: './.database'
   # workingDirectory: /tmp # Use this to configure a working directory for the scaffolder, defaults to the OS temp-dir
 
 integrations:

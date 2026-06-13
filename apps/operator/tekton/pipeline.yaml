@@ -9,7 +9,7 @@ spec:
     - name: app-repo-revision
     - name: image-repo
     - name: gitops-repo-url
-    - name: manifest-path-in-gitops-repo
+    - name: manifest-path
     - name: gitops-repo-branch
     - name: context-subpath
       default: "" # Empty means Dockerfile is at repo root
@@ -26,8 +26,17 @@ spec:
     - name: argocd-namespace
       default: "argocd"
     - name: argocd-app-name
+    - name: env-vars
+      default: "[]"
+    - name: resources
+      default: "{}"
+    - name: gitops-secret-ref
+      default: "helios-gitops-bot"
+    - name: gitops-author-name
+      default: "Helios Bot"
+    - name: gitops-author-email
+      default: "helios-bot@helios.local"
 
-  # CHANGE 1: Define two separate workspaces for the pipeline
   workspaces:
     - name: source-workspace
     - name: gitops-workspace
@@ -79,21 +88,20 @@ spec:
               fi
 
               echo "Running tests with command: $(params.test-command)"
-              # Use 'sh -lc' so that compound commands and PATH work
               sh -lc "$(params.test-command)"
 
     - name: build-and-push-image
       taskRef:
-        name: kaniko-build
+        name: buildah-build
       runAfter: [run-tests]
       workspaces:
         # CHANGE 3: The build task also uses 'source-workspace'
         - name: source
           workspace: source-workspace
       params:
-        - name: IMAGE
+        - name: image
           value: "$(params.image-repo):$(params.app-repo-revision)"
-        - name: CONTEXT_SUBPATH
+        - name: context-subpath
           value: "$(params.context-subpath)"
         - name: docker-secret
           value: "$(params.docker-secret)"
@@ -107,17 +115,23 @@ spec:
         - name: gitops-repo
           workspace: gitops-workspace
       params:
-        - name: GITOPS_REPO_URL
+        - name: gitops-repo-url
           value: $(params.gitops-repo-url)
-        - name: MANIFEST_PATH
-          value: $(params.manifest-path-in-gitops-repo)
-        - name: NEW_IMAGE_URL
+        - name: manifest-path
+          value: $(params.manifest-path)
+        - name: new-image-url
           value: $(tasks.build-and-push-image.results.IMAGE_URL)
-        - name: GITOPS_REPO_BRANCH
+        - name: gitops-repo-branch
           value: $(params.gitops-repo-branch)
-        - name: REPLICAS
+        - name: gitops-secret-ref
+          value: $(params.gitops-secret-ref)
+        - name: gitops-author-name
+          value: $(params.gitops-author-name)
+        - name: gitops-author-email
+          value: $(params.gitops-author-email)
+        - name: replicas
           value: $(params.replicas)
-        - name: PORT
+        - name: port
           value: $(params.port)
 
     - name: argocd-sync

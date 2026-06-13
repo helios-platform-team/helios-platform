@@ -13,12 +13,10 @@ import {
   CircularProgress,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
-import {
-  Visibility,
-  VisibilityOff,
-  FileCopy,
-  FileCopyOutlined,
-} from '@material-ui/icons';
+import Visibility from '@material-ui/icons/Visibility';
+import VisibilityOff from '@material-ui/icons/VisibilityOff';
+import FileCopy from '@material-ui/icons/FileCopy';
+import FileCopyOutlined from '@material-ui/icons/FileCopyOutlined';
 import { makeStyles } from '@material-ui/core/styles';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { useApi, fetchApiRef, configApiRef } from '@backstage/core-plugin-api';
@@ -95,6 +93,8 @@ export const DatabaseTab: React.FC = () => {
 
   const componentName = entity.metadata.name;
 
+  const [hasDatabase, setHasDatabase] = useState<boolean | null>(null);
+
   useEffect(() => {
     const fetchDatabaseInfo = async () => {
       try {
@@ -103,6 +103,12 @@ export const DatabaseTab: React.FC = () => {
         const response = await fetchApi.fetch(
           `${backendUrl}/api/helios/info/${componentName}`,
         );
+        if (response.status === 404) {
+          setHasDatabase(false);
+          setDatabaseInfo(null);
+          setError(null);
+          return;
+        }
         if (!response.ok) {
           throw new Error(
             `Failed to fetch database info: ${response.statusText}`,
@@ -110,17 +116,19 @@ export const DatabaseTab: React.FC = () => {
         }
         const data = await response.json();
         setDatabaseInfo(data);
+        setHasDatabase(true);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
         setDatabaseInfo(null);
+        setHasDatabase(null);
       } finally {
         setLoading(false);
       }
     };
 
     fetchDatabaseInfo();
-  }, [componentName]);
+  }, [componentName, configApi, fetchApi]);
 
   const handleCopyToClipboard = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text);
@@ -194,10 +202,12 @@ cursor = conn.cursor()`;
     );
   }
 
-  if (!databaseInfo) {
+  if (hasDatabase === false || !databaseInfo) {
     return (
       <Box className={classes.root}>
-        <Alert severity="info">No database information available</Alert>
+        <Alert severity="info">
+          No database is associated with this component.
+        </Alert>
       </Box>
     );
   }
@@ -231,6 +241,29 @@ cursor = conn.cursor()`;
               className={classes.cardTitle}
             />
             <CardContent>
+              <Alert severity="info" style={{ marginBottom: '16px' }}>
+                These connectivity details represent the internal cluster
+                address. To connect from your local machine, you must
+                port-forward the database service:
+                <br />
+                <code
+                  style={{
+                    display: 'block',
+                    margin: '8px 0',
+                    padding: '8px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+                    borderRadius: '4px',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  kubectl port-forward -n default svc/{databaseInfo.host}{' '}
+                  {databaseInfo.port}:{databaseInfo.port}
+                </code>
+                Once port-forwarded, you can use the connection snippets below
+                by replacing the Host with <code>localhost</code> (or{' '}
+                <code>127.0.0.1</code>) and Port with{' '}
+                <code>{databaseInfo.port}</code>.
+              </Alert>
               <Grid container spacing={2} className={classes.connectivityGrid}>
                 {/* Host */}
                 <Grid item xs={12} sm={6}>

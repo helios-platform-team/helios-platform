@@ -39,7 +39,7 @@ const serviceAccountName = "operator-controller-manager"
 // metricsServiceName is the name of the metrics service of the project
 const metricsServiceName = "operator-controller-manager-metrics-service"
 
-// metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
+// metricsRoleBindingName is the name of the RBAC that will be created to allow getting the metrics data
 const metricsRoleBindingName = "operator-metrics-binding"
 
 var _ = Describe("Manager", Ordered, func() {

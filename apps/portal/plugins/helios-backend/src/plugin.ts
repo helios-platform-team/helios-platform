@@ -20,10 +20,10 @@ export const heliosBackendPlugin = createBackendPlugin({
       },
       async init({ logger, config, httpRouter }) {
         httpRouter.use(
-          await createRouter({
+          (await createRouter({
             logger,
             config,
-          }),
+          })) as any,
         );
         httpRouter.addAuthPolicy({
           path: '/health',

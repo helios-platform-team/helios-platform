@@ -5,7 +5,7 @@ import {
   palettes,
   shapes,
 } from '@backstage/theme';
-import { alpha } from '@mui/material/styles';
+import { alpha } from '@material-ui/core/styles';
 
 // --- HELIOS CONSTANTS ---
 const COLORS_LIGHT = {

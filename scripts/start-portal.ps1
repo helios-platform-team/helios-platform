@@ -34,6 +34,7 @@ if ($null -ne $adminSecret) {
     Write-Host "[ArgoCD] Fetching Admin Password..." -ForegroundColor Yellow
     $passB64 = $adminSecret.data.password
     $pass = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($passB64)).Trim()
+    Write-Host "[ArgoCD] Admin Password: $pass" -ForegroundColor Green
 
     Write-Host "[ArgoCD] Starting Port-Forward (localhost:$ArgocdPort)..." -ForegroundColor Yellow
     $Jobs += Start-Job -ScriptBlock { kubectl port-forward -n argocd svc/argocd-server "${using:ArgocdPort}:443" }

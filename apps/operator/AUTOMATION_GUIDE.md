@@ -4,7 +4,7 @@ Tài liệu duy nhất bạn cần để kích hoạt và vận hành tính năn
 
 ## 1. Kiến Trúc (How it works)
 *   **Trigger**: Bạn push code lên GitHub -> Webhook gọi Ingress -> EventListener.
-*   **Pipeline**: Tekton clone code -> Build Docker Image (Kaniko) -> Push Docker Hub.
+*   **Pipeline**: Tekton clone code -> Build Docker Image (Buildah) -> Push Docker Hub.
 *   **GitOps**: Pipeline update file manifest trong repo GitOps -> ArgoCD sync về cụm.
 
 ## 2. Setup Hạ Tầng (Làm 1 lần)

@@ -17,8 +17,8 @@ import (
 	"github.com/helios-platform-team/helios-platform/apps/operator/internal/gitops"
 )
 
-// GitFactory creates a GitOps client for the given repo, user and token.
-type GitFactory func(repo, user, token string) gitops.GitOpsClientInterface
+// GitFactory creates a GitOps client for the given repo, user, and token.
+type GitFactory func(repo, user, token string) gitops.ClientInterface
 
 // Reconciler handles GitOps manifest sync (credentials + git push + hash).
 type Reconciler struct {
@@ -30,8 +30,8 @@ type Reconciler struct {
 // NewReconciler creates a new GitOps sync Reconciler.
 func NewReconciler(c client.Client, scheme *runtime.Scheme, factory GitFactory) *Reconciler {
 	if factory == nil {
-		factory = func(repo, user, token string) gitops.GitOpsClientInterface {
-			return gitops.NewGitOpsClient(repo, user, token)
+		factory = func(repo, user, token string) gitops.ClientInterface {
+			return gitops.NewClient(repo, user, token)
 		}
 	}
 	return &Reconciler{Client: c, Scheme: scheme, GitFactory: factory}
@@ -87,7 +87,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, 
 	return nil
 }
 
-// resolveCredentials reads the GitOps token and username from a Secret or env vars.
+// resolveCredentials reads the GitOps token and username from a Secret or env var.
 func (r *Reconciler) resolveCredentials(ctx context.Context, app *appv1alpha1.HeliosApp) (string, string) {
 	log := logf.FromContext(ctx)
 

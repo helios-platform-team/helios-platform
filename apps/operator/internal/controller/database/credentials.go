@@ -56,7 +56,7 @@ func GenerateSecureUsername(length int) (string, error) {
 }
 
 // GenerateCredentials generates a new set of database credentials.
-func GenerateCredentials() (*DatabaseCredentials, error) {
+func GenerateCredentials() (*Credentials, error) {
 	username, err := GenerateSecureUsername(DefaultUsernameLength)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate username: %w", err)
@@ -67,7 +67,7 @@ func GenerateCredentials() (*DatabaseCredentials, error) {
 		return nil, fmt.Errorf("failed to generate password: %w", err)
 	}
 
-	return &DatabaseCredentials{
+	return &Credentials{
 		Username: username,
 		Password: password,
 	}, nil

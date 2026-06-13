@@ -8,8 +8,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
-// NewInMemoryGitOpsClient creates a new client that uses in-memory storage (for testing)
-func NewInMemoryGitOpsClient(repoURL, username, token string) *GitOpsClient {
+// NewInMemoryClient creates a new client that uses in-memory storage (for testing)
+func NewInMemoryClient(repoURL, username, token string) *Client {
 	authorName := os.Getenv("GIT_AUTHOR_NAME")
 	if authorName == "" {
 		authorName = "Helios Operator"
@@ -19,7 +19,7 @@ func NewInMemoryGitOpsClient(repoURL, username, token string) *GitOpsClient {
 		authorEmail = "operator@helios.io"
 	}
 
-	return &GitOpsClient{
+	return &Client{
 		RepoURL: repoURL,
 		Auth: &http.BasicAuth{
 			Username: username,
@@ -31,9 +31,9 @@ func NewInMemoryGitOpsClient(repoURL, username, token string) *GitOpsClient {
 	}
 }
 
-func TestGitOpsClient_SyncManifest(t *testing.T) {
+func TestClient_SyncManifest(t *testing.T) {
 	// Use the InMemory client to avoid network calls and filesystem issues
-	client := NewInMemoryGitOpsClient("https://github.com/example/repo", "user", "token")
+	client := NewInMemoryClient("https://github.com/example/repo", "user", "token")
 
 	ctx := context.TODO()
 	filePath := "apps/test-app/manifest.yaml"

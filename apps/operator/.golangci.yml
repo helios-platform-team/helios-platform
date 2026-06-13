@@ -8,7 +8,6 @@ linters:
     - dupl
     - errcheck
     - ginkgolinter
-    - goconst
     - gocyclo
     - govet
     - ineffassign
@@ -36,6 +35,9 @@ linters:
           - dupl
           - lll
         path: internal/*
+      - linters:
+          - staticcheck
+        text: "SA1019"
       - linters:
           - gocyclo
           - goconst

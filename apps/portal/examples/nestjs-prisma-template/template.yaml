@@ -2,8 +2,8 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: nestjs-prisma-template
-  title: NestJS + Prisma Template (Database-backed)
-  description: Scaffolds a NestJS service with Prisma and PostgreSQL-ready GitOps manifests.
+  title: NestJS + Prisma Template (Optional Database)
+  description: Scaffolds a NestJS service with optional Prisma/PostgreSQL-ready GitOps manifests.
 spec:
   owner: user:guest
   type: service
@@ -20,6 +20,7 @@ spec:
           title: Name
           type: string
           description: Unique name of the component
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
           title: Port
@@ -74,11 +75,23 @@ spec:
         targetPath: ./source
         values:
           # Use repoName as the app identifier to keep it Kubernetes/URL safe.
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: "NestJS service: ${{ parameters.name }}"
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+
+    - id: fetch-source-db
+      name: Fetch Database Source Files
+      if: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+      action: fetch:template
+      input:
+        url: ./content/source-db
+        targetPath: ./source
+        values:
+          name: ${{ parameters.name }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
 
     - id: publish-source
       name: Publish Source Code
@@ -95,10 +108,10 @@ spec:
       input:
         repoUrl: ${{ parameters.repoUrl }}
         # Tekton EventListener address is the service root.
-        webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
         # Deterministic secret so users don't have to provide one.
         # Must match the Kubernetes secret value created below.
-        webhookSecret: ${{ parameters.repoName }}
+        webhookSecret: ${{ parameters.name }}
         events:
           - push
 
@@ -110,17 +123,23 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          name: ${{ parameters.name }}
+          # No index.docker.io prefix — imageRepo stored as org/repo, tag appended by pipeline
+          image: ${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
           port: ${{ parameters.port }}
-          databaseType: ${{ parameters.databaseConfig.dbType }}
-          databaseName: ${{ parameters.databaseConfig.dbName }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+          databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          databaseName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          databaseVersion: ${{ parameters.databaseConfig.dbVersion if parameters.databaseConfig.dbType == 'postgres' else '' }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
-          testCommand: "npm ci && npm test"
+          # Node_modules caching (keyed by package-lock.json hash) is handled
+          # by the pipeline's run-tests step — only the test runner is needed here.
+          testCommand: "npm test"
+          testImage: "node:24"
 
     - id: publish-gitops
       name: Publish GitOps Manifests
@@ -136,10 +155,10 @@ spec:
       name: Create Git Credentials Secret
       action: kubernetes:create-git-credentials-secret
       input:
-        name: ${{ parameters.repoName }}
+        name: ${{ parameters.name }}
         namespace: default
         username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-        webhookSecret: ${{ parameters.repoName }}
+        webhookSecret: ${{ parameters.name }}
 
     - id: apply-helios
       name: Deploy to Kubernetes

@@ -87,7 +87,7 @@ func TestGenerateDatabaseSecret(t *testing.T) {
 	dbName := "my-app-db"
 	port := int32(5432)
 
-	creds := &DatabaseCredentials{
+	creds := &Credentials{
 		Username: "testuser",
 		Password: "testpassword123",
 	}
@@ -180,7 +180,7 @@ func TestExtractDatabaseTraits(t *testing.T) {
 	dbProps := map[string]any{
 		"dbType":  "postgres",
 		"dbName":  "mydb",
-		"version": "18.3",
+		"version": "18.4",
 	}
 	dbPropsJSON, _ := json.Marshal(dbProps)
 
@@ -248,7 +248,7 @@ func TestExtractDatabaseTraits(t *testing.T) {
 func TestGenerateDatabaseStatefulSet(t *testing.T) {
 	sts, err := GenerateDatabaseStatefulSet(
 		"test-ns", "my-app-db", "my-app-db-secret",
-		"my_custom_db", "18.3", "2Gi", 5432,
+		"my_custom_db", "18.4", "2Gi", 5432,
 	)
 
 	if err != nil {
@@ -283,8 +283,8 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 	}
 
 	container := containers[0]
-	if container.Image != "postgres:18.3" {
-		t.Errorf("Expected image %q, got %q", "postgres:18.3", container.Image)
+	if container.Image != "postgres:18.4" {
+		t.Errorf("Expected image %q, got %q", "postgres:18.4", container.Image)
 	}
 
 	if len(container.Ports) != 1 || container.Ports[0].ContainerPort != 5432 {

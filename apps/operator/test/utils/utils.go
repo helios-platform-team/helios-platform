@@ -165,19 +165,19 @@ func IsCertManagerCRDsInstalled() bool {
 	return false
 }
 
-// LoadImageToKindClusterWithName loads a local docker image to the kind cluster
-func LoadImageToKindClusterWithName(name string) error {
-	cluster := "kind"
-	if v, ok := os.LookupEnv("KIND_CLUSTER"); ok {
+// LoadImageToK3dClusterWithName loads a local docker image to the k3d cluster
+func LoadImageToK3dClusterWithName(name string) error {
+	cluster := "helios-dev"
+	if v, ok := os.LookupEnv("K3D_CLUSTER"); ok {
 		cluster = v
 	}
-	kindOptions := []string{"load", "docker-image", name, "--name", cluster}
-	cmd := exec.Command("kind", kindOptions...)
+	k3dOptions := []string{"image", "import", name, "-c", cluster}
+	cmd := exec.Command("k3d", k3dOptions...)
 	_, err := Run(cmd)
 	return err
 }
 
-// GetNonEmptyLines converts given command output string into individual objects
+// GetNonEmptyLines converts a given command output string into individual objects
 // according to line breakers, and ignores the empty elements in it.
 func GetNonEmptyLines(output string) []string {
 	var res []string
@@ -200,7 +200,7 @@ func GetProjectDir() (string, error) {
 	return wd, nil
 }
 
-// UncommentCode searches for target in the file and remove the comment prefix
+// UncommentCode searches for target in the file and removes the comment prefix
 // of the target content. The target content may span multiple lines.
 func UncommentCode(filename, target, prefix string) error {
 	// false positive

@@ -4,6 +4,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+{% if values.hasDatabase -%}
 var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
 var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
 var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD")
@@ -19,6 +20,8 @@ var connectionString = connectionTemplate
     .Replace("{DB_PASSWORD}", dbPassword, StringComparison.Ordinal)
     .Replace("{DB_NAME}", dbName, StringComparison.Ordinal);
 builder.Configuration["ConnectionStrings:DefaultConnection"] = connectionString;
+{% endif -%}
+
 
 var app = builder.Build();
 
@@ -27,6 +30,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 
+{% if values.hasDatabase -%}
     app.MapGet("/database/config", () =>
         Results.Ok(new
         {
@@ -34,6 +38,7 @@ if (app.Environment.IsDevelopment())
             User = dbUser,
             Database = dbName,
         }));
+{% endif -%}
 }
 
 app.UseHttpsRedirection();

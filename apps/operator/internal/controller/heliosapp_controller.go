@@ -25,7 +25,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,7 +48,7 @@ import (
 type HeliosAppReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
-	CueEngine heliosCue.CueEngineInterface
+	CueEngine heliosCue.EngineInterface
 
 	Tekton   TektonReconciler
 	ArgoCD   ArgoCDReconciler
@@ -58,9 +60,9 @@ type HeliosAppReconciler struct {
 func NewHeliosAppReconciler(
 	c client.Client,
 	scheme *runtime.Scheme,
-	cueEngine heliosCue.CueEngineInterface,
+	cueEngine heliosCue.EngineInterface,
 	tektonRenderer heliosCue.TektonRendererInterface,
-	gitFactory func(string, string, string) gitops.GitOpsClientInterface,
+	gitFactory func(string, string, string) gitops.ClientInterface,
 ) *HeliosAppReconciler {
 	return &HeliosAppReconciler{
 		Client:    c,
@@ -185,19 +187,26 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	for _, comp := range appModel.App.Components {
-		if img, ok := comp.Properties["image"].(string); !ok || img == "" {
-			msg := fmt.Sprintf("Component '%s' is waiting for image (likely building). Status: Pending.", comp.Name)
-			log.Info(msg)
-			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhasePending, msg)
-			return ctrl.Result{}, nil
-		}
-	}
-
 	if err := r.Tekton.ReconcileInitialPipelineRun(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile initial PipelineRun")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Initial PipelineRun failed: %v", err))
 		return ctrl.Result{}, err
+	}
+
+	for _, comp := range appModel.App.Components {
+		// Only check for image if the component is NOT a web-service or similar that requires building.
+		// If it's a web-service and the image is empty, we expect Tekton to build it.
+		if img, ok := comp.Properties["image"].(string); !ok || img == "" {
+			if comp.Type != "web-service" && comp.Type != "worker" {
+				msg := fmt.Sprintf("Component '%s' is waiting for image. Status: Pending.", comp.Name)
+				log.Info(msg)
+				r.updateStatus(ctx, &heliosApp, appv1alpha1.PhasePending, msg)
+				return ctrl.Result{}, nil
+			}
+			log.Info("Component image empty but it is a buildable component, waiting for PipelineRun to complete", "component", comp.Name)
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhasePending, fmt.Sprintf("Waiting for component '%s' image build", comp.Name))
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
 	}
 
 	// ------------------------------------------------------------------
@@ -235,6 +244,13 @@ func (r *HeliosAppReconciler) updateStatus(ctx context.Context, app *appv1alpha1
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	pr := &unstructured.Unstructured{}
+	pr.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "tekton.dev",
+		Version: "v1",
+		Kind:    "PipelineRun",
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appv1alpha1.HeliosApp{}).
 		Owns(&appsv1.Deployment{}).
@@ -244,6 +260,10 @@ func (r *HeliosAppReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSecret),
+		).
+		Watches(
+			pr,
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForPipelineRun),
 		).
 		Named("heliosapp").
 		Complete(r)
@@ -277,6 +297,23 @@ func (r *HeliosAppReconciler) findObjectsForSecret(ctx context.Context, obj clie
 	}
 
 	return requests
+}
+
+// findObjectsForPipelineRun maps PipelineRun changes to HeliosApp reconcile requests.
+func (r *HeliosAppReconciler) findObjectsForPipelineRun(ctx context.Context, obj client.Object) []reconcile.Request {
+	appName := obj.GetLabels()["app.kubernetes.io/name"]
+	if appName == "" {
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      appName,
+				Namespace: obj.GetNamespace(),
+			},
+		},
+	}
 }
 
 // validateSecretReferences checks if all referenced secrets exist in the cluster.

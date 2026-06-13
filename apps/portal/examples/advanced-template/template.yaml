@@ -78,7 +78,7 @@ spec:
         targetPath: ./source
         values:
           # Use repoName as the app identifier to keep it Kubernetes/URL safe.
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: "Service for ${{ parameters.name }}"
@@ -99,10 +99,10 @@ spec:
       input:
         repoUrl: ${{ parameters.repoUrl }}
         # Tekton EventListener address is the service root.
-        webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
         # Deterministic secret so users don't have to provide one.
         # Must match the Kubernetes secret value created below.
-        webhookSecret: ${{ parameters.repoName }}
+        webhookSecret: ${{ parameters.name }}
         events:
           - push
 
@@ -114,7 +114,7 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
           dockerOrg: ${{ parameters.dockerOrg }}
           repoName: ${{ parameters.repoName }}
@@ -143,10 +143,10 @@ spec:
       name: Create Git Credentials Secret
       action: kubernetes:create-git-credentials-secret
       input:
-        name: ${{ parameters.repoName }}
+        name: ${{ parameters.name }}
         namespace: default
         username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-        webhookSecret: ${{ parameters.repoName }}
+        webhookSecret: ${{ parameters.name }}
 
     # 2.2 Deploy HeliosApp (after secret exists)
     - id: apply-helios

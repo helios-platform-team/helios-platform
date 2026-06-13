@@ -24,7 +24,7 @@ export const DatabasePicker = ({
   // Default to 'none' if no data is present
   const dbType = formData?.dbType || 'none';
   const dbName = formData?.dbName || '';
-  const dbVersion = formData?.dbVersion || '18.3';
+  const dbVersion = formData?.dbVersion || '18.4';
 
   const handleTypeChange = (event: React.ChangeEvent<{ value: unknown }>) => {
     const newType = event.target.value as string;
@@ -81,7 +81,7 @@ export const DatabasePicker = ({
             <InputLabel>Database Version</InputLabel>
             <Select value={dbVersion} onChange={handleVersionChange}>
               <MenuItem value="18">18</MenuItem>
-              <MenuItem value="18.3">18.3</MenuItem>
+              <MenuItem value="18.4">18.4</MenuItem>
             </Select>
           </FormControl>
         </>

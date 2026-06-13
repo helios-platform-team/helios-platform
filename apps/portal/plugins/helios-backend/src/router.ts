@@ -21,7 +21,7 @@ export function createDatabaseRouter(): Router {
     try {
       const { componentName } = req.params;
 
-      if (!componentName) {
+      if (!componentName || typeof componentName !== 'string') {
         return res.status(400).json({ error: 'Component name is required' });
       }
 

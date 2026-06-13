@@ -387,7 +387,7 @@ func (r *Reconciler) ReconcileInstances(ctx context.Context, app *appv1alpha1.He
 // DB_HOST, DB_USER, DB_PASS env vars from the operator-managed Secret.
 //
 // Returns (pendingInjection, error). pendingInjection is true when one or more
-// target Deployments do not exist yet, signalling the caller to requeue.
+// target Deployments do not exist yet, signaling the caller to requeue.
 func (r *Reconciler) ReconcileInjection(ctx context.Context, app *appv1alpha1.HeliosApp) (bool, error) {
 	log := logf.FromContext(ctx)
 
