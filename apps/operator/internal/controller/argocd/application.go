@@ -22,6 +22,9 @@ func GenerateArgoApplication(heliosApp *appv1alpha1.HeliosApp) (*unstructured.Un
 			"repoURL":        shared.RewriteGiteaURL(heliosApp.Spec.GitOpsRepo),
 			"targetRevision": gitOpsBranch,
 			"path":           heliosApp.Spec.GitOpsPath,
+			"directory": map[string]any{
+				"include": "helios-app.yaml",
+			},
 		},
 		"destination": map[string]any{
 			"server":    "https://kubernetes.default.svc",
