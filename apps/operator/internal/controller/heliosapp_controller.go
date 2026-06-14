@@ -151,7 +151,7 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			client.FieldOwner("helios-operator"),
 		}
 
-		if err := r.Client.Patch(ctx, u, client.Apply, patchOpts...); err != nil {
+		if err := r.Patch(ctx, u, client.Apply, patchOpts...); err != nil {
 			log.Error(err, "Failed to apply resource via Server-Side Apply", "kind", u.GetKind(), "name", u.GetName())
 			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Resource application failed (%s/%s): %v", u.GetKind(), u.GetName(), err))
 			return ctrl.Result{}, err

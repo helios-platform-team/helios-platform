@@ -29,7 +29,7 @@ func (m *FakeGitOpsClient) SyncManifest(ctx context.Context, filePath, content s
 	return nil
 }
 
-func setupReconcilerTest(t *testing.T) (*Reconciler, *FakeGitOpsClient, *appv1alpha1.HeliosApp) {
+func setupReconcilerTest(_ *testing.T) (*Reconciler, *FakeGitOpsClient, *appv1alpha1.HeliosApp) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
