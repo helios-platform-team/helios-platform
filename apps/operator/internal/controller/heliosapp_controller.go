@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -120,12 +121,42 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	// 3. Render via CUE Engine
-	manifestBytes, err := r.CueEngine.Render(appModel)
+	// 3. Render via CUE Engine to Objects
+	objects, err := r.CueEngine.RenderToObjects(appModel)
 	if err != nil {
-		log.Error(err, "Failed to render application via CUE")
+		log.Error(err, "Failed to render application objects via CUE")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("CUE rendering failed: %v", err))
 		return ctrl.Result{}, err
+	}
+
+	// 4. Apply Rendered Objects Directly to Cluster
+	for _, objMap := range objects {
+		u := &unstructured.Unstructured{Object: objMap}
+
+		// Ensure namespaced resources inherit HeliosApp namespace
+		if u.GetNamespace() == "" {
+			u.SetNamespace(heliosApp.Namespace)
+		}
+
+		// Only set OwnerReference for namespaced scoped resources
+		// Assuming we only create resources in the same namespace for now
+		if err := controllerutil.SetControllerReference(&heliosApp, u, r.Scheme); err != nil {
+			log.Error(err, "Failed to set owner reference", "kind", u.GetKind(), "name", u.GetName())
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Owner reference setup failed: %v", err))
+			return ctrl.Result{}, err
+		}
+
+		patchOpts := []client.PatchOption{
+			client.ForceOwnership,
+			client.FieldOwner("helios-operator"),
+		}
+
+		if err := r.Patch(ctx, u, client.Apply, patchOpts...); err != nil {
+			log.Error(err, "Failed to apply resource via Server-Side Apply", "kind", u.GetKind(), "name", u.GetName())
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Resource application failed (%s/%s): %v", u.GetKind(), u.GetName(), err))
+			return ctrl.Result{}, err
+		}
+		log.Info("Successfully applied resource via SSA", "kind", u.GetKind(), "name", u.GetName())
 	}
 
 	// ------------------------------------------------------------------
@@ -210,10 +241,18 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// ------------------------------------------------------------------
-	// PHASE 1: Render & GitOps
+	// PHASE 1: Serialize CR & GitOps
 	// ------------------------------------------------------------------
 
-	if err := r.GitOps.Reconcile(ctx, &heliosApp, manifestBytes); err != nil {
+	// Serialize clean CR YAML for GitOps repository
+	crYAML, err := gitopssync.SerializeHeliosApp(&heliosApp)
+	if err != nil {
+		log.Error(err, "Failed to serialize HeliosApp to YAML")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("CR serialization failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	if err := r.GitOps.Reconcile(ctx, &heliosApp, crYAML); err != nil {
 		log.Error(err, "GitOps sync failed")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("GitOps sync failed: %v", err))
 		return ctrl.Result{}, err

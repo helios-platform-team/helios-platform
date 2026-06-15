@@ -54,3 +54,42 @@ func TestGenerateArgoApplication_IgnoresOperatorInjectedDatabaseEnv(t *testing.T
 		t.Fatalf("jqPathExpressions[0] = %q, want DATABASE_URL to be ignored", expression)
 	}
 }
+
+func TestGenerateArgoApplication_IncludesDirectory(t *testing.T) {
+	app := &appv1alpha1.HeliosApp{
+		Spec: appv1alpha1.HeliosAppSpec{
+			GitOpsRepo: "http://localhost:3030/helios-platform/nestjs-gitops",
+		},
+	}
+	app.Name = "nestjs"
+	app.Namespace = "default"
+
+	generated, err := GenerateArgoApplication(app)
+	if err != nil {
+		t.Fatalf("GenerateArgoApplication() error = %v", err)
+	}
+
+	spec, ok := generated.Object["spec"].(map[string]any)
+	if !ok {
+		t.Fatalf("generated spec has unexpected type: %T", generated.Object["spec"])
+	}
+
+	source, ok := spec["source"].(map[string]any)
+	if !ok {
+		t.Fatalf("source has unexpected type: %T", spec["source"])
+	}
+
+	directory, ok := source["directory"].(map[string]any)
+	if !ok {
+		t.Fatalf("directory has unexpected type: %T", source["directory"])
+	}
+
+	include, ok := directory["include"].(string)
+	if !ok {
+		t.Fatalf("directory.include has unexpected type: %T", directory["include"])
+	}
+
+	if include != "helios-app.yaml" {
+		t.Errorf("directory.include = %q, want %q", include, "helios-app.yaml")
+	}
+}

@@ -39,7 +39,7 @@ func NewReconciler(c client.Client, scheme *runtime.Scheme, factory GitFactory) 
 
 // Reconcile resolves GitOps credentials, computes a manifest hash, and syncs
 // changed manifests to the GitOps repo. It also updates the HeliosApp status.
-func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, manifestBytes []byte) error {
+func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, crBytes []byte) error {
 	log := logf.FromContext(ctx)
 
 	token, username := r.resolveCredentials(ctx, app)
@@ -51,7 +51,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, 
 		return nil
 	}
 
-	currentHash := computeHash([]byte(app.Spec.GitOpsRepo + "\x00" + app.Spec.GitOpsPath + "\x00" + string(manifestBytes)))
+	currentHash := computeHash([]byte(app.Spec.GitOpsRepo + "\x00" + app.Spec.GitOpsPath + "\x00" + string(crBytes)))
 	if app.Status.LastAppliedHash == currentHash {
 		log.Info("Manifest hash unchanged, skipping GitOps sync", "hash", currentHash)
 
@@ -65,16 +65,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, 
 	}
 
 	gitClient := r.GitFactory(app.Spec.GitOpsRepo, username, token)
-	targetPath := fmt.Sprintf("%s/manifest.yaml", app.Spec.GitOpsPath)
+	targetPath := fmt.Sprintf("%s/helios-app.yaml", app.Spec.GitOpsPath)
 
-	if err := gitClient.SyncManifest(ctx, targetPath, string(manifestBytes)); err != nil {
+	if err := gitClient.SyncManifest(ctx, targetPath, string(crBytes)); err != nil {
 		log.Error(err, "GitOps sync failed")
 		r.updateFailedStatus(ctx, app, fmt.Sprintf("GitOps failed: %v", err))
 		return err
 	}
 
 	app.Status.Phase = appv1alpha1.PhaseReady
-	app.Status.Message = fmt.Sprintf("Manifest pushed to %s/%s", app.Spec.GitOpsRepo, targetPath)
+	app.Status.Message = fmt.Sprintf("HeliosApp CR pushed to %s/%s", app.Spec.GitOpsRepo, targetPath)
 	app.Status.LastAppliedHash = currentHash
 	app.Status.ResourcesCreated = nil
 

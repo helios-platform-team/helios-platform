@@ -17,7 +17,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/argocd"
 	"github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/database"
@@ -46,7 +48,15 @@ func (f *FakeCueEngine) Render(app heliosCue.Application) ([]byte, error) {
 }
 
 func (f *FakeCueEngine) RenderToObjects(app heliosCue.Application) ([]map[string]any, error) {
-	return []map[string]any{}, nil
+	return []map[string]any{
+		{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]any{
+				"name": "test-deployment",
+			},
+		},
+	}, nil
 }
 
 // FakeTektonRenderer is a mock implementation of TektonRendererInterface.
@@ -115,12 +125,20 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 		},
 	}
 
-	// 3. Setup Fake Client
-	// We init with the object existing
+	patchApplied := false
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(heliosApp, gitOpsSecret, dockerCredentialsSecret, heliosGitopsBotSecret).
 		WithStatusSubresource(heliosApp).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Patch: func(ctx context.Context, client client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+				if patch.Type() == types.ApplyPatchType {
+					patchApplied = true
+					return nil
+				}
+				return client.Patch(ctx, obj, patch, opts...)
+			},
+		}).
 		Build()
 
 	// 4. Setup Mock GitOps
@@ -160,7 +178,7 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 
 	// Verify GitOps was called
 	// SyncManifest(ctx, targetPath, content)
-	expectedPath := "apps/test-app/manifest.yaml"
+	expectedPath := "apps/test-app/helios-app.yaml"
 	found := false
 	for path := range mockGit.SyncedFiles {
 		if strings.Contains(path, expectedPath) {
@@ -177,6 +195,10 @@ func TestHeliosAppReconciler_Reconcile_Success(t *testing.T) {
 	_ = fakeClient.Get(ctx, req.NamespacedName, updatedApp)
 	if updatedApp.Status.Phase != appv1alpha1.PhaseReady {
 		t.Errorf("Expected Phase to be %s, got %s", appv1alpha1.PhaseReady, updatedApp.Status.Phase)
+	}
+
+	if !patchApplied {
+		t.Errorf("Expected Server-Side Apply Patch to be called, but it was not")
 	}
 }
 
