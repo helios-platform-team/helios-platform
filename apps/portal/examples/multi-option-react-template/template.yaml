@@ -1,0 +1,237 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: multi-option-react-template
+  title: Multi-Option React Scaffolder Template
+  description: A flexible React template that lets you customize your build tool (Vite/Webpack), styling (Tailwind CSS), state management (Zustand/Redux), and data fetching (React Query), and deploys it automatically.
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Component Details
+      required:
+        - name
+        - port
+        - dockerOrg
+        - repoName
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Unique name of the component
+          ui:autofocus: true
+        port:
+          title: Port
+          type: number
+          description: The port to expose
+          default: 8080
+        dockerOrg:
+          title: Docker Registry Org/User
+          type: string
+          description: Your Docker Hub username or Organization
+          default: phamhoangkha1403
+        repoName:
+          title: Docker Repository Name
+          type: string
+          description: The name of the repository (e.g. my-react-app)
+          pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+        description:
+          title: Description
+          type: string
+          description: A brief description of the component
+    - title: Tech Stack Options
+      required:
+        - buildTool
+        - styling
+        - stateManagement
+        - dataFetching
+      properties:
+        buildTool:
+          title: Build Tool
+          type: string
+          description: Select the build tool and bundler
+          enum:
+            - vite
+            - webpack
+          enumNames:
+            - Vite
+            - Webpack
+          default: vite
+        styling:
+          title: Styling
+          type: string
+          description: Choose the styling method
+          enum:
+            - tailwind
+            - vanilla
+          enumNames:
+            - Tailwind CSS
+            - Vanilla CSS
+          default: tailwind
+        stateManagement:
+          title: State Management
+          type: string
+          description: Choose a state management library
+          enum:
+            - none
+            - zustand
+            - redux
+          enumNames:
+            - None
+            - Zustand
+            - Redux (Toolkit)
+          default: none
+        dataFetching:
+          title: Data Fetching
+          type: string
+          description: Choose a data fetching library
+          enum:
+            - none
+            - react-query
+          enumNames:
+            - None (Standard fetch)
+            - React Query (TanStack Query)
+          default: none
+    - title: Choose a location
+      required:
+        - repoUrl
+        - webhookSecret
+      properties:
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - localhost:3030
+        webhookSecret:
+          title: Webhook Secret
+          type: string
+          description: A secure random secret to secure the Git webhook
+          ui:field: Secret
+
+  steps:
+    # 1. Fetch Source Code Template
+    - id: fetch-source
+      name: Fetch Source Code Template
+      action: fetch:template
+      input:
+        url: ./content/source
+        targetPath: ./source
+        values:
+          name: ${{ parameters.name }}
+          repoName: ${{ parameters.repoName }}
+          description: ${{ parameters.description }}
+          buildTool: ${{ parameters.buildTool }}
+          styling: ${{ parameters.styling }}
+          stateManagement: ${{ parameters.stateManagement }}
+          dataFetching: ${{ parameters.dataFetching }}
+          port: ${{ parameters.port }}
+          owner: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+
+    # 2. Configure Selected Stack (Always run, dynamic list)
+    # File rename logic:
+    #   - index.{buildTool}.html -> index.html (vite or webpack)
+    #   - src/index.{styling}.css -> src/index.css (tailwind or vanilla)
+    #   - src/store/{redux|zustand}Store.js -> src/store/store.js (if not "none")
+    #   - webpack.config.ejs -> webpack.config.js (if webpack)
+    - id: configure-files
+      name: Configure Selected Stack
+      action: fs:rename
+      input:
+        files: '${{ [ { from: "./source/index." + parameters.buildTool + ".html", to: "./source/index.html" }, { from: "./source/src/index." + parameters.styling + ".css", to: "./source/src/index.css" } ].concat( [ { from: "./source/src/store/reduxStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "redux" else ( [ { from: "./source/src/store/zustandStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "zustand" else [] ) ).concat( [ { from: "./source/webpack.config.ejs", to: "./source/webpack.config.js" } ] if parameters.buildTool == "webpack" else [] ) }}'
+
+    # 3. Clean up Unused Files (Always run, dynamic list)
+    - id: cleanup-files
+      name: Clean up Unused Files
+      action: fs:delete
+      input:
+        files: '${{ ( [ "./source/index.webpack.html", "./source/webpack.config.ejs", "./source/babel.config.json" ] if parameters.buildTool == "vite" else [ "./source/index.vite.html", "./source/vite.config.js" ] ).concat( [ "./source/tailwind.config.cjs", "./source/postcss.config.cjs" ] if parameters.styling == "vanilla" else [] ).concat( [ "./source/src/store/zustandStore.js" ] if parameters.stateManagement == "redux" else ( [ "./source/src/store/reduxStore.js" ] if parameters.stateManagement == "zustand" else [ "./source/src/store" ] ) ).concat( [ "./source/src/index.vanilla.css" ] if parameters.styling == "tailwind" else [ "./source/src/index.tailwind.css" ] ) }}'
+
+    # 4. Publish Source Code to Gitea
+    - id: publish-source
+      name: Publish Source Code
+      action: publish:gitea
+      input:
+        description: Source Code for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}
+        sourcePath: ./source
+        repoVisibility: public
+
+    # 5. Create Gitea Webhook for Tekton CI
+    - id: create-webhook
+      name: Create Webhook
+      action: gitea:create-webhook
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
+        webhookSecret: ${{ secrets.webhookSecret }}
+        events:
+          - push
+
+    # 6. Fetch GitOps Manifests Template
+    - id: fetch-gitops
+      name: Fetch GitOps Manifests
+      action: fetch:template
+      input:
+        url: ./content/gitops
+        targetPath: ./gitops
+        values:
+          name: ${{ parameters.name }}
+          repoName: ${{ parameters.repoName }}
+          namespace: default
+          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          dockerOrg: ${{ parameters.dockerOrg }}
+          port: ${{ parameters.port }}
+          owner: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+          sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
+          gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
+          testCommand: "npm install && npm run build"
+
+    # 7. Publish GitOps Manifests to Gitea
+    - id: publish-gitops
+      name: Publish GitOps Manifests
+      action: publish:gitea
+      input:
+        description: GitOps Manifests for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}-gitops
+        sourcePath: ./gitops
+        repoVisibility: public
+
+    # 8. Create Git Credentials Secret on Kubernetes
+    - id: create-secret
+      name: Create Git Credentials Secret
+      action: kubernetes:create-git-credentials-secret
+      input:
+        name: ${{ parameters.repoName }}
+        namespace: default
+        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+        webhookSecret: ${{ secrets.webhookSecret }}
+
+    # 9. Deploy HeliosApp to Kubernetes
+    - id: apply-helios
+      name: Deploy to Kubernetes
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/helios-app.yaml
+        namespaced: true
+
+    # 10. Register Component in Catalog
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
+        catalogInfoPath: 'catalog-info.yaml'
+
+  output:
+    links:
+      - title: Source Repository
+        url: ${{ steps['publish-source'].output.remoteUrl }}
+      - title: GitOps Repository
+        url: ${{ steps['publish-gitops'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
