@@ -64,7 +64,7 @@ type HeliosAppSpec struct {
 
 	// TriggerType is the type of trigger to use for the pipeline
 	// +optional
-	// +kubebuilder:validation:Enum=gitea-push;db-migrate
+	// +kubebuilder:validation:Enum=git-push;gitea-push;db-migrate
 	// +kubebuilder:default="gitea-push"
 	TriggerType string `json:"triggerType,omitempty"`
 

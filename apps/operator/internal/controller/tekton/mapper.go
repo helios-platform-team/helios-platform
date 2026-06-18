@@ -4,21 +4,23 @@ import (
 	"cmp"
 
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
-	heliosCue "github.com/helios-platform-team/helios-platform/apps/operator/internal/controller/shared"
 	cueModel "github.com/helios-platform-team/helios-platform/apps/operator/internal/cue"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/provider"
 )
 
 const defaultPipelineName = "from-code-to-cluster"
 
 // MapCRDToTektonInput converts HeliosApp CRD to TektonInput for CUE rendering.
 func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
+	p := provider.Default
+
 	input := cueModel.TektonInput{
 		AppName:         app.Name,
 		Namespace:       app.Namespace,
-		GitRepo:         heliosCue.RewriteGiteaURL(app.Spec.GitRepo),
+		GitRepo:         p.RewriteURL(app.Spec.GitRepo),
 		GitBranch:       app.Spec.GitBranch,
 		ImageRepo:       app.Spec.ImageRepo,
-		GitOpsRepo:      heliosCue.RewriteGiteaURL(app.Spec.GitOpsRepo),
+		GitOpsRepo:      p.RewriteURL(app.Spec.GitOpsRepo),
 		GitOpsPath:      app.Spec.GitOpsPath,
 		GitOpsBranch:    app.Spec.GitOpsBranch,
 		GitOpsSecretRef: app.Spec.GitOpsSecretRef,
@@ -45,12 +47,12 @@ func MapCRDToTektonInput(app *appv1alpha1.HeliosApp) cueModel.TektonInput {
 	input.GitBranch = cmp.Or(input.GitBranch, "main")
 	input.GitOpsBranch = cmp.Or(input.GitOpsBranch, "main")
 	input.GitOpsSecretRef = cmp.Or(input.GitOpsSecretRef, "helios-gitops-bot")
-	input.WebhookSecret = cmp.Or(input.WebhookSecret, "gitea-webhook-secret")
+	input.WebhookSecret = cmp.Or(input.WebhookSecret, p.WebhookSecretName())
 	// Derive the database secret name dynamically from app name if not explicitly set
 	if input.DatabaseSecretRef == "" {
 		input.DatabaseSecretRef = app.Name + "-db-secret"
 	}
-	input.TriggerType = cmp.Or(input.TriggerType, "gitea-push")
+	input.TriggerType = cmp.Or(input.TriggerType, p.DefaultTriggerType())
 	if input.PipelineName == "" {
 		input.PipelineName = defaultPipelineName
 		input.PipelineType = defaultPipelineName

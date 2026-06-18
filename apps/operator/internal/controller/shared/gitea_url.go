@@ -1,46 +1,13 @@
 package shared
 
 import (
-	"os"
-	"strings"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/provider"
 )
 
-// RewriteGiteaURL translates an external Gitea URL (e.g., http://localhost:3030/...)
-// to the in-cluster service URL so in-cluster components can reach it.
+// RewriteGiteaURL translates an external git URL to the in-cluster service URL
+// so in-cluster components can reach it. Delegates to the configured git provider.
 //
-// Falls back to the original URL if GITEA_URL / GITEA_INTERNAL_URL are not set.
+// Deprecated: Use provider.Default.RewriteURL() directly for provider-agnostic code.
 func RewriteGiteaURL(repoURL string) string {
-	externalURL := os.Getenv("GITEA_URL")
-	internalURL := os.Getenv("GITEA_INTERNAL_URL")
-
-	// Normalize: remove trailing slashes
-	externalURL = strings.TrimSuffix(externalURL, "/")
-	internalURL = strings.TrimSuffix(internalURL, "/")
-
-	if externalURL != "" && internalURL != "" {
-		rewritten := strings.Replace(repoURL, externalURL, internalURL, 1)
-		if rewritten != repoURL {
-			return rewritten
-		}
-
-		const (
-			localhost = "localhost"
-			loopback  = "127.0.0.1"
-		)
-		if strings.Contains(externalURL, localhost) {
-			altExternal := strings.Replace(externalURL, localhost, loopback, 1)
-			rewritten = strings.Replace(repoURL, altExternal, internalURL, 1)
-			if rewritten != repoURL {
-				return rewritten
-			}
-		}
-		if strings.Contains(externalURL, loopback) {
-			altExternal := strings.Replace(externalURL, loopback, localhost, 1)
-			rewritten = strings.Replace(repoURL, altExternal, internalURL, 1)
-			if rewritten != repoURL {
-				return rewritten
-			}
-		}
-	}
-	return repoURL
+	return provider.Default.RewriteURL(repoURL)
 }
