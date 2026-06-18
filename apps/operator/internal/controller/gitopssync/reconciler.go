@@ -45,7 +45,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, 
 	token, username := r.resolveCredentials(ctx, app)
 
 	if token == "" {
-		err := fmt.Errorf("GitOps token is empty. Check Secret or GITEA_TOKEN env var")
+		err := fmt.Errorf("GitOps token is empty. Check GitOpsSecretRef or provider credentials")
 		log.Error(err, "Authentication failed")
 		r.updateFailedStatus(ctx, app, "GitOps token missing")
 		return nil

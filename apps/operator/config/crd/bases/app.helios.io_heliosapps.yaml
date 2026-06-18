@@ -383,6 +383,7 @@ spec:
                 default: gitea-push
                 description: TriggerType is the type of trigger to use for the pipeline
                 enum:
+                - git-push
                 - gitea-push
                 - db-migrate
                 type: string
