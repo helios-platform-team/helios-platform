@@ -33,3 +33,7 @@ func (p *GitHubProvider) DefaultUsername() string {
 	}
 	return "git"
 }
+
+func (p *GitHubProvider) TokenEnvVar() string { return "GITHUB_TOKEN" }
+
+func (p *GitHubProvider) UserEnvVar() string { return "GITHUB_USER" }

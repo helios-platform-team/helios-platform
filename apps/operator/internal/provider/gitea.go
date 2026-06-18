@@ -54,3 +54,7 @@ func (p *GiteaProvider) DefaultUsername() string {
 	}
 	return "git"
 }
+
+func (p *GiteaProvider) TokenEnvVar() string { return "GITEA_TOKEN" }
+
+func (p *GiteaProvider) UserEnvVar() string { return "GITEA_USER" }

@@ -15,6 +15,7 @@ import (
 
 	appv1alpha1 "github.com/helios-platform-team/helios-platform/apps/operator/api/v1alpha1"
 	"github.com/helios-platform-team/helios-platform/apps/operator/internal/gitops"
+	"github.com/helios-platform-team/helios-platform/apps/operator/internal/provider"
 )
 
 // GitFactory creates a GitOps client for the given repo, user, and token.
@@ -91,10 +92,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, 
 func (r *Reconciler) resolveCredentials(ctx context.Context, app *appv1alpha1.HeliosApp) (string, string) {
 	log := logf.FromContext(ctx)
 
-	token := os.Getenv("GITEA_TOKEN")
-	username := os.Getenv("GITEA_USER")
+	token := readTokenEnv(provider.Default)
+	username := readUserEnv(provider.Default)
 	if username == "" {
-		username = "git"
+		username = provider.Default.DefaultUsername()
 	}
 
 	if app.Spec.GitOpsSecretRef != "" {
@@ -133,4 +134,22 @@ func (r *Reconciler) updateFailedStatus(ctx context.Context, app *appv1alpha1.He
 func computeHash(data []byte) string {
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
+}
+
+// readTokenEnv reads the auth token from the provider-specific env var,
+// falling back to the generic GIT_TOKEN.
+func readTokenEnv(p provider.GitProvider) string {
+	if t := os.Getenv(p.TokenEnvVar()); t != "" {
+		return t
+	}
+	return os.Getenv("GIT_TOKEN")
+}
+
+// readUserEnv reads the username from the provider-specific env var,
+// falling back to the generic GIT_USER.
+func readUserEnv(p provider.GitProvider) string {
+	if u := os.Getenv(p.UserEnvVar()); u != "" {
+		return u
+	}
+	return os.Getenv("GIT_USER")
 }

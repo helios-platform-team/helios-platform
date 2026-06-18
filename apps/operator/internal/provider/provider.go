@@ -32,4 +32,10 @@ type GitProvider interface {
 	// DefaultUsername returns the default username for git authentication
 	// when none is explicitly provided.
 	DefaultUsername() string
+
+	// TokenEnvVar returns the environment variable name for the authentication token.
+	TokenEnvVar() string
+
+	// UserEnvVar returns the environment variable name for the git username.
+	UserEnvVar() string
 }

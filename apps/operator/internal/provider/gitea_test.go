@@ -59,6 +59,12 @@ func TestGiteaProvider_Defaults(t *testing.T) {
 	if got := p.DefaultUsername(); got != "git" {
 		t.Errorf("DefaultUsername() = %q, want %q", got, "git")
 	}
+	if got := p.TokenEnvVar(); got != "GITEA_TOKEN" {
+		t.Errorf("TokenEnvVar() = %q, want %q", got, "GITEA_TOKEN")
+	}
+	if got := p.UserEnvVar(); got != "GITEA_USER" {
+		t.Errorf("UserEnvVar() = %q, want %q", got, "GITEA_USER")
+	}
 }
 
 func TestGitHubProvider_RewriteURL(t *testing.T) {
@@ -86,6 +92,12 @@ func TestGitHubProvider_Defaults(t *testing.T) {
 	}
 	if got := p.DefaultUsername(); got != "git" {
 		t.Errorf("DefaultUsername() = %q, want %q", got, "git")
+	}
+	if got := p.TokenEnvVar(); got != "GITHUB_TOKEN" {
+		t.Errorf("TokenEnvVar() = %q, want %q", got, "GITHUB_TOKEN")
+	}
+	if got := p.UserEnvVar(); got != "GITHUB_USER" {
+		t.Errorf("UserEnvVar() = %q, want %q", got, "GITHUB_USER")
 	}
 }
 
