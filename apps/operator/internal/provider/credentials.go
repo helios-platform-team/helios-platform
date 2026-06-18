@@ -10,17 +10,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// CredentialResolver resolves git authentication credentials using a
-// three-tier strategy: explicit app secret → provider default secret → env vars.
-type CredentialResolver struct {
+// CredentialsResolver resolves git authentication credentials.
+type CredentialsResolver interface {
+	// ResolveGitCredentials resolves the token and username for git operations.
+	//
+	// Resolution order:
+	//  1. Explicit secret referenced by secretRef (highest priority)
+	//  2. Provider default secret (e.g., "helios-gitops-bot" for Gitea)
+	//  3. Environment variables (provider-specific with generic fallback)
+	ResolveGitCredentials(ctx context.Context, namespace, secretRef string) (token, username string, err error)
+}
+
+// credentialResolver is the default implementation of CredentialsResolver.
+type credentialResolver struct {
 	client   client.Client
 	provider GitProvider
 }
 
-// NewCredentialResolver creates a CredentialResolver backed by the given
+// NewCredentialResolver creates a CredentialsResolver backed by the given
 // Kubernetes client and git provider.
-func NewCredentialResolver(c client.Client, p GitProvider) *CredentialResolver {
-	return &CredentialResolver{client: c, provider: p}
+func NewCredentialResolver(c client.Client, p GitProvider) CredentialsResolver {
+	return &credentialResolver{client: c, provider: p}
 }
 
 // ResolveGitCredentials resolves the token and username for git operations.
@@ -29,7 +39,7 @@ func NewCredentialResolver(c client.Client, p GitProvider) *CredentialResolver {
 //  1. Explicit secret referenced by secretRef (highest priority)
 //  2. Provider default secret (e.g., "helios-gitops-bot" for Gitea)
 //  3. Environment variables (provider-specific with generic fallback)
-func (r *CredentialResolver) ResolveGitCredentials(
+func (r *credentialResolver) ResolveGitCredentials(
 	ctx context.Context,
 	namespace, secretRef string,
 ) (token, username string, err error) {
@@ -67,7 +77,7 @@ func (r *CredentialResolver) ResolveGitCredentials(
 
 // readSecret looks up a Kubernetes Secret and extracts the token and username.
 // Returns zero values and false if the secret is missing or lacks credentials.
-func (r *CredentialResolver) readSecret(ctx context.Context, namespace, name string) (token, username string, found bool) {
+func (r *credentialResolver) readSecret(ctx context.Context, namespace, name string) (token, username string, found bool) {
 	var secret corev1.Secret
 	if err := r.client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, &secret); err != nil {
 		return "", "", false

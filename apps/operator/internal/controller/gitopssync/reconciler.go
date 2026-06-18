@@ -23,7 +23,7 @@ type Reconciler struct {
 	Client      client.Client
 	Scheme      *runtime.Scheme
 	GitFactory  GitFactory
-	Credentials *provider.CredentialResolver
+	Credentials provider.CredentialsResolver
 }
 
 // NewReconciler creates a new GitOps sync Reconciler.
