@@ -181,12 +181,6 @@ spec:
       input:
         manifestPath: ./gitops/serviceaccount.yaml
 
-    # 3.2 Apply presync job
-    - id: apply-presync
-      name: Run Initial Database Migration
-      action: kubernetes:apply
-      input:
-        manifestPath: ./gitops/presync-job.yaml
 
     # 4. Create webhook secret in cluster
     - id: create-webhook-secret

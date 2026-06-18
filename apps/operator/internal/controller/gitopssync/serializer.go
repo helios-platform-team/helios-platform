@@ -74,6 +74,9 @@ func SerializeHeliosApp(app *appv1alpha1.HeliosApp) ([]byte, error) {
 	// and causes false drift detection in GitOps systems.
 	if cleanApp.Annotations != nil {
 		delete(cleanApp.Annotations, "kubectl.kubernetes.io/last-applied-configuration")
+		// Strip internal operator annotations that should not be tracked in GitOps
+		delete(cleanApp.Annotations, "helios.io/presync-job")
+
 		// Clean up empty annotations map to avoid clutter in output
 		if len(cleanApp.Annotations) == 0 {
 			cleanApp.Annotations = nil

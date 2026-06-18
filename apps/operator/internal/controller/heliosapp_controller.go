@@ -18,10 +18,12 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -129,36 +131,6 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	// 4. Apply Rendered Objects Directly to Cluster
-	for _, objMap := range objects {
-		u := &unstructured.Unstructured{Object: objMap}
-
-		// Ensure namespaced resources inherit HeliosApp namespace
-		if u.GetNamespace() == "" {
-			u.SetNamespace(heliosApp.Namespace)
-		}
-
-		// Only set OwnerReference for namespaced scoped resources
-		// Assuming we only create resources in the same namespace for now
-		if err := controllerutil.SetControllerReference(&heliosApp, u, r.Scheme); err != nil {
-			log.Error(err, "Failed to set owner reference", "kind", u.GetKind(), "name", u.GetName())
-			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Owner reference setup failed: %v", err))
-			return ctrl.Result{}, err
-		}
-
-		patchOpts := []client.PatchOption{
-			client.ForceOwnership,
-			client.FieldOwner("helios-operator"),
-		}
-
-		if err := r.Patch(ctx, u, client.Apply, patchOpts...); err != nil {
-			log.Error(err, "Failed to apply resource via Server-Side Apply", "kind", u.GetKind(), "name", u.GetName())
-			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Resource application failed (%s/%s): %v", u.GetKind(), u.GetName(), err))
-			return ctrl.Result{}, err
-		}
-		log.Info("Successfully applied resource via SSA", "kind", u.GetKind(), "name", u.GetName())
-	}
-
 	// ------------------------------------------------------------------
 	// PHASE -1 & 0: Tekton CI/CD Resources (Tasks, Pipeline, Triggers)
 	// All Tekton resources are rendered via CUE engine.
@@ -203,6 +175,48 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "Failed to reconcile database instance")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Database instance provisioning failed: %v", err))
 		return ctrl.Result{}, err
+	}
+
+	// ------------------------------------------------------------------
+	// PHASE 0.8: PreSync Job Execution
+	// ------------------------------------------------------------------
+	presyncResult, err := r.handlePreSyncJob(ctx, &heliosApp)
+	if err != nil {
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("PreSync Job failed: %v", err))
+		return ctrl.Result{}, err
+	}
+	if presyncResult.Requeue || presyncResult.RequeueAfter > 0 {
+		return presyncResult, nil
+	}
+
+	// 4. Apply Rendered Objects Directly to Cluster
+	for _, objMap := range objects {
+		u := &unstructured.Unstructured{Object: objMap}
+
+		// Ensure namespaced resources inherit HeliosApp namespace
+		if u.GetNamespace() == "" {
+			u.SetNamespace(heliosApp.Namespace)
+		}
+
+		// Only set OwnerReference for namespaced scoped resources
+		// Assuming we only create resources in the same namespace for now
+		if err := controllerutil.SetControllerReference(&heliosApp, u, r.Scheme); err != nil {
+			log.Error(err, "Failed to set owner reference", "kind", u.GetKind(), "name", u.GetName())
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Owner reference setup failed: %v", err))
+			return ctrl.Result{}, err
+		}
+
+		patchOpts := []client.PatchOption{
+			client.ForceOwnership,
+			client.FieldOwner("helios-operator"),
+		}
+
+		if err := r.Patch(ctx, u, client.Apply, patchOpts...); err != nil {
+			log.Error(err, "Failed to apply resource via Server-Side Apply", "kind", u.GetKind(), "name", u.GetName())
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Resource application failed (%s/%s): %v", u.GetKind(), u.GetName(), err))
+			return ctrl.Result{}, err
+		}
+		log.Info("Successfully applied resource via SSA", "kind", u.GetKind(), "name", u.GetName())
 	}
 
 	// ------------------------------------------------------------------
@@ -410,4 +424,61 @@ func (r *HeliosAppReconciler) handlePreSyncCleanup(ctx context.Context, heliosAp
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// handlePreSyncJob extracts and applies the PreSync job from the HeliosApp annotations.
+// It blocks the reconcile loop until the job is completed successfully.
+func (r *HeliosAppReconciler) handlePreSyncJob(ctx context.Context, app *appv1alpha1.HeliosApp) (ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	jobJSON, ok := app.Annotations["helios.io/presync-job"]
+	if !ok || jobJSON == "" {
+		return ctrl.Result{}, nil
+	}
+
+	var job batchv1.Job
+	if err := json.Unmarshal([]byte(jobJSON), &job); err != nil {
+		log.Error(err, "Failed to unmarshal PreSync job")
+		return ctrl.Result{}, fmt.Errorf("failed to unmarshal presync job: %w", err)
+	}
+
+	// Ensure namespace matches
+	job.Namespace = app.Namespace
+
+	// Ensure OwnerReference for garbage collection
+	if err := controllerutil.SetControllerReference(app, &job, r.Scheme); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to set owner reference on presync job: %w", err)
+	}
+
+	existingJob := &batchv1.Job{}
+	err := r.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, existingJob)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Creating PreSync Job", "job", job.Name)
+			if err := r.Create(ctx, &job); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to create presync job: %w", err)
+			}
+			r.updateStatus(ctx, app, appv1alpha1.PhasePending, "Waiting for PreSync database migration job to complete")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("failed to get presync job: %w", err)
+	}
+
+	// Check status of existing job
+	if existingJob.Status.Succeeded > 0 {
+		log.Info("PreSync Job completed successfully", "job", job.Name)
+		return ctrl.Result{}, nil
+	}
+
+	// If the job has failed and reached its backoff limit, we consider it a permanent failure.
+	for _, cond := range existingJob.Status.Conditions {
+		if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+			return ctrl.Result{}, fmt.Errorf("presync job failed permanently: %s", cond.Reason)
+		}
+	}
+
+	// Still running
+	log.Info("Waiting for PreSync Job to complete", "job", job.Name)
+	r.updateStatus(ctx, app, appv1alpha1.PhasePending, "Waiting for PreSync database migration job to complete")
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }

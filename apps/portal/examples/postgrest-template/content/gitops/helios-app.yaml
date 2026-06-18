@@ -15,6 +15,7 @@ spec:
   port: ${{ values.port }}
   replicas: 1
   triggerType: db-migrate
+  pipelineName: db-migrate
 
   components:
     - name: ${{ values.name }}

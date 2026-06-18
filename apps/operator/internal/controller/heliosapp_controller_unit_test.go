@@ -269,3 +269,73 @@ func TestHeliosAppReconciler_Reconcile_PendingImage(t *testing.T) {
 		t.Errorf("Expected Phase to be %s, got %s", appv1alpha1.PhasePending, updatedApp.Status.Phase)
 	}
 }
+
+func TestHeliosAppReconciler_Reconcile_PreSyncJob(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
+
+	jobJSON := `{"apiVersion":"batch/v1","kind":"Job","metadata":{"name":"test-presync","namespace":"default"},"spec":{"template":{"spec":{"containers":[{"name":"main","image":"busybox"}]}}}}`
+
+	heliosApp := &appv1alpha1.HeliosApp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "presync-app",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"helios.io/presync-job": jobJSON,
+			},
+		},
+		Spec: appv1alpha1.HeliosAppSpec{
+			Components: []appv1alpha1.Component{
+				{
+					Name:       "backend",
+					Type:       "webservice",
+					Properties: &runtime.RawExtension{Raw: []byte(`{"image": "nginx:latest"}`)},
+				},
+			},
+		},
+	}
+
+	dockerCredentialsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "docker-credentials", Namespace: "default"},
+		Type:       corev1.SecretTypeDockercfg,
+		Data:       map[string][]byte{".dockercfg": []byte(`{}`)},
+	}
+
+	heliosGitopsBotSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "helios-gitops-bot", Namespace: "default"},
+		Data:       map[string][]byte{"token": []byte("dummy-token")},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(heliosApp, dockerCredentialsSecret, heliosGitopsBotSecret).
+		WithStatusSubresource(heliosApp).
+		Build()
+
+	r := &HeliosAppReconciler{
+		Client:    fakeClient,
+		Scheme:    scheme,
+		CueEngine: &FakeCueEngine{},
+		Tekton:    tekton.NewReconciler(fakeClient, scheme, &FakeTektonRenderer{}),
+		ArgoCD:    argocd.NewReconciler(fakeClient, scheme),
+		Database:  database.NewReconciler(fakeClient, scheme),
+		GitOps:    gitopssync.NewReconciler(fakeClient, scheme, nil),
+	}
+
+	// 1st Reconcile: Should create the job and return RequeueAfter
+	res, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: types.NamespacedName{Name: "presync-app", Namespace: "default"}})
+	if err != nil {
+		t.Errorf("Reconcile() error = %v, wantErr %v", err, nil)
+	}
+	if res.RequeueAfter != 5*time.Second {
+		t.Errorf("Reconcile() result = %v, want RequeueAfter: 5s", res)
+	}
+
+	updatedApp := &appv1alpha1.HeliosApp{}
+	_ = fakeClient.Get(t.Context(), types.NamespacedName{Name: "presync-app", Namespace: "default"}, updatedApp)
+	if updatedApp.Status.Phase != appv1alpha1.PhasePending {
+		t.Errorf("Expected Phase to be %s, got %s", appv1alpha1.PhasePending, updatedApp.Status.Phase)
+	}
+}
