@@ -5,11 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"os"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -23,9 +20,10 @@ type GitFactory func(repo, user, token string) gitops.ClientInterface
 
 // Reconciler handles GitOps manifest sync (credentials + git push + hash).
 type Reconciler struct {
-	Client     client.Client
-	Scheme     *runtime.Scheme
-	GitFactory GitFactory
+	Client      client.Client
+	Scheme      *runtime.Scheme
+	GitFactory  GitFactory
+	Credentials *provider.CredentialResolver
 }
 
 // NewReconciler creates a new GitOps sync Reconciler.
@@ -35,7 +33,12 @@ func NewReconciler(c client.Client, scheme *runtime.Scheme, factory GitFactory) 
 			return gitops.NewClient(repo, user, token)
 		}
 	}
-	return &Reconciler{Client: c, Scheme: scheme, GitFactory: factory}
+	return &Reconciler{
+		Client:      c,
+		Scheme:      scheme,
+		GitFactory:  factory,
+		Credentials: provider.NewCredentialResolver(c, provider.Default),
+	}
 }
 
 // Reconcile resolves GitOps credentials, computes a manifest hash, and syncs
@@ -43,10 +46,8 @@ func NewReconciler(c client.Client, scheme *runtime.Scheme, factory GitFactory) 
 func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, manifestBytes []byte) error {
 	log := logf.FromContext(ctx)
 
-	token, username := r.resolveCredentials(ctx, app)
-
-	if token == "" {
-		err := fmt.Errorf("GitOps token is empty. Check GitOpsSecretRef or provider credentials")
+	token, username, err := r.Credentials.ResolveGitCredentials(ctx, app.Namespace, app.Spec.GitOpsSecretRef)
+	if err != nil {
 		log.Error(err, "Authentication failed")
 		r.updateFailedStatus(ctx, app, "GitOps token missing")
 		return nil
@@ -88,41 +89,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, 
 	return nil
 }
 
-// resolveCredentials reads the GitOps token and username from a Secret or env var.
-func (r *Reconciler) resolveCredentials(ctx context.Context, app *appv1alpha1.HeliosApp) (string, string) {
-	log := logf.FromContext(ctx)
-
-	token := readTokenEnv(provider.Default)
-	username := readUserEnv(provider.Default)
-	if username == "" {
-		username = provider.Default.DefaultUsername()
-	}
-
-	if app.Spec.GitOpsSecretRef != "" {
-		var secret corev1.Secret
-		if err := r.Client.Get(ctx, types.NamespacedName{Name: app.Spec.GitOpsSecretRef, Namespace: app.Namespace}, &secret); err == nil {
-			if t, ok := secret.Data["token"]; ok {
-				token = string(t)
-			} else if p, ok := secret.Data["password"]; ok {
-				token = string(p)
-			} else {
-				log.Info("Secret found but 'token' or 'password' key is missing", "Secret", app.Spec.GitOpsSecretRef)
-				r.updateFailedStatus(ctx, app, fmt.Sprintf("Secret %s missing 'token' key", app.Spec.GitOpsSecretRef))
-				return "", ""
-			}
-			if u, ok := secret.Data["username"]; ok {
-				username = string(u)
-			}
-		} else {
-			log.Error(err, "Failed to get GitOps Secret", "Secret", app.Spec.GitOpsSecretRef)
-			r.updateFailedStatus(ctx, app, fmt.Sprintf("Secret %s not found", app.Spec.GitOpsSecretRef))
-			return "", ""
-		}
-	}
-
-	return token, username
-}
-
 func (r *Reconciler) updateFailedStatus(ctx context.Context, app *appv1alpha1.HeliosApp, message string) {
 	app.Status.Phase = appv1alpha1.PhaseFailed
 	app.Status.Message = message
@@ -134,22 +100,4 @@ func (r *Reconciler) updateFailedStatus(ctx context.Context, app *appv1alpha1.He
 func computeHash(data []byte) string {
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
-}
-
-// readTokenEnv reads the auth token from the provider-specific env var,
-// falling back to the generic GIT_TOKEN.
-func readTokenEnv(p provider.GitProvider) string {
-	if t := os.Getenv(p.TokenEnvVar()); t != "" {
-		return t
-	}
-	return os.Getenv("GIT_TOKEN")
-}
-
-// readUserEnv reads the username from the provider-specific env var,
-// falling back to the generic GIT_USER.
-func readUserEnv(p provider.GitProvider) string {
-	if u := os.Getenv(p.UserEnvVar()); u != "" {
-		return u
-	}
-	return os.Getenv("GIT_USER")
 }

@@ -37,3 +37,5 @@ func (p *GitHubProvider) DefaultUsername() string {
 func (p *GitHubProvider) TokenEnvVar() string { return "GITHUB_TOKEN" }
 
 func (p *GitHubProvider) UserEnvVar() string { return "GITHUB_USER" }
+
+func (p *GitHubProvider) DefaultCredentialSecretName() string { return "github-credentials" }

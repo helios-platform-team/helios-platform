@@ -38,4 +38,8 @@ type GitProvider interface {
 
 	// UserEnvVar returns the environment variable name for the git username.
 	UserEnvVar() string
+
+	// DefaultCredentialSecretName returns the default Kubernetes Secret name
+	// used for git credentials when no explicit secret is configured.
+	DefaultCredentialSecretName() string
 }

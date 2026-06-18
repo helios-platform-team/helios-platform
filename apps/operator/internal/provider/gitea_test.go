@@ -65,6 +65,9 @@ func TestGiteaProvider_Defaults(t *testing.T) {
 	if got := p.UserEnvVar(); got != "GITEA_USER" {
 		t.Errorf("UserEnvVar() = %q, want %q", got, "GITEA_USER")
 	}
+	if got := p.DefaultCredentialSecretName(); got != "helios-gitops-bot" {
+		t.Errorf("DefaultCredentialSecretName() = %q, want %q", got, "helios-gitops-bot")
+	}
 }
 
 func TestGitHubProvider_RewriteURL(t *testing.T) {
@@ -98,6 +101,9 @@ func TestGitHubProvider_Defaults(t *testing.T) {
 	}
 	if got := p.UserEnvVar(); got != "GITHUB_USER" {
 		t.Errorf("UserEnvVar() = %q, want %q", got, "GITHUB_USER")
+	}
+	if got := p.DefaultCredentialSecretName(); got != "github-credentials" {
+		t.Errorf("DefaultCredentialSecretName() = %q, want %q", got, "github-credentials")
 	}
 }
 
