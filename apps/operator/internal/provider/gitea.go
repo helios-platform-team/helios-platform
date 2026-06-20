@@ -58,3 +58,5 @@ func (p *GiteaProvider) DefaultUsername() string {
 func (p *GiteaProvider) TokenEnvVar() string { return "GITEA_TOKEN" }
 
 func (p *GiteaProvider) UserEnvVar() string { return "GITEA_USER" }
+
+func (p *GiteaProvider) DefaultCredentialSecretName() string { return "helios-gitops-bot" }
