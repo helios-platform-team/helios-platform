@@ -77,6 +77,7 @@ spec:
           ui:options:
             allowedHosts:
               - localhost:3030
+              - github.com
         namespace:
           title: Kubernetes Namespace
           type: string
@@ -115,7 +116,20 @@ spec:
 
     - id: publish-source
       name: Publish Source Code
+      if: ${{ parameters.gitProvider == 'gitea' }}
+
       action: publish:gitea
+      input:
+        description: PostgREST Configuration for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}
+        sourcePath: ./source
+        repoVisibility: public
+
+    - id: publish-source-github
+      name: Publish Source Code
+      if: ${{ parameters.gitProvider == 'github' }}
+
+      action: publish:github
       input:
         description: PostgREST Configuration for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}
@@ -124,7 +138,7 @@ spec:
 
     - id: create-webhook
       name: Create Webhook for DB Migration Trigger
-      action: gitea:create-webhook
+      action: git:create-webhook
       input:
         repoUrl: ${{ parameters.repoUrl }}
         webhookUrl: http://el-${{ parameters.name }}-db-migrate-listener.${{ parameters.namespace }}.svc.cluster.local:8080
@@ -160,7 +174,20 @@ spec:
 
     - id: publish-gitops
       name: Publish GitOps Manifests
+      if: ${{ parameters.gitProvider == 'gitea' }}
+
       action: publish:gitea
+      input:
+        description: GitOps Manifests for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl | replace('.git', '') }}-gitops
+        sourcePath: ./gitops
+        repoVisibility: public
+
+    - id: publish-gitops-github
+      name: Publish GitOps Manifests
+      if: ${{ parameters.gitProvider == 'github' }}
+
+      action: publish:github
       input:
         description: GitOps Manifests for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl | replace('.git', '') }}-gitops

@@ -50,9 +50,9 @@ integrations:
       username: ${GITEA_USER}
       password: ${GITEA_TOKEN}
   # Optional: GitHub integration (uncomment if you still need GitHub access)
-  # github:
-  #   - host: github.com
-  #     token: ${GITHUB_TOKEN}
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}
 
 proxy:
   ### Example for how to add a proxy endpoint for the frontend.
@@ -103,6 +103,8 @@ scaffolder:
   defaultEnvironment:
     secrets:
       GITEA_TOKEN: ${GITEA_TOKEN}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GIT_PROVIDER_TYPE: ${GIT_PROVIDER_TYPE:-gitea}
 
 catalog:
   import:

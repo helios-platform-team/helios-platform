@@ -105,6 +105,7 @@ spec:
           ui:options:
             allowedHosts:
               - localhost:3030
+              - github.com
         webhookSecret:
           title: Webhook Secret
           type: string
@@ -151,9 +152,23 @@ spec:
         files: '${{ ( [ "./source/index.webpack.html", "./source/webpack.config.ejs", "./source/babel.config.json" ] if parameters.buildTool == "vite" else [ "./source/index.vite.html", "./source/vite.config.js" ] ).concat( [ "./source/tailwind.config.cjs", "./source/postcss.config.cjs" ] if parameters.styling == "vanilla" else [] ).concat( [ "./source/src/store/zustandStore.js" ] if parameters.stateManagement == "redux" else ( [ "./source/src/store/reduxStore.js" ] if parameters.stateManagement == "zustand" else [ "./source/src/store" ] ) ).concat( [ "./source/src/index.vanilla.css" ] if parameters.styling == "tailwind" else [ "./source/src/index.tailwind.css" ] ) }}'
 
     # 4. Publish Source Code to Gitea
+
     - id: publish-source
       name: Publish Source Code
+      if: ${{ parameters.gitProvider == 'gitea' }}
+
       action: publish:gitea
+      input:
+        description: Source Code for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}
+        sourcePath: ./source
+        repoVisibility: public
+
+    - id: publish-source-github
+      name: Publish Source Code
+      if: ${{ parameters.gitProvider == 'github' }}
+
+      action: publish:github
       input:
         description: Source Code for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}
@@ -163,7 +178,7 @@ spec:
     # 5. Create Gitea Webhook for Tekton CI
     - id: create-webhook
       name: Create Webhook
-      action: gitea:create-webhook
+      action: git:create-webhook
       input:
         repoUrl: ${{ parameters.repoUrl }}
         webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
@@ -191,9 +206,23 @@ spec:
           testCommand: "npm install && npm run build"
 
     # 7. Publish GitOps Manifests to Gitea
+
     - id: publish-gitops
       name: Publish GitOps Manifests
+      if: ${{ parameters.gitProvider == 'gitea' }}
+
       action: publish:gitea
+      input:
+        description: GitOps Manifests for ${{ parameters.name }}
+        repoUrl: ${{ parameters.repoUrl }}-gitops
+        sourcePath: ./gitops
+        repoVisibility: public
+
+    - id: publish-gitops-github
+      name: Publish GitOps Manifests
+      if: ${{ parameters.gitProvider == 'github' }}
+
+      action: publish:github
       input:
         description: GitOps Manifests for ${{ parameters.name }}
         repoUrl: ${{ parameters.repoUrl }}-gitops
