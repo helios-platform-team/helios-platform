@@ -64,6 +64,14 @@ func (r *PreSyncReconciler) ReconcilePreSyncResources(
 		return nil
 	}
 
+	// Only create PreSync resources if the application uses the db-migrate pipeline.
+	// Other templates (like React or standard Node.js apps) might have a database trait
+	// but handle migrations internally or not at all, so they won't have a -migrate image.
+	if heliosApp.Spec.PipelineName != "db-migrate" {
+		log.Info("Database trait found, but pipeline is not db-migrate. Skipping PreSync resource creation")
+		return nil
+	}
+
 	log.Info("Creating PreSync resources for database migrations", "app", heliosApp.Name)
 
 	// Add finalizer to ensure cluster-scoped RBAC resources are cleaned up on deletion
@@ -224,8 +232,8 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 	databaseSecretName := fmt.Sprintf("%s-db-secret", databaseComponentName)
 
 	// Find migration image reference from components
-	// For now, use the standard naming convention: <app-name>-migrate:latest
-	migrateImage := fmt.Sprintf("index.docker.io/{{.Values.dockerOrg}}/%s-migrate:latest", heliosApp.Name)
+	// The migration image is tagged as <app-name>-migrate:latest in the same repository
+	migrateImage := fmt.Sprintf("%s-migrate:latest", heliosApp.Spec.ImageRepo)
 
 	// Build PreSync Job YAML
 	preSyncJob := map[string]interface{}{
@@ -260,6 +268,11 @@ func (r *PreSyncReconciler) reconcilePreSyncJobconfig(ctx context.Context, helio
 							"name":            "db-migrate",
 							"image":           migrateImage,
 							"imagePullPolicy": "Always",
+							"command": []string{
+								"/bin/sh",
+								"-c",
+								"if [ -d \"db/migrations\" ]; then echo \"Running migrations...\"; migrate -path db/migrations -database \"$PGRST_DB_URI\" up; else echo \"No db/migrations directory found.\"; fi",
+							},
 							"env": []map[string]interface{}{
 								{
 									"name": "PGRST_DB_URI",
