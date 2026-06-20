@@ -4,15 +4,24 @@ import {
 } from '@backstage/plugin-scaffolder-node';
 import { InputError } from '@backstage/errors';
 
+function getGitToken(): string {
+  return (
+    process.env.GIT_TOKEN ||
+    process.env.GITEA_TOKEN ||
+    process.env.GITHUB_TOKEN ||
+    ''
+  );
+}
+
 /**
  * Custom action to create Git credentials secret in Kubernetes.
- * Reads GITEA_TOKEN from environment variable to avoid template substitution issues.
+ * Reads the git token from GIT_TOKEN env var (or provider-specific fallbacks).
  */
 export const createGitCredentialsSecretAction = () => {
   return createTemplateAction({
     id: 'kubernetes:create-git-credentials-secret',
     description:
-      'Creates a Git credentials secret in Kubernetes using the server-side GITEA_TOKEN',
+      'Creates a Git credentials secret in Kubernetes using the server-side git token',
     schema: {
       input: z =>
         z.object({
@@ -35,11 +44,11 @@ export const createGitCredentialsSecretAction = () => {
         webhookSecret = '',
       } = ctx.input;
 
-      const token = process.env.GITEA_TOKEN;
+      const token = getGitToken();
 
       if (!token) {
         throw new InputError(
-          'GITEA_TOKEN environment variable is not set on the Backstage server',
+          'Git token is not set. Configure GIT_TOKEN, GITEA_TOKEN, or GITHUB_TOKEN on the Backstage server',
         );
       }
 
