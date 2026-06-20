@@ -10,9 +10,9 @@ import (
 // =====================================================
 
 #TriggerRegistry: {
-	// FIX: Remove 'tekton.' prefix. This is a local definition in the same package.
-	"gitea-push":  #GiteaPushTriggerBundle
-	"db-migrate":  #DatabaseMigrationTriggerBundle
+	"git-push":   #GitPushTriggerBundle
+	"gitea-push": #GitPushTriggerBundle
+	"db-migrate": #DatabaseMigrationTriggerBundle
 }
 
 // =====================================================
@@ -24,14 +24,14 @@ import (
 	// Input
 	triggerType:   string
 	webhookDomain: string | *""
-	
+
 	// Data passed to the Bundle
 	// Inherit contract from Base Trigger Bundle (Validation + Defaults)
 	bundleParams: tekton.#TriggerBundle.parameter
 
 	// Lookup Bundle
 	_bundleDef: #TriggerRegistry[triggerType]
-	
+
 	// Render Bundle
 	_bundle: _bundleDef & {
 		parameter: bundleParams
@@ -50,7 +50,7 @@ import (
 					servicePort:   8080
 				}
 			}).output
-		}
+		},
 	]
 
 	// Combine Outputs using list.Concat

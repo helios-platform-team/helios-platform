@@ -103,10 +103,11 @@ func (r *Reconciler) ReconcileInitialPipelineRun(ctx context.Context, app *appv1
 		pipelineName = defaultPipelineName
 	}
 
-	// Only trigger if triggerType is not gitea-push or if we want to force the initial build.
-	// If it's gitea-push, we only skip if a PipelineRun ALREADY exists (triggered by webhook).
+	// Only trigger if triggerType is not a webhook-driven type (git-push/gitea-push)
+	// or if we want to force the initial build.
+	// If it's webhook-driven, we only skip if a PipelineRun ALREADY exists (triggered by webhook).
 	// This prevents missing the initial build if the webhook fails or is delayed.
-	if app.Spec.TriggerType == "gitea-push" {
+	if isWebhookTrigger(app.Spec.TriggerType) {
 		prList := &unstructured.UnstructuredList{}
 		prList.SetGroupVersionKind(schema.GroupVersionKind{
 			Group:   "tekton.dev",
@@ -117,11 +118,11 @@ func (r *Reconciler) ReconcileInitialPipelineRun(ctx context.Context, app *appv1
 			"app.kubernetes.io/name": app.Name,
 		})
 		if err == nil && len(prList.Items) > 0 {
-			log.Info("Skipping initial PipelineRun because one already exists for gitea-push", "count", len(prList.Items))
+			log.Info("Skipping initial PipelineRun because one already exists for webhook trigger", "count", len(prList.Items))
 			app.Status.InitialBuildTriggered = true
 			return r.Client.Status().Update(ctx, app)
 		}
-		log.Info("No PipelineRun found for gitea-push app; triggering initial build as fallback")
+		log.Info("No PipelineRun found for webhook-triggered app; triggering initial build as fallback")
 	}
 
 	pr, err := GeneratePipelineRun(app, pipelineName)
@@ -324,4 +325,10 @@ func isPipelineRunActive(pr *unstructured.Unstructured) bool {
 		}
 	}
 	return true
+}
+
+// Returns true for trigger types that are driven by git webhooks
+// (as opposed to manual triggers like db-migrate).
+func isWebhookTrigger(triggerType string) bool {
+	return triggerType == "git-push" || triggerType == "gitea-push"
 }

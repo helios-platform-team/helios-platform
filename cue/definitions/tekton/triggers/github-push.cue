@@ -5,17 +5,17 @@ import (
 )
 
 // =====================================================
-// GITEA PUSH TRIGGER BUNDLE
+// GIT PUSH TRIGGER BUNDLE
 // =====================================================
 
-#GiteaPushTriggerBundle: tekton.#TriggerBundle & {
+#GitPushTriggerBundle: tekton.#TriggerBundle & {
     // Alias the parameter field to bundleParams for global access
     bundleParams=parameter: _
 
     // 1. TRIGGER BINDING
     _binding: tekton.#TektonTriggerBinding & {
         parameter: {
-            name:      "\(bundleParams.appName)-gitea-binding"
+            name:      "\(bundleParams.appName)-git-binding"
             namespace: bundleParams.namespace
         }
         config: params: [
@@ -30,7 +30,7 @@ import (
         let _bp = bundleParams
 
         parameter: {
-            name:      "\(_bp.appName)-gitea-template"
+            name:      "\(_bp.appName)-git-template"
             namespace: _bp.namespace
         }
         config: {
@@ -191,7 +191,7 @@ import (
         config: {
             triggers: [
                 {
-                    name: "gitea-push"
+                    name: "git-push"
                     bindings: [{ref: _binding.parameter.name}]
                     template: {ref: _template.parameter.name}
 

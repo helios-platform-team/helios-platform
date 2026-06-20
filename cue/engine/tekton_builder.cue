@@ -23,25 +23,25 @@ tektonInput: tekton.#TektonInput
 // Resolve Webhook Domain safely.
 // Logic: If input is provided, use it. Else, default to empty string "".
 let _webhookDomain = [
-	if tektonInput.webhookDomain != _|_ { tektonInput.webhookDomain },
+	if tektonInput.webhookDomain != _|_ {tektonInput.webhookDomain},
 	"",
 ][0]
 
 // Resolve Test Command safely.
 let _testCommand = [
-	if tektonInput.testCommand != _|_ { tektonInput.testCommand },
+	if tektonInput.testCommand != _|_ {tektonInput.testCommand},
 	"",
 ][0]
 
 // Resolve Test Image safely.
 let _testImage = [
-	if tektonInput.testImage != _|_ { tektonInput.testImage },
+	if tektonInput.testImage != _|_ {tektonInput.testImage},
 	tekton.#CommonParams.test.image.default,
 ][0]
 
 // Argo CD API URL: explicit override or in-cluster default.
 let _argoCDNamespace = [
-	if tektonInput.argoCDNamespace != _|_ { tektonInput.argoCDNamespace },
+	if tektonInput.argoCDNamespace != _|_ {tektonInput.argoCDNamespace},
 	"argocd",
 ][0]
 
@@ -56,7 +56,7 @@ _tasks: [
 			taskName:  name
 			namespace: tektonInput.namespace
 		}).output
-	}
+	},
 ]
 
 // 2. RENDER PIPELINES
@@ -65,36 +65,36 @@ _primaryPipeline: [
 	(pipelines.#RenderPipeline & {
 		pipelineType: tektonInput.pipelineType
 		namespace:    tektonInput.namespace
-	}).output
+	}).output,
 ]
 
 // Also render db-migrate pipeline if it's available and needed by triggers
 _dbMigratePipeline: [
-	if tektonInput.triggerType == "gitea-push" || tektonInput.triggerType == "db-migrate" {
+	if tektonInput.triggerType == "git-push" || tektonInput.triggerType == "gitea-push" || tektonInput.triggerType == "db-migrate" {
 		(pipelines.#RenderPipeline & {
 			pipelineType: "db-migrate"
 			namespace:    tektonInput.namespace
 		}).output
-	}
+	},
 ]
 
 _pipeline: list.Concat([_primaryPipeline, _dbMigratePipeline])
 
 // 3. RENDER TRIGGERS
 _triggers: (triggers.#RenderTriggers & {
-	triggerType:   tektonInput.triggerType
-	
+	triggerType: tektonInput.triggerType
+
 	// Use the pre-calculated concrete string
 	webhookDomain: _webhookDomain
-	
+
 	bundleParams: {
-		appName:        tektonInput.appName
-		namespace:      tektonInput.namespace
-		pipelineName:   tektonInput.pipelineName
-		
+		appName:      tektonInput.appName
+		namespace:    tektonInput.namespace
+		pipelineName: tektonInput.pipelineName
+
 		// Use the pre-calculated concrete string
-		webhookDomain:  _webhookDomain
-		
+		webhookDomain: _webhookDomain
+
 		webhookSecret:  tektonInput.webhookSecret
 		gitRepo:        tektonInput.gitRepo
 		gitBranch:      tektonInput.gitBranch
@@ -107,14 +107,14 @@ _triggers: (triggers.#RenderTriggers & {
 		contextSubpath: tektonInput.contextSubpath
 		replicas:       tektonInput.replicas
 		port:           tektonInput.port
-		
+
 		// Use the pre-calculated concrete string
-		testCommand:    _testCommand
+		testCommand: _testCommand
 
 		// Use explicit test image when provided, else common default.
-		testImage:      _testImage
-		serviceAccount: tektonInput.serviceAccount
-		dockerSecret:   tektonInput.dockerSecret
+		testImage:         _testImage
+		serviceAccount:    tektonInput.serviceAccount
+		dockerSecret:      tektonInput.dockerSecret
 		databaseSecretRef: tektonInput.databaseSecretRef
 
 		storageDriver:    tektonInput.storageDriver

@@ -25,12 +25,12 @@ package tekton
 
 	// === WEBHOOK (optional - triggers only created if set) ===
 	webhookDomain?: string
-	webhookSecret:  string | *"gitea-webhook-secret"
+	webhookSecret:  string | *"webhook-secret"
 
 	// === PIPELINE CONFIG ===
 	pipelineName:   string | *"from-code-to-cluster"
 	pipelineType:   string | *"from-code-to-cluster" // For registry lookup
-	triggerType:    string | *"gitea-push"           // For registry lookup
+	triggerType:    string | *"git-push"           // For registry lookup
 	serviceAccount: string | *"default"
 	pvcName:        string | *"shared-workspace-pvc"
 	contextSubpath: string & !~"\\.\\./" | *"" // Prevent directory traversal
