@@ -58,7 +58,7 @@ source-repo/
 To view your live service from your local developer workstation, forward your cluster service port to your host network:
 
 ```bash
-kubectl port-forward svc/${{ values.name }} 8005:5000 -n ${{ values.namespace }}
+kubectl port-forward svc/${{ values.name }} 8005:8080 -n ${{ values.namespace }}
 ```
 
 ### Step 2: Access the Endpoints
