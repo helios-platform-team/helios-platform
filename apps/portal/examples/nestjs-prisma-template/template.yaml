@@ -10,31 +10,30 @@ spec:
 
   parameters:
     - title: Component Information
-      required:
-        - name
-        - port
-        - dockerOrg
-        - repoName
+      required: [name]
       properties:
         name:
-          title: Name
+          title: Project Name
           type: string
-          description: Unique name of the component
+          description: Unique name of the service.
           ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
-          title: Port
+          title: API Port
           type: number
-          description: The port the NestJS app listens on
           default: 3000
-        dockerOrg:
-          title: Docker Registry Org/User
+          ui:readonly: true
+          description: Standardized platform networking port for web services.
+        namespace:
+          title: Kubernetes Namespace
           type: string
-          description: Your Docker Hub username or Organization
-        repoName:
-          title: Docker Repository Name
-          type: string
-          description: The name of the Docker repository (e.g. my-service)
+          default: default
+
+    - title: Automated Platform Routing
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+      properties: {} 
 
     - title: Database Configuration
       properties:
@@ -43,30 +42,7 @@ spec:
           type: object
           ui:field: DatabasePicker
 
-    - title: Repository & Webhook
-      required:
-        - repoUrl
-      properties:
-        repoUrl:
-          title: Source Repository Location
-          type: string
-          ui:field: RepoUrlPicker
-          ui:options:
-            allowedHosts:
-              - localhost:3030
-    - title: Optional Extras (Local Convenience)
-      properties:
-        registerToCatalog:
-          title: Register component in catalog
-          type: boolean
-          default: false
-        sendNotification:
-          title: Send Backstage notification
-          type: boolean
-          default: false
-
   steps:
-    # 1. Source Code
     - id: fetch-source
       name: Fetch Source Code
       action: fetch:template
@@ -74,12 +50,12 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          # Use repoName as the app identifier to keep it Kubernetes/URL safe.
           name: ${{ parameters.name }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: "NestJS service: ${{ parameters.name }}"
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          # DYNAMIC ROUTING
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
           hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
 
     - id: fetch-source-db
@@ -98,7 +74,8 @@ spec:
       action: publish:gitea
       input:
         description: Source Code for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}
+        # DYNAMIC ROUTING
+        repoUrl: 127.0.0.1:3030?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
         sourcePath: ./source
         repoVisibility: public
 
@@ -106,16 +83,12 @@ spec:
       name: Create Webhook
       action: gitea:create-webhook
       input:
-        repoUrl: ${{ parameters.repoUrl }}
-        # Tekton EventListener address is the service root.
-        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
-        # Deterministic secret so users don't have to provide one.
-        # Must match the Kubernetes secret value created below.
+        repoUrl: 127.0.0.1:3030?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        webhookUrl: http://el-${{ parameters.name }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}
         events:
           - push
 
-    # 2. GitOps
     - id: fetch-gitops
       name: Fetch GitOps Manifests
       action: fetch:template
@@ -124,10 +97,9 @@ spec:
         targetPath: ./gitops
         values:
           name: ${{ parameters.name }}
-          # No index.docker.io prefix — imageRepo stored as org/repo, tag appended by pipeline
-          image: ${{ parameters.dockerOrg }}/${{ parameters.repoName }}
-          dockerOrg: ${{ parameters.dockerOrg }}
-          repoName: ${{ parameters.repoName }}
+          image: ${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          dockerOrg: ${{ environment.parameters.dockerOrg }}
+          repoName: ${{ parameters.name }}
           port: ${{ parameters.port }}
           hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
           databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
@@ -136,8 +108,6 @@ spec:
           owner: ${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
-          # Node_modules caching (keyed by package-lock.json hash) is handled
-          # by the pipeline's run-tests step — only the test runner is needed here.
           testCommand: "npm test"
           testImage: "node:24"
 
@@ -146,18 +116,17 @@ spec:
       action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}-gitops
+        repoUrl: 127.0.0.1:3030?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
         sourcePath: ./gitops
         repoVisibility: public
 
-    # 3. Secret + Deploy
     - id: create-secret
       name: Create Git Credentials Secret
       action: kubernetes:create-git-credentials-secret
       input:
         name: ${{ parameters.name }}
-        namespace: default
-        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+        namespace: ${{ parameters.namespace }}
+        username: ${{ environment.parameters.gitOrg }}
         webhookSecret: ${{ parameters.name }}
 
     - id: apply-helios
@@ -167,25 +136,12 @@ spec:
         manifestPath: ./gitops/helios-app.yaml
         namespaced: true
 
-    # 4. Registration
     - id: register
       name: Register Component
       action: catalog:register
-      if: '{{ parameters.registerToCatalog }}'
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
         catalogInfoPath: 'catalog-info.yaml'
-
-    - id: notify
-      name: Notify User
-      action: notification:send
-      if: '{{ parameters.sendNotification }}'
-      input:
-        recipients: entity
-        entityRefs:
-          - user:default/guest
-        title: 'NestJS + Prisma Template Executed'
-        info: 'Your NestJS + Prisma service has been scaffolded with a PostgreSQL database!'
 
   output:
     links:
