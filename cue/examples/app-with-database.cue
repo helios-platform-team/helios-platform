@@ -33,7 +33,7 @@ appWithDatabase: schema.#HeliosApp & {
 					properties: {
 						dbType:  "postgres"
 						dbName:  "my_custom_db"
-						version: "16"
+						version: "18.4"
 					}
 				},
 			]

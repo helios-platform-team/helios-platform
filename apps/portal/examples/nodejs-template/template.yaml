@@ -1,8 +1,8 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: advanced-nodejs-template
-  title: Advanced Node.js Template (GitOps + Webhooks)
+  name: nodejs-template
+  title: Nodejs Template
   description: Scaffolds a Node.js Service with Source Code, GitOps manifests (ArgoCD + Tekton), and Webhook configuration.
 spec:
   owner: user:guest
@@ -30,7 +30,6 @@ spec:
             title: Docker Registry Org/User
             type: string
             description: Your Docker Hub username or Organization
-            default: phamhoangkha1403
         repoName:
             title: Docker Repository Name
             type: string

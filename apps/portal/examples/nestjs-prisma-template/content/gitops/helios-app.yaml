@@ -38,6 +38,6 @@ spec:
           properties:
             dbType: postgres
             dbName: ${{ values.databaseName | default(values.name | replace('-', '_') + "_db") }}
-            version: ${{ values.databaseVersion | default("16") | dump }}
+            version: ${{ values.databaseVersion | default("18.4") | dump }}
             storage: "1Gi"
         {% endif %}

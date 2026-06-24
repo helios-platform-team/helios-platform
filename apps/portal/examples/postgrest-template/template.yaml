@@ -147,7 +147,7 @@ spec:
           namespace: ${{ parameters.namespace }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
-          databaseVersion: ${{ parameters.databaseConfig.version or '16' }}
+          databaseVersion: ${{ parameters.databaseConfig.version or '18.4' }}
           apiSchema: ${{ parameters.apiSchema }}
           jwtSecret: ${{ secrets.jwtSecret }}
           jwtRole: ${{ parameters.jwtRole }}

@@ -4,7 +4,8 @@
 //   DB_NAME, DB_PORT (from K8s ConfigMap via CUE engine)
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {

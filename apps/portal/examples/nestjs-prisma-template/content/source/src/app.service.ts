@@ -13,7 +13,16 @@ export class AppService {
     return 'Hello from ${{ values.name }}!';
   }
 
-  healthCheck(): { status: string } {
+  async healthCheck(): Promise<{ status: string; database?: string }> {
+    {% if values.hasDatabase -%}
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return { status: 'ok', database: 'connected' };
+    } catch (err: any) {
+      return { status: 'error', database: `disconnected: ${err.message}` };
+    }
+    {%- else -%}
     return { status: 'ok' };
+    {%- endif %}
   }
 }

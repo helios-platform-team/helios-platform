@@ -5,6 +5,7 @@ import { createKubernetesApplyAction } from '../actions/kubernetes-apply';
 import { createGitCredentialsSecretAction } from '../actions/create-git-credentials-secret';
 import { createGiteaWebhookAction } from '../actions/create-gitea-webhook';
 import { createKubernetesCreateSecretAction } from '../actions/kubernetes-create-secret';
+import { createFetchLocalTemplateAction } from '../actions/fetch-local-template';
 
 export const scaffolderModuleCustomActions = createBackendModule({
   pluginId: 'scaffolder',
@@ -20,6 +21,7 @@ export const scaffolderModuleCustomActions = createBackendModule({
         scaffolder.addActions(createKubernetesCreateSecretAction() as any);
         scaffolder.addActions(createGitCredentialsSecretAction() as any);
         scaffolder.addActions(createGiteaWebhookAction({ config }) as any);
+        scaffolder.addActions(createFetchLocalTemplateAction() as any);
       },
     });
   },

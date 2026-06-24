@@ -409,7 +409,7 @@ func TestGenerateDatabaseStatefulSet(t *testing.T) {
 }
 
 func TestGenerateDatabaseStatefulSet_InvalidStorage(t *testing.T) {
-	_, err := GenerateDatabaseStatefulSet("default", "my-app-db", "my-app-db-secret", "my_custom_db", "16", "invalid-size", 5432)
+	_, err := GenerateDatabaseStatefulSet("default", "my-app-db", "my-app-db-secret", "my_custom_db", "18.4", "invalid-size", 5432)
 
 	if err == nil {
 		t.Fatal("Expected error for invalid storage size, got nil")

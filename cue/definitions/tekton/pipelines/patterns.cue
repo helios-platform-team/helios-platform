@@ -175,8 +175,13 @@ import "helios.io/cue/definitions/tekton"
 						  exit 0
 						fi
 
-						echo "Running npm ci directly."
-						npm ci --ignore-scripts --no-audit --no-fund --progress=false --fetch-retries=5 --fetch-retry-mintimeout=15000
+						if [ -f package-lock.json ]; then
+						  echo "Running npm ci directly."
+						  npm ci --ignore-scripts --no-audit --no-fund --progress=false --fetch-retries=5 --fetch-retry-mintimeout=15000
+						else
+						  echo "Running npm install (no package-lock.json found)."
+						  npm install --no-audit --no-fund --progress=false --fetch-retries=5 --fetch-retry-mintimeout=15000
+						fi
 						if [ -f prisma/schema.prisma ]; then
 						  npm run prisma:generate
 						fi

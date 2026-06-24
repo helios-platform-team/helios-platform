@@ -269,13 +269,13 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err := r.GitOps.Reconcile(ctx, &heliosApp, crYAML); err != nil {
 		log.Error(err, "GitOps sync failed")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("GitOps sync failed: %v", err))
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if err := r.ArgoCD.Reconcile(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile ArgoCD Application")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("ArgoCD reconciliation failed: %v", err))
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if dbInjectionPending {
@@ -286,12 +286,13 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-// updateStatus updates the HeliosApp status.
+// updateStatus updates the HeliosApp status using a patch to avoid resourceVersion conflicts.
 func (r *HeliosAppReconciler) updateStatus(ctx context.Context, app *appv1alpha1.HeliosApp, phase appv1alpha1.HeliosAppPhase, message string) {
+	patch := client.MergeFrom(app.DeepCopy())
 	app.Status.Phase = phase
 	app.Status.Message = message
-	if err := r.Status().Update(ctx, app); err != nil {
-		logf.FromContext(ctx).Error(err, "Failed to update status")
+	if err := r.Status().Patch(ctx, app, patch); err != nil {
+		logf.FromContext(ctx).Error(err, "Failed to update status via patch")
 	}
 }
 
