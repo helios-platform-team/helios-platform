@@ -34,11 +34,9 @@ COPY --chown=nestjs:nodejs package*.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund --progress=false
 
 {% if values.hasDatabase %}
-# Copy Prisma schema, config, and generated client from builder
+# Copy Prisma schema and config from builder
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma/
 COPY --from=builder --chown=nestjs:nodejs /app/prisma.config.ts ./
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma/
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma/
 {% endif %}
 
 # Copy built application

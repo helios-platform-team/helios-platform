@@ -26,7 +26,7 @@ spec:
           title: Port
           type: number
           description: The port the NestJS app listens on
-          default: 3000
+          default: 3001
         dockerOrg:
           title: Docker Registry Org/User
           type: string

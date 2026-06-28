@@ -25,7 +25,7 @@ spec:
     - name: ${{ values.name }}-backend
       type: web-service
       properties:
-        image: ${{ values.dockerOrg }}/${{ values.repoName }}:latest
+        image: ${{ values.dockerOrg }}/${{ values.repoName }}:main
         port: ${{ values.port }}
         replicas: 1
         env:

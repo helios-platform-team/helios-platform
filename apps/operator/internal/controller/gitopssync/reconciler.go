@@ -42,13 +42,15 @@ func NewReconciler(c client.Client, scheme *runtime.Scheme, factory GitFactory) 
 func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, crBytes []byte) error {
 	log := logf.FromContext(ctx)
 
-	token, username := r.resolveCredentials(ctx, app)
+	token, username, err := r.resolveCredentials(ctx, app)
+	if err != nil {
+		return err
+	}
 
 	if token == "" {
 		err := fmt.Errorf("GitOps token is empty. Check Secret or GITEA_TOKEN env var")
 		log.Error(err, "Authentication failed")
-		r.updateFailedStatus(ctx, app, "GitOps token missing")
-		return nil
+		return err
 	}
 
 	currentHash := computeHash([]byte(app.Spec.GitOpsRepo + "\x00" + app.Spec.GitOpsPath + "\x00" + string(crBytes)))
@@ -69,7 +71,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, 
 
 	if err := gitClient.SyncManifest(ctx, targetPath, string(crBytes)); err != nil {
 		log.Error(err, "GitOps sync failed")
-		r.updateFailedStatus(ctx, app, fmt.Sprintf("GitOps failed: %v", err))
 		return err
 	}
 
@@ -88,7 +89,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, 
 }
 
 // resolveCredentials reads the GitOps token and username from a Secret or env var.
-func (r *Reconciler) resolveCredentials(ctx context.Context, app *appv1alpha1.HeliosApp) (string, string) {
+func (r *Reconciler) resolveCredentials(ctx context.Context, app *appv1alpha1.HeliosApp) (string, string, error) {
 	log := logf.FromContext(ctx)
 
 	token := os.Getenv("GITEA_TOKEN")
@@ -106,28 +107,18 @@ func (r *Reconciler) resolveCredentials(ctx context.Context, app *appv1alpha1.He
 				token = string(p)
 			} else {
 				log.Info("Secret found but 'token' or 'password' key is missing", "Secret", app.Spec.GitOpsSecretRef)
-				r.updateFailedStatus(ctx, app, fmt.Sprintf("Secret %s missing 'token' key", app.Spec.GitOpsSecretRef))
-				return "", ""
+				return "", "", fmt.Errorf("secret %s missing 'token' key", app.Spec.GitOpsSecretRef)
 			}
 			if u, ok := secret.Data["username"]; ok {
 				username = string(u)
 			}
 		} else {
 			log.Error(err, "Failed to get GitOps Secret", "Secret", app.Spec.GitOpsSecretRef)
-			r.updateFailedStatus(ctx, app, fmt.Sprintf("Secret %s not found", app.Spec.GitOpsSecretRef))
-			return "", ""
+			return "", "", fmt.Errorf("secret %s not found", app.Spec.GitOpsSecretRef)
 		}
 	}
 
-	return token, username
-}
-
-func (r *Reconciler) updateFailedStatus(ctx context.Context, app *appv1alpha1.HeliosApp, message string) {
-	app.Status.Phase = appv1alpha1.PhaseFailed
-	app.Status.Message = message
-	if err := r.Client.Status().Update(ctx, app); err != nil {
-		logf.FromContext(ctx).Error(err, "Failed to update status")
-	}
+	return token, username, nil
 }
 
 func computeHash(data []byte) string {

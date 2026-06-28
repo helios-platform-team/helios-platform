@@ -189,6 +189,7 @@ When a HeliosApp component has a `database` trait, the platform automatically:
 ### Components
 
 #### Tekton Pipeline: `db-migrate-image`
+
 - **Trigger**: Activates when `db/migrations/` path changes in source repository
 - **Tasks**:
   1. Clone source repository
@@ -197,12 +198,14 @@ When a HeliosApp component has a `database` trait, the platform automatically:
 - **Location**: `cue/definitions/tekton/pipelines/db-migrate-image.cue`
 
 #### GitOps Manifests (created via Template Scaffolder)
+
 - **Dockerfile.migrate**: Multi-stage build with golang-migrate
 - **presync-job.yaml**: ArgoCD PreSync hook Job that runs migrations
 - **kustomization.yaml**: Bundles namespace, HeliosApp, and presync-job resources
 - **Location**: `apps/portal/examples/postgrest-template/content/gitops/`
 
 #### ArgoCD Hooks
+
 - **PreSync**: Runs migration Job before Deployment sync
 - **PostSync**: Restarts PostgREST pods after successful sync
 - **Hook Deletion Policy**: `BeforeHookCreation` ensures old Jobs are cleaned up before new ones start
@@ -275,11 +278,12 @@ spec:
     - type: database
       properties:
         dbType: postgres
-        version: "16"
+        version: "18.4"
         storage: "1Gi"
 ```
 
 When the `database` trait is present, the operator automatically creates:
+
 - Database credential Secret named `{componentName}-db-secret` (e.g., `postgrest-api-db-secret`)
 - Database StatefulSet and Service for the component
 - PreSync Job configured to use `<org>/{appName}-migrate:latest` image and injected with `PGRST_DB_URI` from the database secret

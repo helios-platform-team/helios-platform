@@ -36,7 +36,7 @@ spec:
             dbType: ${{ values.databaseType | default("postgres") }}
             dbName: ${{ values.databaseName or values.name }}-db
             port: 5432
-            version: "16"
+            version: "18.4"
             storage: "1Gi"
         - type: service
           properties:
