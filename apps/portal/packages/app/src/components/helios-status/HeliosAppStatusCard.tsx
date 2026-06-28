@@ -22,6 +22,9 @@ import {
   DeleteForever as DeletingIcon,
   HelpOutline as UnknownIcon,
   OpenInNew as OpenInNewIcon,
+  Notifications as NotificationsIcon,
+  Info as InfoIcon,
+  Warning as WarningIcon,
 } from '@material-ui/icons';
 import { makeStyles, Theme } from '@material-ui/core/styles';
 import { useEntity } from '@backstage/plugin-catalog-react';
@@ -53,6 +56,20 @@ interface HeliosComponentSummary {
   type: string;
 }
 
+interface HeliosEvent {
+  type: string;          // Normal | Warning
+  reason: string;
+  message: string;
+  involvedObject: {
+    kind: string;
+    name: string;
+  };
+  count: number;
+  firstTimestamp: string;
+  lastTimestamp: string;
+  source: string;
+}
+
 interface HeliosAppStatus {
   name: string;
   namespace: string;
@@ -61,10 +78,18 @@ interface HeliosAppStatus {
   conditions: HeliosCondition[];
   resourcesCreated: HeliosResourceRef[];
   initialBuildTriggered: boolean;
+  lastAppliedHash: string;
+  observedGeneration: number;
   owner: string;
+  description: string;
   gitRepo: string;
+  gitBranch: string;
+  gitOpsRepo: string;
+  gitOpsPath: string;
   imageRepo: string;
   replicas: number;
+  port: number;
+  pipelineName: string;
   components: HeliosComponentSummary[];
   createdAt: string;
 }
@@ -313,6 +338,122 @@ const useStyles = makeStyles((theme: Theme) => ({
     borderColor: 'var(--helios-solar)',
     color: 'var(--helios-solar)',
   },
+  eventRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: theme.spacing(1.5),
+    padding: theme.spacing(1, 1.5),
+    borderBottom: '1px solid var(--bui-border-1)',
+    transition: 'background-color 0.15s ease',
+    '&:last-child': {
+      borderBottom: 'none',
+    },
+    '&:hover': {
+      backgroundColor: 'var(--bui-bg-neutral-1-hover)',
+    },
+  },
+  eventIcon: {
+    marginTop: 3,
+    fontSize: '1rem',
+    flexShrink: 0,
+  },
+  eventContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  eventHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+    flexWrap: 'wrap' as const,
+  },
+  eventReason: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.72rem',
+    fontWeight: 700,
+    color: 'var(--bui-fg-primary)',
+  },
+  eventKind: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.6rem',
+    fontWeight: 600,
+    color: 'var(--bui-fg-secondary)',
+    padding: '1px 6px',
+    borderRadius: 2,
+    backgroundColor: 'var(--bui-bg-neutral-2)',
+    border: '1px solid var(--bui-border-1)',
+  },
+  eventMessage: {
+    fontFamily: 'var(--font-sans)',
+    fontSize: '0.72rem',
+    color: 'var(--bui-fg-secondary)',
+    marginTop: 2,
+    lineHeight: 1.4,
+  },
+  eventTimestamp: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.6rem',
+    color: 'var(--bui-fg-secondary)',
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  eventCount: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.6rem',
+    fontWeight: 600,
+    color: 'var(--bui-fg-warning)',
+    marginLeft: 4,
+  },
+  hashValue: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.7rem',
+    color: 'var(--bui-fg-secondary)',
+    letterSpacing: '0.03em',
+    backgroundColor: 'var(--bui-bg-neutral-2)',
+    padding: '2px 8px',
+    borderRadius: 2,
+    border: '1px solid var(--bui-border-1)',
+    display: 'inline-block',
+    cursor: 'pointer',
+    transition: 'border-color 0.2s ease',
+    '&:hover': {
+      borderColor: 'var(--helios-solar)',
+    },
+  },
+  descriptionBox: {
+    fontFamily: 'var(--font-sans)',
+    fontSize: '0.8rem',
+    color: 'var(--bui-fg-secondary)',
+    padding: theme.spacing(1.5, 2),
+    backgroundColor: 'var(--bui-bg-neutral-2)',
+    borderRadius: 'var(--bui-radius-2)',
+    border: '1px solid var(--bui-border-1)',
+    marginBottom: theme.spacing(2),
+    lineHeight: 1.5,
+    fontStyle: 'italic' as const,
+  },
+  eventsNotificationBar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+    padding: theme.spacing(1, 1.5),
+    backgroundColor: 'var(--bui-bg-warning)',
+    border: '1px solid var(--bui-border-warning)',
+    borderRadius: 'var(--bui-radius-2)',
+    marginBottom: theme.spacing(2),
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      borderColor: 'var(--helios-solar)',
+    },
+  },
+  eventsNotificationNormal: {
+    backgroundColor: 'var(--bui-bg-info)',
+    border: '1px solid var(--bui-border-info)',
+    '&:hover': {
+      borderColor: 'var(--bui-fg-info)',
+    },
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -379,35 +520,51 @@ export const HeliosAppStatusCard: React.FC = () => {
     entity.metadata.annotations?.['helios.io/namespace'] ?? 'default';
 
   const [status, setStatus] = useState<HeliosAppStatus | null>(null);
+  const [events, setEvents] = useState<HeliosEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conditionsOpen, setConditionsOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(false);
+  const [specDetailsOpen, setSpecDetailsOpen] = useState(false);
 
   const fetchStatus = useCallback(
     async (isManual = false) => {
       try {
         if (isManual) setRefreshing(true);
         const backendUrl = configApi.getString('backend.baseUrl');
-        const response = await fetchApi.fetch(
-          `${backendUrl}/api/helios/status/${componentName}?namespace=${namespace}`,
-        );
 
-        if (response.status === 404) {
-          const data = await response.json();
+        // Fetch status + events in parallel
+        const [statusResponse, eventsResponse] = await Promise.all([
+          fetchApi.fetch(
+            `${backendUrl}/api/helios/status/${componentName}?namespace=${namespace}`,
+          ),
+          fetchApi.fetch(
+            `${backendUrl}/api/helios/events/${componentName}?namespace=${namespace}&limit=20`,
+          ).catch(() => null),
+        ]);
+
+        if (statusResponse.status === 404) {
+          const data = await statusResponse.json();
           setStatus(data);
           setError(null);
           return;
         }
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (!statusResponse.ok) {
+          throw new Error(`HTTP ${statusResponse.status}: ${statusResponse.statusText}`);
         }
 
-        const data = await response.json();
+        const data = await statusResponse.json();
         setStatus(data);
         setError(null);
+
+        // Parse events (best effort)
+        if (eventsResponse && eventsResponse.ok) {
+          const eventsData = await eventsResponse.json();
+          setEvents(eventsData.events ?? []);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -424,6 +581,10 @@ export const HeliosAppStatusCard: React.FC = () => {
     const interval = setInterval(() => fetchStatus(), REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchStatus]);
+
+  // Derived: count warning events
+  const warningEvents = events.filter(e => e.type === 'Warning');
+  const hasWarnings = warningEvents.length > 0;
 
   // ---------- Loading state ----------
   if (loading) {
@@ -588,6 +749,50 @@ export const HeliosAppStatusCard: React.FC = () => {
           <Box className={classes.phaseMessage}>{status.message}</Box>
         )}
 
+        {/* Description */}
+        {status.description && (
+          <Box className={classes.descriptionBox}>
+            {status.description}
+          </Box>
+        )}
+
+        {/* Events notification bar */}
+        {events.length > 0 && (
+          <Box
+            className={`${classes.eventsNotificationBar} ${
+              !hasWarnings ? classes.eventsNotificationNormal : ''
+            }`}
+            onClick={() => setEventsOpen(prev => !prev)}
+          >
+            {hasWarnings ? (
+              <WarningIcon style={{ fontSize: 18, color: 'var(--bui-fg-warning)' }} />
+            ) : (
+              <InfoIcon style={{ fontSize: 18, color: 'var(--bui-fg-info)' }} />
+            )}
+            <Typography
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                color: hasWarnings ? 'var(--bui-fg-warning)' : 'var(--bui-fg-info)',
+                letterSpacing: '0.04em',
+                flex: 1,
+              }}
+            >
+              {hasWarnings
+                ? `${warningEvents.length} warning${warningEvents.length > 1 ? 's' : ''} detected`
+                : `${events.length} recent event${events.length > 1 ? 's' : ''}`}
+            </Typography>
+            <NotificationsIcon
+              style={{
+                fontSize: 14,
+                color: hasWarnings ? 'var(--bui-fg-warning)' : 'var(--bui-fg-info)',
+                opacity: 0.6,
+              }}
+            />
+          </Box>
+        )}
+
         {/* Spec metadata */}
         <Grid container spacing={1} className={classes.metaGrid}>
           {status.owner && (
@@ -606,6 +811,26 @@ export const HeliosAppStatusCard: React.FC = () => {
                 <Typography className={classes.metaLabel}>Replicas</Typography>
                 <Typography className={classes.metaValue}>
                   {status.replicas}
+                </Typography>
+              </Box>
+            </Grid>
+          )}
+          {status.port > 0 && (
+            <Grid item xs={6} sm={3}>
+              <Box className={classes.metaItem}>
+                <Typography className={classes.metaLabel}>Port</Typography>
+                <Typography className={classes.metaValue}>
+                  :{status.port}
+                </Typography>
+              </Box>
+            </Grid>
+          )}
+          {status.gitBranch && (
+            <Grid item xs={6} sm={3}>
+              <Box className={classes.metaItem}>
+                <Typography className={classes.metaLabel}>Branch</Typography>
+                <Typography className={classes.metaValue}>
+                  {status.gitBranch}
                 </Typography>
               </Box>
             </Grid>
@@ -634,7 +859,61 @@ export const HeliosAppStatusCard: React.FC = () => {
               </Box>
             </Grid>
           )}
+          {status.pipelineName && (
+            <Grid item xs={12} sm={3}>
+              <Box className={classes.metaItem}>
+                <Typography className={classes.metaLabel}>Pipeline</Typography>
+                <Typography className={classes.metaValue}>
+                  {status.pipelineName}
+                </Typography>
+              </Box>
+            </Grid>
+          )}
+          {status.createdAt && (
+            <Grid item xs={12} sm={3}>
+              <Box className={classes.metaItem}>
+                <Typography className={classes.metaLabel}>Created</Typography>
+                <Tooltip title={status.createdAt}>
+                  <Typography className={classes.metaValue}>
+                    {formatTimestamp(status.createdAt)}
+                  </Typography>
+                </Tooltip>
+              </Box>
+            </Grid>
+          )}
         </Grid>
+
+        {/* Last Applied Hash */}
+        {status.lastAppliedHash && (
+          <Box mb={2} display="flex" alignItems="center" style={{ gap: 8 }}>
+            <Typography className={classes.metaLabel} style={{ whiteSpace: 'nowrap' }}>
+              Last Sync Hash
+            </Typography>
+            <Tooltip title={`Full hash: ${status.lastAppliedHash} — Click to copy`}>
+              <span
+                className={classes.hashValue}
+                onClick={() => {
+                  navigator.clipboard?.writeText(status.lastAppliedHash);
+                }}
+              >
+                {status.lastAppliedHash.length > 12
+                  ? `${status.lastAppliedHash.slice(0, 12)}…`
+                  : status.lastAppliedHash}
+              </span>
+            </Tooltip>
+            {status.observedGeneration > 0 && (
+              <Typography
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.65rem',
+                  color: 'var(--bui-fg-secondary)',
+                }}
+              >
+                gen {status.observedGeneration}
+              </Typography>
+            )}
+          </Box>
+        )}
 
         {/* Conditions (expandable) */}
         {status.conditions.length > 0 && (
@@ -709,7 +988,7 @@ export const HeliosAppStatusCard: React.FC = () => {
 
         {/* Resources Created (expandable) */}
         {status.resourcesCreated.length > 0 && (
-          <Box>
+          <Box mb={2}>
             <Box
               className={classes.sectionTitle}
               onClick={() => setResourcesOpen(prev => !prev)}
@@ -744,6 +1023,136 @@ export const HeliosAppStatusCard: React.FC = () => {
                     />
                   </Tooltip>
                 ))}
+              </Box>
+            </Collapse>
+          </Box>
+        )}
+
+        {/* Spec Details (expandable) */}
+        {(status.gitOpsRepo || status.gitOpsPath) && (
+          <Box mb={2}>
+            <Box
+              className={classes.sectionTitle}
+              onClick={() => setSpecDetailsOpen(prev => !prev)}
+            >
+              <ExpandMoreIcon
+                className={`${classes.expandIcon} ${
+                  specDetailsOpen ? classes.expandIconOpen : ''
+                }`}
+              />
+              <Typography className={classes.sectionLabel}>
+                Spec Details
+              </Typography>
+            </Box>
+            <Collapse in={specDetailsOpen}>
+              <Box
+                style={{
+                  backgroundColor: 'var(--bui-bg-neutral-2)',
+                  borderRadius: 'var(--bui-radius-2)',
+                  border: '1px solid var(--bui-border-1)',
+                  padding: 12,
+                  overflow: 'hidden',
+                }}
+              >
+                <Grid container spacing={1}>
+                  {status.gitOpsRepo && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography className={classes.metaLabel}>GitOps Repo</Typography>
+                      <Tooltip title={status.gitOpsRepo}>
+                        <Typography className={classes.metaValue} noWrap>
+                          {status.gitOpsRepo.replace(/^https?:\/\//, '')}
+                        </Typography>
+                      </Tooltip>
+                    </Grid>
+                  )}
+                  {status.gitOpsPath && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography className={classes.metaLabel}>GitOps Path</Typography>
+                      <Typography className={classes.metaValue}>
+                        {status.gitOpsPath}
+                      </Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+            </Collapse>
+          </Box>
+        )}
+
+        {/* Recent Events (expandable) */}
+        {events.length > 0 && (
+          <Box>
+            <Box
+              className={classes.sectionTitle}
+              onClick={() => setEventsOpen(prev => !prev)}
+            >
+              <ExpandMoreIcon
+                className={`${classes.expandIcon} ${
+                  eventsOpen ? classes.expandIconOpen : ''
+                }`}
+              />
+              <Typography className={classes.sectionLabel}>
+                Recent Events ({events.length})
+                {hasWarnings && (
+                  <span style={{ color: 'var(--bui-fg-warning)', marginLeft: 8 }}>
+                    ⚠ {warningEvents.length}
+                  </span>
+                )}
+              </Typography>
+            </Box>
+            <Collapse in={eventsOpen}>
+              <Box
+                style={{
+                  backgroundColor: 'var(--bui-bg-neutral-2)',
+                  borderRadius: 'var(--bui-radius-2)',
+                  border: '1px solid var(--bui-border-1)',
+                  overflow: 'hidden',
+                  maxHeight: 320,
+                  overflowY: 'auto',
+                }}
+              >
+                {events.map((evt, i) => {
+                  const isWarning = evt.type === 'Warning';
+                  return (
+                    <Box key={i} className={classes.eventRow}>
+                      {isWarning ? (
+                        <WarningIcon
+                          className={classes.eventIcon}
+                          style={{ color: 'var(--bui-fg-warning)' }}
+                        />
+                      ) : (
+                        <InfoIcon
+                          className={classes.eventIcon}
+                          style={{ color: 'var(--bui-fg-info)' }}
+                        />
+                      )}
+                      <Box className={classes.eventContent}>
+                        <Box className={classes.eventHeader}>
+                          <Typography className={classes.eventReason}>
+                            {evt.reason}
+                          </Typography>
+                          <span className={classes.eventKind}>
+                            {evt.involvedObject.kind}/{evt.involvedObject.name}
+                          </span>
+                          {evt.count > 1 && (
+                            <span className={classes.eventCount}>
+                              ×{evt.count}
+                            </span>
+                          )}
+                        </Box>
+                        {evt.message && (
+                          <Typography className={classes.eventMessage}>
+                            {evt.message}
+                          </Typography>
+                        )}
+                        <Typography className={classes.eventTimestamp}>
+                          {formatTimestamp(evt.lastTimestamp)}
+                          {evt.source && ` · ${evt.source}`}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                })}
               </Box>
             </Collapse>
           </Box>
