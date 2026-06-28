@@ -33,6 +33,10 @@ export const heliosBackendPlugin = createBackendPlugin({
           path: '/status',
           allow: 'unauthenticated',
         });
+        httpRouter.addAuthPolicy({
+          path: '/events',
+          allow: 'unauthenticated',
+        });
       },
     });
   },
