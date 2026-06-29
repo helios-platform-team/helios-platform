@@ -64,7 +64,7 @@ spec:
       input:
         description: Source Code for ${{ parameters.name }}
         # DYNAMIC ROUTING
-        repoUrl: 127.0.0.1:3030?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
         sourcePath: ./source
         repoVisibility: public
 
@@ -72,7 +72,7 @@ spec:
       name: Create Webhook
       action: gitea:create-webhook
       input:
-        repoUrl: 127.0.0.1:3030?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
         webhookUrl: http://el-${{ parameters.name }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}
         events:
@@ -107,7 +107,7 @@ spec:
       action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
-        repoUrl: 127.0.0.1:3030?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
         sourcePath: ./gitops
         repoVisibility: public
 

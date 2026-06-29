@@ -104,6 +104,7 @@ scaffolder:
     parameters:
       dockerOrg: ${DOCKER_USERNAME}
       gitOrg: ${GITEA_USER}
+      gitHost: ${GITEA_HOST}
     secrets:
       GITEA_TOKEN: ${GITEA_TOKEN}
 
