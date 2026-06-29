@@ -95,7 +95,10 @@ spec:
           databaseType: ${{ parameters.databaseConfig.dbType }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           # DYNAMIC ROUTING: Uses Docker bridge variable
-          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          
+          dockerOrg: index.docker.io/${{ environment.parameters.dockerOrg }}
+          repoName: ${{ parameters.name }}
+
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
 
