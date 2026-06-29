@@ -30,6 +30,10 @@ import "helios.io/cue/definitions/tekton"
 		steps: [{
 			name:  "build-and-push"
 			image: "gcr.io/kaniko-project/executor:v1.23.2-debug"
+			env: [{
+				name: "GODEBUG"
+				value: "http2client=0"
+			}]
 			script: """
 				#!/bin/sh
 				set -e

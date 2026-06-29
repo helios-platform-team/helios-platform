@@ -20,10 +20,17 @@ var connectionString = connectionTemplate
     .Replace("{DB_PASSWORD}", dbPassword, StringComparison.Ordinal)
     .Replace("{DB_NAME}", dbName, StringComparison.Ordinal);
 builder.Configuration["ConnectionStrings:DefaultConnection"] = connectionString;
+
+// Register health checks
+builder.Services.AddHealthChecks()
+    .AddNpgSql(connectionString);
 {% endif -%}
+builder.Services.AddCors();
 
 
 var app = builder.Build();
+
+app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 
 if (app.Environment.IsDevelopment())
 {
@@ -44,6 +51,17 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.MapControllers();
 
+{% if values.hasDatabase -%}
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new { status = report.Status.ToString() });
+    }
+});
+{% else -%}
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+{% endif -%}
 
 app.Run();

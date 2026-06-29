@@ -18,10 +18,12 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -120,10 +123,10 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	// 3. Render via CUE Engine
-	manifestBytes, err := r.CueEngine.Render(appModel)
+	// 3. Render via CUE Engine to Objects
+	objects, err := r.CueEngine.RenderToObjects(appModel)
 	if err != nil {
-		log.Error(err, "Failed to render application via CUE")
+		log.Error(err, "Failed to render application objects via CUE")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("CUE rendering failed: %v", err))
 		return ctrl.Result{}, err
 	}
@@ -175,6 +178,48 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// ------------------------------------------------------------------
+	// PHASE 0.8: PreSync Job Execution
+	// ------------------------------------------------------------------
+	presyncResult, err := r.handlePreSyncJob(ctx, &heliosApp)
+	if err != nil {
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("PreSync Job failed: %v", err))
+		return ctrl.Result{}, err
+	}
+	if presyncResult.Requeue || presyncResult.RequeueAfter > 0 {
+		return presyncResult, nil
+	}
+
+	// 4. Apply Rendered Objects Directly to Cluster
+	for _, objMap := range objects {
+		u := &unstructured.Unstructured{Object: objMap}
+
+		// Ensure namespaced resources inherit HeliosApp namespace
+		if u.GetNamespace() == "" {
+			u.SetNamespace(heliosApp.Namespace)
+		}
+
+		// Only set OwnerReference for namespaced scoped resources
+		// Assuming we only create resources in the same namespace for now
+		if err := controllerutil.SetControllerReference(&heliosApp, u, r.Scheme); err != nil {
+			log.Error(err, "Failed to set owner reference", "kind", u.GetKind(), "name", u.GetName())
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Owner reference setup failed: %v", err))
+			return ctrl.Result{}, err
+		}
+
+		patchOpts := []client.PatchOption{
+			client.ForceOwnership,
+			client.FieldOwner("helios-operator"),
+		}
+
+		if err := r.Patch(ctx, u, client.Apply, patchOpts...); err != nil {
+			log.Error(err, "Failed to apply resource via Server-Side Apply", "kind", u.GetKind(), "name", u.GetName())
+			r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("Resource application failed (%s/%s): %v", u.GetKind(), u.GetName(), err))
+			return ctrl.Result{}, err
+		}
+		log.Info("Successfully applied resource via SSA", "kind", u.GetKind(), "name", u.GetName())
+	}
+
+	// ------------------------------------------------------------------
 	// PHASE 0.9: Inject Database Credentials into Backend Deployment
 	// Patches the live Deployment (deployed by ArgoCD) to add DB_HOST,
 	// DB_USER, DB_PASS, DB_PORT, DB_NAME, and DATABASE_URL (via $(VAR) expansion).
@@ -210,19 +255,27 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// ------------------------------------------------------------------
-	// PHASE 1: Render & GitOps
+	// PHASE 1: Serialize CR & GitOps
 	// ------------------------------------------------------------------
 
-	if err := r.GitOps.Reconcile(ctx, &heliosApp, manifestBytes); err != nil {
+	// Serialize clean CR YAML for GitOps repository
+	crYAML, err := gitopssync.SerializeHeliosApp(&heliosApp)
+	if err != nil {
+		log.Error(err, "Failed to serialize HeliosApp to YAML")
+		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("CR serialization failed: %v", err))
+		return ctrl.Result{}, err
+	}
+
+	if err := r.GitOps.Reconcile(ctx, &heliosApp, crYAML); err != nil {
 		log.Error(err, "GitOps sync failed")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("GitOps sync failed: %v", err))
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if err := r.ArgoCD.Reconcile(ctx, &heliosApp); err != nil {
 		log.Error(err, "Failed to reconcile ArgoCD Application")
 		r.updateStatus(ctx, &heliosApp, appv1alpha1.PhaseFailed, fmt.Sprintf("ArgoCD reconciliation failed: %v", err))
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	if dbInjectionPending {
@@ -233,12 +286,13 @@ func (r *HeliosAppReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-// updateStatus updates the HeliosApp status.
+// updateStatus updates the HeliosApp status using a patch to avoid resourceVersion conflicts.
 func (r *HeliosAppReconciler) updateStatus(ctx context.Context, app *appv1alpha1.HeliosApp, phase appv1alpha1.HeliosAppPhase, message string) {
+	patch := client.MergeFrom(app.DeepCopy())
 	app.Status.Phase = phase
 	app.Status.Message = message
-	if err := r.Status().Update(ctx, app); err != nil {
-		logf.FromContext(ctx).Error(err, "Failed to update status")
+	if err := r.Status().Patch(ctx, app, patch); err != nil {
+		logf.FromContext(ctx).Error(err, "Failed to update status via patch")
 	}
 }
 
@@ -371,4 +425,61 @@ func (r *HeliosAppReconciler) handlePreSyncCleanup(ctx context.Context, heliosAp
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// handlePreSyncJob extracts and applies the PreSync job from the HeliosApp annotations.
+// It blocks the reconcile loop until the job is completed successfully.
+func (r *HeliosAppReconciler) handlePreSyncJob(ctx context.Context, app *appv1alpha1.HeliosApp) (ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	jobJSON, ok := app.Annotations["helios.io/presync-job"]
+	if !ok || jobJSON == "" {
+		return ctrl.Result{}, nil
+	}
+
+	var job batchv1.Job
+	if err := json.Unmarshal([]byte(jobJSON), &job); err != nil {
+		log.Error(err, "Failed to unmarshal PreSync job")
+		return ctrl.Result{}, fmt.Errorf("failed to unmarshal presync job: %w", err)
+	}
+
+	// Ensure namespace matches
+	job.Namespace = app.Namespace
+
+	// Ensure OwnerReference for garbage collection
+	if err := controllerutil.SetControllerReference(app, &job, r.Scheme); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to set owner reference on presync job: %w", err)
+	}
+
+	existingJob := &batchv1.Job{}
+	err := r.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, existingJob)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Creating PreSync Job", "job", job.Name)
+			if err := r.Create(ctx, &job); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to create presync job: %w", err)
+			}
+			r.updateStatus(ctx, app, appv1alpha1.PhasePending, "Waiting for PreSync database migration job to complete")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("failed to get presync job: %w", err)
+	}
+
+	// Check status of existing job
+	if existingJob.Status.Succeeded > 0 {
+		log.Info("PreSync Job completed successfully", "job", job.Name)
+		return ctrl.Result{}, nil
+	}
+
+	// If the job has failed and reached its backoff limit, we consider it a permanent failure.
+	for _, cond := range existingJob.Status.Conditions {
+		if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+			return ctrl.Result{}, fmt.Errorf("presync job failed permanently: %s", cond.Reason)
+		}
+	}
+
+	// Still running
+	log.Info("Waiting for PreSync Job to complete", "job", job.Name)
+	r.updateStatus(ctx, app, appv1alpha1.PhasePending, "Waiting for PreSync database migration job to complete")
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }

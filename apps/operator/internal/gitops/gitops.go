@@ -157,7 +157,7 @@ func (c *Client) SyncManifest(ctx context.Context, filePath, content string) err
 	}
 
 	// 5. Git Commit
-	msg := fmt.Sprintf("Update manifest: %s", filePath)
+	msg := fmt.Sprintf("Update HeliosApp CR: %s", filePath)
 	commitHash, err := w.Commit(msg, &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  c.AuthorName,

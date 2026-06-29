@@ -1,7 +1,7 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: ${{ values.repoName | dump }}
+  name: ${{ values.repoName }}
   description: ${{ (values.description or "") | dump }}
   annotations:
     gitea.org/repo-url: http://localhost:3030/${{ values.owner }}/${{ values.repoName }}
@@ -15,4 +15,8 @@ metadata:
 spec:
   type: website
   lifecycle: experimental
-  owner: ${{ values.owner | dump }}
+  owner: ${{ values.owner }}
+  {% if values.backendComponent -%}
+  dependsOn:
+    - component:default/${{ values.backendComponent }}
+  {%- endif %}
