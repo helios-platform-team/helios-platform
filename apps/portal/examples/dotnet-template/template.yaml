@@ -10,31 +10,30 @@ spec:
 
   parameters:
     - title: Component Information
-      required:
-        - name
-        - port
-        - dockerOrg
-        - repoName
+      required: [name]
       properties:
         name:
-          title: Name
+          title: Project Name
           type: string
-          description: Unique name of the component
+          description: Unique name of the service.
           ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
-          title: Port
+          title: API Port
           type: number
-          description: The port the .NET API listens on
           default: 8080
-        dockerOrg:
-          title: Docker Registry Org/User
+          ui:readonly: true
+          description: Standardized platform networking port for web services.
+        namespace:
+          title: Kubernetes Namespace
           type: string
-          description: Your Docker Hub username or Organization
-        repoName:
-          title: Docker Repository Name
-          type: string
-          description: The name of the Docker repository (e.g. my-dotnet-api)
+          default: default
+
+    - title: Automated Platform Routing
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+      properties: {} 
 
     - title: Database Configuration
       properties:
@@ -42,29 +41,6 @@ spec:
           title: Database Settings
           type: object
           ui:field: DatabasePicker
-
-    - title: Repository & Webhook
-      required:
-        - repoUrl
-      properties:
-        repoUrl:
-          title: Source Repository Location
-          type: string
-          ui:field: RepoUrlPicker
-          ui:options:
-            allowedHosts:
-              - localhost:3030
-
-    - title: Optional Extras (Local Convenience)
-      properties:
-        registerToCatalog:
-          title: Register component in catalog
-          type: boolean
-          default: false
-        sendNotification:
-          title: Send Backstage notification
-          type: boolean
-          default: false
 
   steps:
     - id: fetch-source
@@ -78,7 +54,8 @@ spec:
           owner: user:default/${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: ".NET Web API service for ${{ parameters.name }}"
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          # DYNAMIC ROUTING
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
           hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
 
     - id: publish-source
@@ -86,7 +63,8 @@ spec:
       action: publish:gitea
       input:
         description: Source Code for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}
+        # DYNAMIC ROUTING
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
         sourcePath: ./source
         repoVisibility: public
 
@@ -94,8 +72,8 @@ spec:
       name: Create Webhook
       action: gitea:create-webhook
       input:
-        repoUrl: ${{ parameters.repoUrl }}
-        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        webhookUrl: http://el-${{ parameters.name }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}
         events:
           - push
@@ -108,9 +86,9 @@ spec:
         targetPath: ./gitops
         values:
           name: ${{ parameters.name }}
-          image: ${{ parameters.dockerOrg }}/${{ parameters.repoName }}
-          dockerOrg: ${{ parameters.dockerOrg }}
-          repoName: ${{ parameters.repoName }}
+          image: ${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          dockerOrg: ${{ environment.parameters.dockerOrg }}
+          repoName: ${{ parameters.name }}
           port: ${{ parameters.port }}
           hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
           databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
@@ -129,7 +107,7 @@ spec:
       action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}-gitops
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
         sourcePath: ./gitops
         repoVisibility: public
 
@@ -138,8 +116,8 @@ spec:
       action: kubernetes:create-git-credentials-secret
       input:
         name: ${{ parameters.name }}
-        namespace: default
-        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+        namespace: ${{ parameters.namespace }}
+        username: ${{ environment.parameters.gitOrg }}
         webhookSecret: ${{ parameters.name }}
 
     - id: apply-helios
@@ -152,21 +130,9 @@ spec:
     - id: register
       name: Register Component
       action: catalog:register
-      if: "{{ parameters.registerToCatalog }}"
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
         catalogInfoPath: "catalog-info.yaml"
-
-    - id: notify
-      name: Notify User
-      action: notification:send
-      if: "{{ parameters.sendNotification }}"
-      input:
-        recipients: entity
-        entityRefs:
-          - user:default/guest
-        title: ".NET Template Executed"
-        info: "Your .NET Web API service has been scaffolded and deployed via GitOps."
 
   output:
     links:

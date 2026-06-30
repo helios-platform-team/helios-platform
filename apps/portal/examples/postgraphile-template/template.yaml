@@ -12,26 +12,23 @@ spec:
 
   parameters:
     - title: Component Information
-      required: [name, port, dockerOrg, repoName]
+      required: [name]
       properties:
         name:
-          title: Name
+          title: Project Name
           type: string
-          description: Unique name of the PostGraphile API service
+          description: Unique name of the service. Your Git repo and Docker image will be automatically routed based on your environment credentials.
           ui:autofocus: true
         port:
           title: API Port
           type: number
-          description: the port PostGraphile listens on
-          default: 5000
-        dockerOrg:
-          title: Docker Registry Org/User
+          default: 8080
+          ui:readonly: true   # <--- FIX: Locks the field to 8080 so the user cannot change it
+          description: Standardized platform networking port for web services.
+        namespace:
+          title: Kubernetes Namespace
           type: string
-          description: Your Docker Hub username or Organization
-        repoName:
-          title: Docker Repository Name
-          type: string
-          description: The name of the Docker repository (e.g. my-graphql-api)
+          default: default
 
     - title: Database Configuration
       properties:
@@ -39,21 +36,6 @@ spec:
           title: Database Settings
           type: object
           ui:field: DatabasePicker
-
-    - title: Repository & Webhook
-      required: [repoUrl]
-      properties:
-        repoUrl:
-          title: Source Repository Location
-          type: string
-          ui:field: RepoUrlPicker
-          ui:options:
-            allowedHosts: [localhost:3030]
-        namespace:
-          title: Kubernetes Namespace
-          type: string
-          description: Namespace where the service will be deployed
-          default: default
 
   steps:
     - id: fetch-source
@@ -63,8 +45,8 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          name: ${{ parameters.repoName }}
-          port: ${{ parameters.port }}
+          name: ${{ parameters.name }}
+          port: ${{ parameters.port }} # Safely reads the locked 8080 value
           namespace: ${{ parameters.namespace }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
 
@@ -73,7 +55,7 @@ spec:
       action: publish:gitea
       input:
         description: PostGraphile Source for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
         sourcePath: ./source
         repoVisibility: public
 
@@ -81,9 +63,9 @@ spec:
       name: Create Webhook for DB Migration Trigger
       action: gitea:create-webhook
       input:
-        repoUrl: ${{ parameters.repoUrl }}
-        webhookUrl: http://el-${{ parameters.repoName }}-db-migrate-listener.${{ parameters.namespace }}.svc.cluster.local:8080
-        webhookSecret: ${{ parameters.repoName }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        webhookUrl: http://el-${{ parameters.name }}-db-migrate-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookSecret: ${{ parameters.name }}
         events:
           - push
 
@@ -94,23 +76,23 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
-          port: ${{ parameters.port }}
+          name: ${{ parameters.name }}
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          port: ${{ parameters.port }} # Safely reads the locked 8080 value
           namespace: ${{ parameters.namespace }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
-          migrateImage: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}-migrate:latest
+          migrateImage: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}-migrate:main
 
     - id: publish-gitops
       name: Publish GitOps Manifests
       action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}-gitops
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
         sourcePath: ./gitops
         repoVisibility: public
 
@@ -119,9 +101,9 @@ spec:
       action: kubernetes:create-secret
       input:
         namespace: ${{ parameters.namespace }}
-        secretName: ${{ parameters.repoName }}-webhook-secret
+        secretName: ${{ parameters.name }}-webhook-secret
         data:
-          secret: ${{ parameters.repoName }}
+          secret: ${{ parameters.name }}
 
     - id: apply-rbac
       name: Apply RBAC for Migration
@@ -147,3 +129,13 @@ spec:
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
         catalogInfoPath: 'catalog-info.yaml'
+
+  output:
+    links:
+      - title: View Source Code Repository
+        url: ${{ steps['publish-source'].output.remoteUrl }}
+      - title: View GitOps Repository
+        url: ${{ steps['publish-gitops'].output.remoteUrl }}
+      - title: Open Component in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}

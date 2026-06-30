@@ -10,51 +10,37 @@ spec:
 
   parameters:
     - title: Component Information
-      required:
-        - name
-        - port
-        - dockerOrg
-        - repoName
+      required: [name]
       properties:
         name:
-          title: Name
+          title: Project Name
           type: string
-          description: Unique name of the component
+          description: Unique name of the service.
           ui:autofocus: true
         port:
-          title: Port
+          title: API Port
           type: number
-          description: The port to expose
           default: 8080
-        dockerOrg:
-            title: Docker Registry Org/User
-            type: string
-            description: Your Docker Hub username or Organization
-        repoName:
-            title: Docker Repository Name
-            type: string
-            description: The name of the repository (e.g. my-service)
+          ui:readonly: true
+          description: Standardized platform networking port for web services.
+        namespace:
+          title: Kubernetes Namespace
+          type: string
+          default: default
 
-    # --- UPDATED DATABASE CONFIGURATION STEP ---
+    - title: Automated Platform Routing
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+      properties: {}
+
     - title: Database Configuration
       properties:
         databaseConfig:
           title: Database Settings
           type: object
           ui:field: DatabasePicker
-    # --- END OF NEW STEP ---
 
-    - title: Repository & Webhook
-      required:
-        - repoUrl
-      properties:
-        repoUrl:
-          title: Source Repository Location
-          type: string
-          ui:field: RepoUrlPicker
-          ui:options:
-            allowedHosts:
-              - localhost:3030
     - title: Optional Extras (Local Convenience)
       properties:
         registerToCatalog:
@@ -66,7 +52,6 @@ spec:
           type: boolean
           default: false
 
-
   steps:
     # 1. Source Code Logic
     - id: fetch-source
@@ -76,19 +61,20 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          # Use repoName as the app identifier to keep it Kubernetes/URL safe.
           name: ${{ parameters.name }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: "Service for ${{ parameters.name }}"
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          # DYNAMIC ROUTING
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
 
     - id: publish-source
       name: Publish Source Code
       action: publish:gitea
       input:
         description: Source Code for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}
+        # DYNAMIC ROUTING
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
         sourcePath: ./source
         repoVisibility: public
 
@@ -96,9 +82,8 @@ spec:
       name: Create Webhook
       action: gitea:create-webhook
       input:
-        repoUrl: ${{ parameters.repoUrl }}
-        # Tekton EventListener address is the service root.
-        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        webhookUrl: http://el-${{ parameters.name }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
         # Deterministic secret so users don't have to provide one.
         # Must match the Kubernetes secret value created below.
         webhookSecret: ${{ parameters.name }}
@@ -114,9 +99,9 @@ spec:
         targetPath: ./gitops
         values:
           name: ${{ parameters.name }}
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
-          dockerOrg: ${{ parameters.dockerOrg }}
-          repoName: ${{ parameters.repoName }}
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          dockerOrg: ${{ environment.parameters.dockerOrg }}
+          repoName: ${{ parameters.name }}
           port: ${{ parameters.port }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
@@ -133,7 +118,8 @@ spec:
       action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}-gitops
+        # DYNAMIC ROUTING
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
         sourcePath: ./gitops
         repoVisibility: public
 
@@ -143,8 +129,8 @@ spec:
       action: kubernetes:create-git-credentials-secret
       input:
         name: ${{ parameters.name }}
-        namespace: default
-        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
+        namespace: ${{ parameters.namespace }}
+        username: ${{ environment.parameters.gitOrg }}
         webhookSecret: ${{ parameters.name }}
 
     # 2.2 Deploy HeliosApp (after secret exists)

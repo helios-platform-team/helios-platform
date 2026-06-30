@@ -101,6 +101,10 @@ auth:
 scaffolder:
   # see https://backstage.io/docs/features/software-templates/configuration for software template options
   defaultEnvironment:
+    parameters:
+      dockerOrg: ${DOCKER_USERNAME}
+      gitOrg: ${GITEA_USER}
+      gitHost: ${GITEA_HOST}
     secrets:
       GITEA_TOKEN: ${GITEA_TOKEN}
 
