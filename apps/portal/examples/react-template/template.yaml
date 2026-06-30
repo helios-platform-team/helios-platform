@@ -1,9 +1,9 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: multi-option-react-template
-  title: Multi-Option React Scaffolder Template
-  description: A flexible React template that lets you customize your build tool (Vite/Webpack), styling (Tailwind CSS), state management (Zustand/Redux), and data fetching (React Query), and deploys it automatically.
+  name: react-template
+  title: React Template
+  description: Bootstrap a modern frontend application with custom options (Vite/Webpack, Tailwind/CSS, state/fetching). Supports linking to an existing backend or provisioning a new one.
 spec:
   owner: user:guest
   type: service

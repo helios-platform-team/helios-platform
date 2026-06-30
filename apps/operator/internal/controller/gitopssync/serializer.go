@@ -62,6 +62,7 @@ func SerializeHeliosApp(app *appv1alpha1.HeliosApp) ([]byte, error) {
 	// Strip volatile metadata fields that are cluster-managed
 	cleanApp.ResourceVersion = ""
 	cleanApp.UID = ""
+	cleanApp.Generation = 0
 	cleanApp.CreationTimestamp = metav1.Time{}
 	cleanApp.ManagedFields = nil
 

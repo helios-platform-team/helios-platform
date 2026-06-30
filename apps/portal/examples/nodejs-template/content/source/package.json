@@ -1,19 +1,32 @@
 {
-    "name": "${{ values.name }}",
-    "version": "1.0.0",
-    "description": "${{ values.description }}",
-    "main": "index.js",
-    "scripts": {
-        "start": "node index.js",
-        "test": "jest"
-    },
-    "dependencies": {
-        "express": "^4.17.1"
-    },
-    "devDependencies": {
-        "jest": "^29.7.0"
-    },
-    "jest": {
-        "testEnvironment": "node"
-    }
+  "name": "${{ values.name }}",
+  "version": "1.0.0",
+  "description": "${{ values.description }}",
+  "main": "index.js",
+  "scripts": {
+    "start": "{% if values.hasDatabase %}node --env-file=.env index.js{% else %}node index.js{% endif %}",
+    "start:prod": "{% if values.hasDatabase %}npx prisma migrate deploy && node index.js{% else %}node index.js{% endif %}",
+    "test": "jest"
+    {%- if values.hasDatabase -%},
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy"
+    {%- endif %}
+  },
+  "dependencies": {
+    {%- if values.hasDatabase %}
+    "@prisma/adapter-pg": "7.8.0",
+    "@prisma/client": "7.8.0",
+    "pg": "8.21.0"
+    {%- endif %}
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+    {%- if values.hasDatabase -%},
+    "prisma": "7.8.0"
+    {%- endif %}
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
 }

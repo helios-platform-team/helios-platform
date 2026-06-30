@@ -3,10 +3,7 @@ kind: Template
 metadata:
   name: hasura-graphql-template
   title: Hasura GraphQL API Template
-  description: >-
-    Scaffolds a Hasura GraphQL Engine instance connected to a
-    dynamically provisioned PostgreSQL database.
-    The Helios Operator automatically injects the connection string (PGRST_DB_URI).
+  description: Spin up a Hasura GraphQL Engine instance connected to a dynamically provisioned PostgreSQL database with automated connection string injection.
 spec:
   owner: user:guest
   type: service

@@ -3,11 +3,7 @@ kind: Template
 metadata:
   name: postgrest-template
   title: PostgREST API Template
-  description: >-
-    Scaffolds a PostgREST instant REST API over a PostgreSQL database.
-    PostgREST automatically generates CRUD endpoints from your database schema.
-    The Helios Operator automatically provisions the database and injects
-    the connection string (PGRST_DB_URI) into the PostgREST pod.
+  description: Expose a fully-featured, instant RESTful API directly from any PostgreSQL database schema using PostgREST.
 spec:
   owner: user:guest
   type: service

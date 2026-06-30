@@ -2,8 +2,8 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: dotnet-webapi-template
-  title: .NET Web API Template (Optional Database)
-  description: Scaffolds an ASP.NET Core Web API service with optional PostgreSQL-ready GitOps manifests.
+  title: .NET Web API Template
+  description: Create a high-performance ASP.NET Core Web API service with optional PostgreSQL database support.
 spec:
   owner: user:guest
   type: service

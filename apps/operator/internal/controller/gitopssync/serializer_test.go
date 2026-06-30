@@ -192,6 +192,37 @@ func TestSerializeHeliosApp_StripsUID(t *testing.T) {
 	}
 }
 
+// TestSerializeHeliosApp_StripsGeneration verifies generation is removed
+func TestSerializeHeliosApp_StripsGeneration(t *testing.T) {
+	app := &appv1alpha1.HeliosApp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-app",
+			Namespace:  "default",
+			Generation: 3,
+		},
+		Spec: appv1alpha1.HeliosAppSpec{
+			GitRepo:    "https://git.example.com/repo",
+			GitOpsRepo: "https://git.example.com/gitops",
+			GitOpsPath: "apps/test",
+			ImageRepo:  "registry.example.com/test",
+		},
+	}
+
+	output, err := gitopssync.SerializeHeliosApp(app)
+	if err != nil {
+		t.Fatalf("SerializeHeliosApp failed: %v", err)
+	}
+
+	var unmarshaled appv1alpha1.HeliosApp
+	if err := yaml.Unmarshal(output, &unmarshaled); err != nil {
+		t.Fatalf("failed to unmarshal output: %v", err)
+	}
+
+	if unmarshaled.Generation != 0 {
+		t.Errorf("Generation not stripped: got %d, want 0", unmarshaled.Generation)
+	}
+}
+
 // TestSerializeHeliosApp_StripsManagedFields verifies managedFields is removed
 func TestSerializeHeliosApp_StripsManagedFields(t *testing.T) {
 	app := &appv1alpha1.HeliosApp{

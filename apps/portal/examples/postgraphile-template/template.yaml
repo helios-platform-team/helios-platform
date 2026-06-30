@@ -3,9 +3,7 @@ kind: Template
 metadata:
   name: postgraphile-template
   title: PostGraphile GraphQL API Template
-  description: >-
-    Scaffolds an instant GraphQL API over a PostgreSQL database using PostGraphile.
-    The Helios Operator automatically provisions the database and injects the connection string (PGRST_DB_URI).
+  description: Generate an instant, high-performance GraphQL API directly from your PostgreSQL database schema using PostGraphile.
 spec:
   owner: user:guest
   type: service

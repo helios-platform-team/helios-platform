@@ -121,21 +121,21 @@ catalog:
       rules:
         - allow: [User, Group]
 
-    # Nodejs Template
+    # Node.js Template
     - type: file
       target: ../../examples/nodejs-template/template.yaml
       rules:
         - allow: [Template]
 
-    # Multi-Option React Scaffolder Template
+    # React Template
     - type: file
-      target: ../../examples/multi-option-react-template/template.yaml
+      target: ../../examples/react-template/template.yaml
       rules:
         - allow: [Template]
 
-    # NestJS + Prisma Template
+    # NestJS Template
     - type: file
-      target: ../../examples/nestjs-prisma-template/template.yaml
+      target: ../../examples/nestjs-template/template.yaml
       rules:
         - allow: [Template]
 

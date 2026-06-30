@@ -4,40 +4,34 @@ metadata:
   name: ${{ values.name }}
   namespace: default
 spec:
-
-  description: "Managed by Helios Operator"
   owner: ${{ values.owner }}
-  
-  # Required Git/Docker Info
+  description: "Node.js service: ${{ values.name }}"
+  gitRepo: ${{ values.sourceRepo }}
+  gitBranch: main
   imageRepo: ${{ values.dockerOrg }}/${{ values.repoName }}
-  gitRepo: "${{ values.sourceRepo }}"
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: "apps/${{ values.name }}" # Assumed path
+  gitopsPath: ${{ values.name }}
+  pipelineName: from-code-to-cluster
+  webhookSecret: git-credentials-${{ values.name }}
+  gitopsSecretRef: git-credentials-${{ values.name }}
   port: ${{ values.port }}
-  replicas: 1
-  testCommand: ${{ values.testCommand }}
-  
-  # Webhook Config
-  webhookSecret: "git-credentials-${{ values.name }}"
-  gitopsSecretRef: "git-credentials-${{ values.name }}"
-
+  # testCommand runs inside the pipeline's run-tests step.
+  testCommand: "npm test"
+  testImage: "node:24"
   components:
-    - name: ${{ values.name }}-backend
+    - name: ${{ values.name }}
       type: web-service
       properties:
         image: ${{ values.dockerOrg }}/${{ values.repoName }}:main
         port: ${{ values.port }}
         replicas: 1
-        env:
-          - name: NODE_ENV
-            value: "production"
       traits:
         - type: service
           properties:
-            port: ${{ values.port }}
-            targetPort: ${{ values.port }}
+            port: ${{ values.port }}{% if values.databaseType == "postgres" %}
         - type: database
           properties:
-            dbType: ${{ values.dbType | dump }}
-            dbName: ${{ values.dbName | dump }}
-            version: ${{ values.dbVersion | dump }}
+            dbType: postgres
+            dbName: ${{ values.databaseName | default(values.name | replace('-', '_') + "_db") }}
+            version: ${{ values.databaseVersion | default("18.4") | dump }}
+            storage: "1Gi"{% endif %}

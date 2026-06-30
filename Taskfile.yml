@@ -264,29 +264,30 @@ tasks:
       - kubectl get deployment/tekton-triggers-webhook -n tekton-pipelines
     cmds:
       - echo "Waiting for ArgoCD to deploy Tekton Pipelines..."
+      # ponytail: Wait for both deployments to exist and be ready before applying triggers to avoid webhook connection errors.
       - cmd: |
           for i in {1..120}; do
-            if kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines >/dev/null 2>&1; then
-              echo "Tekton Pipelines controller deployment found."
+            if kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines >/dev/null 2>&1 && kubectl get deployment/tekton-pipelines-webhook -n tekton-pipelines >/dev/null 2>&1; then
+              echo "Tekton Pipelines controller and webhook deployments found."
               exit 0
             fi
-            echo "Waiting for deployment to be created..."
+            echo "Waiting for deployments to be created..."
             sleep 5
           done
-          echo "Timeout waiting for Tekton Pipelines deployment"
+          echo "Timeout waiting for Tekton Pipelines deployments"
           exit 1
         platforms: [linux, darwin]
       - cmd: |
-          powershell -ExecutionPolicy Bypass -Command "for ($i=1; $i -le 120; $i++) { if (kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines 2>$null) { echo 'Tekton Pipelines controller deployment found.'; exit 0 }; echo 'Waiting for deployment to be created...'; Start-Sleep -Seconds 5 }; echo 'Timeout waiting for Tekton Pipelines deployment'; exit 1"
+          powershell -ExecutionPolicy Bypass -Command "for ($i=1; $i -le 120; $i++) { if ((kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines 2>$null) -and (kubectl get deployment/tekton-pipelines-webhook -n tekton-pipelines 2>$null)) { echo 'Tekton Pipelines controller and webhook deployments found.'; exit 0 }; echo 'Waiting for deployments to be created...'; Start-Sleep -Seconds 5 }; echo 'Timeout waiting for Tekton Pipelines deployments'; exit 1"
         platforms: [windows]
-      - echo "Installing Tekton Triggers..."
-      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml --request-timeout=120s
-      - echo "Installing Tekton Interceptors..."
-      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml --request-timeout=120s
       - echo "Waiting for Tekton Pipelines controller..."
       - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
       - echo "Waiting for Tekton Pipelines webhook..."
       - kubectl rollout status deployment/tekton-pipelines-webhook -n tekton-pipelines --timeout=600s
+      - echo "Installing Tekton Triggers..."
+      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml --request-timeout=120s
+      - echo "Installing Tekton Interceptors..."
+      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml --request-timeout=120s
       - echo "Ensuring Tekton webhook deployment is still healthy..."
       - cmd: kubectl rollout status deployment/tekton-pipelines-webhook -n tekton-pipelines --timeout=120s
         platforms: [linux, darwin]

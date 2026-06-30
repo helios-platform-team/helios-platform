@@ -2,11 +2,8 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: spring-boot-template
-  title: Java Spring Boot Template (Database-backed)
-  description: >-
-    Scaffolds a standard Java Spring Boot application (Gradle) with a PostgreSQL database.
-    The Helios Operator automatically provisions the database and injects
-    credentials (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS) into the backend pod.
+  title: Java Spring Boot Template
+  description: Create a production-ready Java Spring Boot application (Gradle) integrated with a PostgreSQL database and automatic environment credential injection.
 spec:
   owner: user:guest
   type: service
