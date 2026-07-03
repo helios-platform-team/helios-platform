@@ -38,7 +38,11 @@ const BACKEND_TEMPLATES: BackendTemplateInfo[] = [
   { id: 'spring-boot', name: 'Spring Boot', defaultPort: 8081 },
   { id: 'postgrest', name: 'PostgREST (Instant REST API)', defaultPort: 3003 },
   { id: 'hasura', name: 'Hasura GraphQL Engine', defaultPort: 8082 },
-  { id: 'postgraphile', name: 'PostGraphile (Instant GraphQL API)', defaultPort: 5433 },
+  {
+    id: 'postgraphile',
+    name: 'PostGraphile (Instant GraphQL API)',
+    defaultPort: 5433,
+  },
 ];
 
 interface PickerOption {
@@ -63,7 +67,10 @@ interface BackendConfigData {
 }
 
 // Find next available port not in RESERVED_PORTS and not in usedPorts
-function findNextAvailablePort(startPort: number, usedPorts: Set<number>): number {
+function findNextAvailablePort(
+  startPort: number,
+  usedPorts: Set<number>,
+): number {
   let port = startPort;
   while (usedPorts.has(port) || RESERVED_PORTS.includes(port)) {
     port++;
@@ -142,9 +149,17 @@ export const BackendComponentPicker = ({
       return options[0];
     }
     if (val.connectionType === 'Existing') {
-      return options.find(opt => opt.type === 'existing' && opt.id === val.backendComponent) || options[0];
+      return (
+        options.find(
+          opt => opt.type === 'existing' && opt.id === val.backendComponent,
+        ) || options[0]
+      );
     }
-    return options.find(opt => opt.type === 'template' && opt.id === val.backendType) || options[0];
+    return (
+      options.find(
+        opt => opt.type === 'template' && opt.id === val.backendType,
+      ) || options[0]
+    );
   }, [formData, options]);
 
   const handleSelectionChange = (_: any, option: PickerOption | null) => {
@@ -208,7 +223,10 @@ export const BackendComponentPicker = ({
       backendDatabaseConfig: val.backendDatabaseConfig
         ? {
             ...val.backendDatabaseConfig,
-            dbName: (!currentDbName || currentDbName === oldName) ? newName : currentDbName,
+            dbName:
+              !currentDbName || currentDbName === oldName
+                ? newName
+                : currentDbName,
           }
         : undefined,
     });
@@ -242,7 +260,10 @@ export const BackendComponentPicker = ({
       backendDatabaseConfig: {
         dbType: newType,
         dbName: newType === 'postgres' ? val.backendComponent : '',
-        dbVersion: newType === 'postgres' ? (val.backendDatabaseConfig?.dbVersion || '18.4') : '',
+        dbVersion:
+          newType === 'postgres'
+            ? val.backendDatabaseConfig?.dbVersion || '18.4'
+            : '',
       },
     });
   };
@@ -263,7 +284,9 @@ export const BackendComponentPicker = ({
   const isPortConflict = React.useMemo(() => {
     if (!val.backendPort) return false;
     // Conflict if port is in usedPorts or RESERVED_PORTS
-    return usedPorts.has(val.backendPort) || RESERVED_PORTS.includes(val.backendPort);
+    return (
+      usedPorts.has(val.backendPort) || RESERVED_PORTS.includes(val.backendPort)
+    );
   }, [val.backendPort, usedPorts]);
 
   const getGroupHeader = (type: string) => {
@@ -301,22 +324,41 @@ export const BackendComponentPicker = ({
             return <span>{option.label}</span>;
           }
           const isTemplate = option.type === 'template';
-          
+
           // Theme-aware colors
           const bg = isDarkMode
-            ? (isTemplate ? 'rgba(76, 175, 80, 0.15)' : 'rgba(33, 150, 243, 0.15)')
-            : (isTemplate ? '#e8f5e9' : '#e3f2fd');
+            ? isTemplate
+              ? 'rgba(76, 175, 80, 0.15)'
+              : 'rgba(33, 150, 243, 0.15)'
+            : isTemplate
+              ? '#e8f5e9'
+              : '#e3f2fd';
           const fg = isDarkMode
-            ? (isTemplate ? '#81c784' : '#64b5f6')
-            : (isTemplate ? '#2e7d32' : '#1565c0');
+            ? isTemplate
+              ? '#81c784'
+              : '#64b5f6'
+            : isTemplate
+              ? '#2e7d32'
+              : '#1565c0';
           const border = isDarkMode
-            ? (isTemplate ? '1px solid rgba(76, 175, 80, 0.3)' : '1px solid rgba(33, 150, 243, 0.3)')
-            : (isTemplate ? '1px solid #c8e6c9' : '1px solid #bbdefb');
-            
+            ? isTemplate
+              ? '1px solid rgba(76, 175, 80, 0.3)'
+              : '1px solid rgba(33, 150, 243, 0.3)'
+            : isTemplate
+              ? '1px solid #c8e6c9'
+              : '1px solid #bbdefb';
+
           const text = isTemplate ? 'Template' : 'Existing';
 
           return (
-            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                width: '100%',
+                alignItems: 'center',
+              }}
+            >
               <span>{option.label}</span>
               <span
                 style={{
@@ -350,8 +392,19 @@ export const BackendComponentPicker = ({
       />
 
       {val.backendType && (
-        <div style={{ paddingLeft: '16px', borderLeft: '2px solid #ccc', marginTop: '16px', marginBottom: '16px' }}>
-          <Typography variant="subtitle1" gutterBottom style={{ fontWeight: 'bold' }}>
+        <div
+          style={{
+            paddingLeft: '16px',
+            borderLeft: '2px solid #ccc',
+            marginTop: '16px',
+            marginBottom: '16px',
+          }}
+        >
+          <Typography
+            variant="subtitle1"
+            gutterBottom
+            style={{ fontWeight: 'bold' }}
+          >
             Backend Component Configuration Details
           </Typography>
 
@@ -363,7 +416,11 @@ export const BackendComponentPicker = ({
             fullWidth
             margin="normal"
             required
-            helperText={val.connectionType === 'Existing' ? 'ReadOnly name of the existing catalog component.' : 'Name of the backend to create.'}
+            helperText={
+              val.connectionType === 'Existing'
+                ? 'ReadOnly name of the existing catalog component.'
+                : 'Name of the backend to create.'
+            }
           />
 
           <TextField
@@ -382,13 +439,20 @@ export const BackendComponentPicker = ({
           {val.connectionType !== 'Existing' && val.backendDatabaseConfig && (
             <>
               <Divider style={{ marginTop: '16px', marginBottom: '16px' }} />
-              <Typography variant="subtitle2" gutterBottom style={{ fontWeight: 'bold' }}>
+              <Typography
+                variant="subtitle2"
+                gutterBottom
+                style={{ fontWeight: 'bold' }}
+              >
                 Backend Database Settings
               </Typography>
 
               <FormControl fullWidth margin="normal">
                 <InputLabel>Database Type</InputLabel>
-                <Select value={val.backendDatabaseConfig.dbType || 'none'} onChange={handleDbTypeChange}>
+                <Select
+                  value={val.backendDatabaseConfig.dbType || 'none'}
+                  onChange={handleDbTypeChange}
+                >
                   <MenuItem value="none">No Database</MenuItem>
                   <MenuItem value="postgres">PostgreSQL</MenuItem>
                 </Select>
@@ -407,7 +471,10 @@ export const BackendComponentPicker = ({
 
                   <FormControl fullWidth margin="normal">
                     <InputLabel>Database Version</InputLabel>
-                    <Select value={val.backendDatabaseConfig.dbVersion || '18.4'} onChange={handleDbVersionChange}>
+                    <Select
+                      value={val.backendDatabaseConfig.dbVersion || '18.4'}
+                      onChange={handleDbVersionChange}
+                    >
                       <MenuItem value="18">18</MenuItem>
                       <MenuItem value="18.4">18.4</MenuItem>
                     </Select>

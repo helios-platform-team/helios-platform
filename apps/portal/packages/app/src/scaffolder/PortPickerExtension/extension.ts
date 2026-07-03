@@ -26,7 +26,9 @@ export const PortPickerExtension: any = scaffolderPlugin.provide(
       }
 
       if (RESERVED_PORTS.includes(value)) {
-        validation.addError(`Port ${value} is reserved for Helios infrastructure core services.`);
+        validation.addError(
+          `Port ${value} is reserved for Helios infrastructure core services.`,
+        );
         return;
       }
 
@@ -51,7 +53,9 @@ export const PortPickerExtension: any = scaffolderPlugin.provide(
           });
 
           if (usedPorts.has(value)) {
-            validation.addError(`Port ${value} is already in use by another component.`);
+            validation.addError(
+              `Port ${value} is already in use by another component.`,
+            );
           }
         }
       } catch (error) {

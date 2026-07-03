@@ -46,14 +46,25 @@ export const PortPicker = ({
         });
 
         const startPort = schema?.default || 5173;
-        const currentVal = formData !== undefined && formData !== null ? Number(formData) : 0;
-        
-        const isCurrentValUsed = usedPorts.has(currentVal) || RESERVED_PORTS.includes(currentVal);
-        const isDefaultValUsed = usedPorts.has(Number(startPort)) || RESERVED_PORTS.includes(Number(startPort));
+        const currentVal =
+          formData !== undefined && formData !== null ? Number(formData) : 0;
 
-        if (currentVal === 0 || (currentVal === Number(startPort) && isDefaultValUsed) || isCurrentValUsed) {
+        const isCurrentValUsed =
+          usedPorts.has(currentVal) || RESERVED_PORTS.includes(currentVal);
+        const isDefaultValUsed =
+          usedPorts.has(Number(startPort)) ||
+          RESERVED_PORTS.includes(Number(startPort));
+
+        if (
+          currentVal === 0 ||
+          (currentVal === Number(startPort) && isDefaultValUsed) ||
+          isCurrentValUsed
+        ) {
           let candidate = Number(startPort);
-          while (RESERVED_PORTS.includes(candidate) || usedPorts.has(candidate)) {
+          while (
+            RESERVED_PORTS.includes(candidate) ||
+            usedPorts.has(candidate)
+          ) {
             candidate += 1;
           }
           onChange(candidate);
