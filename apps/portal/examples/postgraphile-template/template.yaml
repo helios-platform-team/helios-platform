@@ -10,26 +10,23 @@ spec:
 
   parameters:
     - title: Component Information
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
       required: [name]
       properties:
         name:
           title: Project Name
           type: string
-          description: Unique name of the service. Your Git repo and Docker image will be automatically routed based on your environment credentials.
+          description: Unique name of the service.
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
           title: API Port
           type: number
-          default: 8080
-          ui:readonly: true   # <--- FIX: Locks the field to 8080 so the user cannot change it
+          default: 5433
+          ui:field: PortPicker
           description: Standardized platform networking port for web services.
-        namespace:
-          title: Kubernetes Namespace
-          type: string
-          default: default
-
-    - title: Database Configuration
-      properties:
         databaseConfig:
           title: Database Settings
           type: object
@@ -45,7 +42,7 @@ spec:
         values:
           name: ${{ parameters.name }}
           port: ${{ parameters.port }} # Safely reads the locked 8080 value
-          namespace: ${{ parameters.namespace }}
+          namespace: default
           owner: ${{ user.entity.metadata.name or 'guest' }}
 
     - id: publish-source
@@ -62,7 +59,7 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
-        webhookUrl: http://el-${{ parameters.name }}-db-migrate-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.name }}-db-migrate-listener.default.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}
         events:
           - push
@@ -77,7 +74,7 @@ spec:
           name: ${{ parameters.name }}
           image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
           port: ${{ parameters.port }} # Safely reads the locked 8080 value
-          namespace: ${{ parameters.namespace }}
+          namespace: default
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
@@ -98,7 +95,7 @@ spec:
       name: Create Kubernetes Webhook Secret
       action: kubernetes:create-secret
       input:
-        namespace: ${{ parameters.namespace }}
+        namespace: default
         secretName: ${{ parameters.name }}-webhook-secret
         data:
           secret: ${{ parameters.name }}

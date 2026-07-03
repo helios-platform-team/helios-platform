@@ -24,14 +24,10 @@ function App() {
 
   {% if values.dataFetching == 'react-query' -%}
   const { data, isLoading, error } = useQuery({
-    queryKey: ['repoData'],
+    queryKey: ['backendData'],
     queryFn: async () => {
-      {% if values.backendComponent -%}
-      // ponytail: Defaulting to local dev port for NestJS (3001) or postgrest (8080) to test local connection.
-      const res = await fetch('http://localhost:${{ values.backendPort or 3001 }}/health')
-      {%- else -%}
-      const res = await fetch('https://api.github.com/repos/facebook/react')
-      {%- endif %}
+      const url = {% if values.hasBackend %}`http://localhost:${{ values.backendPort }}/health`{% else %}'https://api.github.com/repos/facebook/react'{% endif %}
+      const res = await fetch(url)
       if (!res.ok) {
         throw new Error('Network response was not ok')
       }
@@ -45,9 +41,8 @@ function App() {
 
   React.useEffect(() => {
     setIsLoading(true)
-    {% if values.backendComponent -%}
-    // ponytail: Defaulting to local dev port for NestJS (3001) or postgrest (8080) to test local connection.
-    fetch('http://localhost:${{ values.backendPort or 3001 }}/health')
+    const url = {% if values.hasBackend %}`http://localhost:${{ values.backendPort }}/health`{% else %}'https://api.github.com/repos/facebook/react'{% endif %}
+    fetch(url)
       .then((res) => {
         if (!res.ok) {
           throw new Error('Network response was not ok')
@@ -62,23 +57,6 @@ function App() {
         setError(err)
         setIsLoading(false)
       })
-    {%- else -%}
-    fetch('https://api.github.com/repos/facebook/react')
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error('Network response was not ok')
-        }
-        return res.json()
-      })
-      .then((data) => {
-        setData(data)
-        setIsLoading(false)
-      })
-      .catch((err) => {
-        setError(err)
-        setIsLoading(false)
-      })
-    {%- endif %}
   }, [])
   {%- endif %}
 
@@ -88,7 +66,7 @@ function App() {
         <h1 className="{% if values.styling == 'tailwind' %}text-3xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent{% else %}app-title{% endif %}">
           React App Scaffolder Template
         </h1>
-        
+
         <div className="{% if values.styling == 'tailwind' %}mb-8 p-4 bg-slate-700/50 rounded-lg{% else %}tech-stack-panel{% endif %}">
           <h2 className="{% if values.styling == 'tailwind' %}text-lg font-semibold mb-2 text-cyan-300{% else %}section-title{% endif %}">Tech Stack</h2>
           <ul className="{% if values.styling == 'tailwind' %}grid grid-cols-2 gap-2 text-sm{% else %}tech-stack-list{% endif %}">
@@ -103,14 +81,14 @@ function App() {
         <div className="{% if values.styling == 'tailwind' %}mb-8{% else %}counter-section{% endif %}">
           <h2 className="{% if values.styling == 'tailwind' %}text-xl font-semibold mb-4{% else %}section-title{% endif %}">Counter State Example (${{ values.stateManagement | capitalize }})</h2>
           <div className="{% if values.styling == 'tailwind' %}flex items-center gap-4{% else %}counter-controls{% endif %}">
-            <button 
+            <button
               onClick={() => {% if values.stateManagement == 'zustand' %}decrement(){% elif values.stateManagement == 'redux' %}dispatch(decrement()){% else %}setCount(c => c - 1){% endif %}}
               className="{% if values.styling == 'tailwind' %}px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded font-bold transition-all{% else %}btn{% endif %}"
             >
               -
             </button>
             <span className="{% if values.styling == 'tailwind' %}text-2xl font-mono w-12 text-center{% else %}counter-value{% endif %}">{count}</span>
-            <button 
+            <button
               onClick={() => {% if values.stateManagement == 'zustand' %}increment(){% elif values.stateManagement == 'redux' %}dispatch(increment()){% else %}setCount(c => c + 1){% endif %}}
               className="{% if values.styling == 'tailwind' %}px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded font-bold transition-all{% else %}btn btn-primary{% endif %}"
             >
@@ -119,28 +97,34 @@ function App() {
           </div>
         </div>
 
-        {/* Data Fetching Section */}
+        {/* Data Fetching / Backend Connection Section */}
         <div className="{% if values.styling == 'tailwind' %}border-t border-slate-700 pt-6{% else %}data-section{% endif %}">
           <h2 className="{% if values.styling == 'tailwind' %}text-xl font-semibold mb-4{% else %}section-title{% endif %}">
-            {% if values.backendComponent -%}
-            Backend Connection Example
-            {%- else -%}
-            Data Fetching Example ({% if values.dataFetching == 'react-query' %}React Query{% else %}Fetch{% endif %})
-            {%- endif -%}
+            {% if values.hasBackend %}Backend Integration Health Check{% else %}Data Fetching Example ({% if values.dataFetching == 'react-query' %}React Query{% else %}Fetch{% endif %}){% endif %}
           </h2>
-          {isLoading && <p>{% if values.backendComponent %}Connecting to backend...{% else %}Loading React repo stats...{% endif %}</p>}
-          {error && <p className="{% if values.styling == 'tailwind' %}text-red-400{% else %}error-msg{% endif %}">Error fetching data: {error.message || 'Unknown error'}</p>}
+          {isLoading && <p>{% if values.hasBackend %}Checking connection to backend...{% else %}Loading React repo stats...{% endif %}</p>}
+          {error && (
+            <div className="{% if values.styling == 'tailwind' %}text-red-400 space-y-1{% else %}error-panel{% endif %}">
+              <p><strong>Status:</strong> Disconnected / Error</p>
+              <p className="text-sm">Error details: {error.message || 'Unknown error'}</p>
+              {% if values.hasBackend %}<p className="text-xs text-slate-400 mt-2">Make sure your backend is running at http://localhost:${{ values.backendPort }}</p>{% endif %}
+            </div>
+          )}
           {data && (
             <div className="{% if values.styling == 'tailwind' %}text-sm space-y-2{% else %}stats-grid{% endif %}">
-              {% if values.backendComponent -%}
-              <p><strong>Connected Backend:</strong> ${{ values.backendComponent }}</p>
-              <p><strong>Health Status:</strong> {data.status}</p>
-              {%- else -%}
+              {% if values.hasBackend %}
+              <p><strong>Backend Service:</strong> ${{ values.backendComponent }}</p>
+              <p><strong>API Endpoint:</strong> <code className="bg-slate-700 px-1 py-0.5 rounded">http://localhost:${{ values.backendPort }}/health</code></p>
+              <p><strong>Status:</strong> <span className="text-emerald-400 font-semibold">Active & Healthy</span></p>
+              {data.database && (
+                <p><strong>Database:</strong> <span className={data.database === 'connected' ? "text-emerald-400 font-semibold" : "text-amber-400 font-semibold"}>{data.database === 'connected' ? 'Connected' : 'Disconnected'}</span></p>
+              )}
+              {% else %}
               <p><strong>Repo Name:</strong> {data.full_name}</p>
               <p><strong>Stars:</strong> {data.stargazers_count?.toLocaleString()}</p>
               <p><strong>Forks:</strong> {data.forks_count?.toLocaleString()}</p>
               <p><strong>Open Issues:</strong> {data.open_issues_count?.toLocaleString()}</p>
-              {%- endif %}
+              {% endif %}
             </div>
           )}
         </div>

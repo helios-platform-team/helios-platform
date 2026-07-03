@@ -11,33 +11,23 @@ spec:
   # MINIMAL UI: Only requires Project Name and Database Selection
   parameters:
     - title: Component Information
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
       required: [name]
       properties:
         name:
           title: Project Name
           type: string
           description: Unique name of the service.
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
           title: API Port
           type: number
-          default: 8080
-          ui:readonly: true   # Locked to platform standard port 8080
+          default: 8082
+          ui:field: PortPicker
           description: Standardized platform networking port for web services.
-        namespace:
-          title: Kubernetes Namespace
-          type: string
-          default: default
-
-    # UX FIX: Explains the automated routing to the developer
-    - title: Automated Platform Routing
-      description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
-      properties: {} # Empty block ensures the step displays the text without asking for inputs
-
-    - title: Database Configuration
-      properties:
         databaseConfig:
           title: Database Settings
           type: object
@@ -54,7 +44,7 @@ spec:
         values:
           name: ${{ parameters.name }}
           port: ${{ parameters.port }}
-          namespace: ${{ parameters.namespace }}
+          namespace: default
           owner: ${{ user.entity.metadata.name or 'guest' }}
 
     - id: publish-source
@@ -73,7 +63,7 @@ spec:
       input:
         # Match the dynamic Git routing
         repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
-        webhookUrl: http://el-${{ parameters.name }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}-webhook-secret
         events:
           - push
@@ -87,7 +77,7 @@ spec:
         values:
           name: ${{ parameters.name }}
           port: ${{ parameters.port }}
-          namespace: ${{ parameters.namespace }}
+          namespace: default
           databaseName: ${{ parameters.databaseConfig.dbName }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
@@ -115,7 +105,7 @@ spec:
       name: Create Kubernetes Webhook Secret
       action: kubernetes:create-secret
       input:
-        namespace: ${{ parameters.namespace }}
+        namespace: default
         secretName: ${{ parameters.name }}-webhook-secret
         data:
           secret: ${{ parameters.name }}-webhook-secret

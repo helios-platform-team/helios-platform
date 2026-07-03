@@ -10,8 +10,6 @@
 
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
-    {% if values.hasDatabase -%}
-    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
-    {% endif -%}
+    {% if values.hasDatabase %}<PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />{% endif %}
   </ItemGroup>
 </Project>

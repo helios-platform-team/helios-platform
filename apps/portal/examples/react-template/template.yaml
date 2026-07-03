@@ -3,51 +3,30 @@ kind: Template
 metadata:
   name: react-template
   title: React Template
-  description: Bootstrap a modern frontend application with custom options (Vite/Webpack, Tailwind/CSS, state/fetching). Supports linking to an existing backend or provisioning a new one.
+  description: Bootstrap a customizable React application (Vite/Webpack, Tailwind/CSS, Zustand/Redux, React Query). Supports connecting to a new template backend or linking to an existing one.
 spec:
   owner: user:guest
   type: service
 
   parameters:
     - title: Component Information
-      required: [name]
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+      required: [name, buildTool, styling, stateManagement, dataFetching]
       properties:
         name:
           title: Project Name
           type: string
           description: Unique name of the service.
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
           title: Web Port
           type: number
-          default: 8080
-          ui:readonly: true
+          default: 5173
+          ui:field: PortPicker
           description: Standardized platform networking port for web services.
-        namespace:
-          title: Kubernetes Namespace
-          type: string
-          default: default
-        backendComponent:
-          title: Backend Component
-          type: string
-          description: Select the backend component to connect to (optional)
-          ui:field: BackendComponentPicker
-          ui:options:
-            allowCustom: false
-
-    - title: Automated Platform Routing
-      description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
-      properties: {}
-
-    - title: Tech Stack Options
-      required:
-        - buildTool
-        - styling
-        - stateManagement
-        - dataFetching
-      properties:
         buildTool:
           title: Build Tool
           type: string
@@ -94,51 +73,10 @@ spec:
             - None (Standard fetch)
             - React Query (TanStack Query)
           default: none
-
-    - title: Backend Component Details
-      if:
-        properties:
-          backendComponent:
-            type: string
-            minLength: 1
-      then:
-        required:
-          - backendType
-          - backendPort
-          - backendRepoName
-        properties:
-          backendType:
-            title: Backend Type
-            type: string
-            enum:
-              - nestjs-prisma
-              - nodejs
-              - dotnet
-              - spring-boot
-              - postgrest
-              - hasura
-              - postgraphile
-            enumNames:
-              - NestJS + Prisma (Optional Database)
-              - Node.js Service
-              - .NET Web API
-              - Spring Boot
-              - PostgREST (Instant REST API)
-              - Hasura GraphQL Engine
-              - PostGraphile (Instant GraphQL API)
-            default: nestjs-prisma
-          backendPort:
-            title: Backend Port
-            type: number
-            default: 3001
-          backendRepoName:
-            title: Backend Docker Repository Name
-            type: string
-            description: The name of the repository (e.g. nestjs-prisma-backend)
-          backendDatabaseConfig:
-            title: Backend Database Settings
-            type: object
-            ui:field: DatabasePicker
+        backendConfig:
+          title: Backend Configuration
+          type: object
+          ui:field: BackendComponentPicker
 
   steps:
     # 1. Fetch Source Code Template
@@ -150,7 +88,6 @@ spec:
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
-          # Mapped repoName to name to preserve skeleton compatibility
           repoName: ${{ parameters.name }}
           description: "React application: ${{ parameters.name }}"
           buildTool: ${{ parameters.buildTool }}
@@ -159,19 +96,19 @@ spec:
           dataFetching: ${{ parameters.dataFetching }}
           port: ${{ parameters.port }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
-          # DYNAMIC ROUTING
           image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
-          backendComponent: ${{ parameters.backendComponent }}
-          backendPort: ${{ parameters.backendPort or 3001 }}
+          backendComponent: ${{ parameters.backendConfig.backendComponent if parameters.backendConfig else '' }}
+          backendPort: ${{ parameters.backendConfig.backendPort if parameters.backendConfig else 3001 }}
+          hasBackend: ${{ parameters.backendConfig and parameters.backendConfig.connectionType and parameters.backendConfig.connectionType != 'None' }}
 
-    # 2. Configure Selected Stack (Always run, dynamic list)
+    # 2. Configure Selected Stack
     - id: configure-files
       name: Configure Selected Stack
       action: fs:rename
       input:
         files: '${{ [ { from: "./source/index." + parameters.buildTool + ".html", to: "./source/index.html" }, { from: "./source/src/index." + parameters.styling + ".css", to: "./source/src/index.css" } ].concat( [ { from: "./source/src/store/reduxStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "redux" else ( [ { from: "./source/src/store/zustandStore.js", to: "./source/src/store/store.js" } ] if parameters.stateManagement == "zustand" else [] ) ).concat( [ { from: "./source/webpack.config.ejs", to: "./source/webpack.config.js" } ] if parameters.buildTool == "webpack" else [] ) }}'
 
-    # 3. Clean up Unused Files (Always run, dynamic list)
+    # 3. Clean up Unused Files
     - id: cleanup-files
       name: Clean up Unused Files
       action: fs:delete
@@ -184,7 +121,6 @@ spec:
       action: publish:gitea
       input:
         description: Source Code for ${{ parameters.name }}
-        # DYNAMIC ROUTING
         repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
         sourcePath: ./source
         repoVisibility: public
@@ -195,7 +131,7 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
-        webhookUrl: http://el-${{ parameters.name }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}
         events:
           - push
@@ -210,7 +146,7 @@ spec:
         values:
           name: ${{ parameters.name }}
           repoName: ${{ parameters.name }}
-          namespace: ${{ parameters.namespace }}
+          namespace: default
           image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
           dockerOrg: ${{ environment.parameters.dockerOrg }}
           port: ${{ parameters.port }}
@@ -235,7 +171,7 @@ spec:
       action: kubernetes:create-git-credentials-secret
       input:
         name: ${{ parameters.name }}
-        namespace: ${{ parameters.namespace }}
+        namespace: default
         username: ${{ environment.parameters.gitOrg }}
         webhookSecret: ${{ parameters.name }}
 
@@ -253,130 +189,128 @@ spec:
       action: catalog:register
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
-        catalogInfoPath: 'catalog-info.yaml'
+        catalogInfoPath: "catalog-info.yaml"
 
     # 11. Fetch Backend Source Code
     - id: fetch-backend-source
       name: Fetch Backend Source Code
-      if: ${{ parameters.backendComponent }}
+      if: ${{ parameters.backendConfig and parameters.backendConfig.connectionType == 'New' }}
       action: fetch:local-template
       input:
-        templateName: ${{ parameters.backendType + "-template" }}
+        templateName: ${{ parameters.backendConfig.backendType + "-template" }}
         subDir: source
         targetPath: ./backend-source
         values:
-          name: ${{ parameters.backendComponent }}
+          name: ${{ parameters.backendConfig.backendComponent }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
-          port: ${{ parameters.backendPort }}
+          port: ${{ parameters.backendConfig.backendPort }}
           description: "Backend service for ${{ parameters.name }}"
-          image: ${{ "index.docker.io/" + environment.parameters.dockerOrg + "/" + parameters.backendRepoName }}
-          hasDatabase: ${{ parameters.backendDatabaseConfig.dbType == 'postgres' }}
-          repoName: ${{ parameters.backendRepoName }}
+          image: ${{ "index.docker.io/" + environment.parameters.dockerOrg + "/" + parameters.backendConfig.backendComponent }}
+          hasDatabase: ${{ parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' }}
+          repoName: ${{ parameters.backendConfig.backendComponent }}
           dockerOrg: ${{ environment.parameters.dockerOrg }}
-          databaseConfig: ${{ parameters.backendDatabaseConfig }}
+          databaseConfig: ${{ parameters.backendConfig.backendDatabaseConfig }}
           apiSchema: "public"
           jwtSecret: "default_secret_key_32_characters_long"
           jwtRole: "authenticated"
           anonRole: "anon"
 
-    # 12. Fetch Backend Database Source Files (NestJS only)
+    # 12. Fetch Backend Database Source Files (NestJS & Node.js)
     - id: fetch-backend-source-db
       name: Fetch Backend Database Source Files
-      if: ${{ parameters.backendComponent and parameters.backendType == 'nestjs-prisma' and parameters.backendDatabaseConfig.dbType == 'postgres' }}
+      if: ${{ parameters.backendConfig and parameters.backendConfig.connectionType == 'New' and (parameters.backendConfig.backendType == 'nestjs' or parameters.backendConfig.backendType == 'nodejs') and parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' }}
       action: fetch:local-template
       input:
-        templateName: nestjs-prisma-template
+        templateName: ${{ parameters.backendConfig.backendType + "-template" }}
         subDir: source-db
         targetPath: ./backend-source
         values:
-          name: ${{ parameters.backendComponent }}
+          name: ${{ parameters.backendConfig.backendComponent }}
           hasDatabase: true
 
     # 13. Publish Backend Source Code to Gitea
     - id: publish-backend-source
       name: Publish Backend Source Code
-      if: ${{ parameters.backendComponent }}
+      if: ${{ parameters.backendConfig and parameters.backendConfig.connectionType == 'New' }}
       action: publish:gitea
       input:
-        description: Backend Source Code for ${{ parameters.backendComponent }}
-        # DYNAMIC ROUTING
-        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.backendRepoName }}
+        description: Backend Source Code for ${{ parameters.backendConfig.backendComponent }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.backendConfig.backendComponent }}
         sourcePath: ./backend-source
         repoVisibility: public
 
     # 14. Create Gitea Webhook for Backend
     - id: create-backend-webhook
       name: Create Backend Webhook
-      if: ${{ parameters.backendComponent }}
+      if: ${{ parameters.backendConfig and parameters.backendConfig.connectionType == 'New' }}
       action: gitea:create-webhook
       input:
-        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.backendRepoName }}
-        webhookUrl: http://el-${{ parameters.backendComponent }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
-        webhookSecret: ${{ parameters.backendComponent }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.backendConfig.backendComponent }}
+        webhookUrl: http://el-${{ parameters.backendConfig.backendComponent }}-listener.default.svc.cluster.local:8080
+        webhookSecret: ${{ parameters.backendConfig.backendComponent }}
         events:
           - push
 
-    # 15. Fetch Backend GitOps Manifests
+      # 15. Fetch Backend GitOps Manifests
     - id: fetch-backend-gitops
       name: Fetch Backend GitOps Manifests
-      if: ${{ parameters.backendComponent }}
+      if: ${{ parameters.backendConfig and parameters.backendConfig.connectionType == 'New' }}
       action: fetch:local-template
       input:
-        templateName: ${{ parameters.backendType + "-template" }}
+        templateName: ${{ parameters.backendConfig.backendType + "-template" }}
         subDir: gitops
         targetPath: ./backend-gitops
         values:
-          name: ${{ parameters.backendComponent }}
-          image: ${{ parameters.backendRepoName if (parameters.backendType == 'nestjs-prisma' or parameters.backendType == 'dotnet') else "index.docker.io/" + environment.parameters.dockerOrg + "/" + parameters.backendRepoName }}
+          name: ${{ parameters.backendConfig.backendComponent }}
+          image: ${{ "index.docker.io/" + environment.parameters.dockerOrg + "/" + parameters.backendConfig.backendComponent }}
           dockerOrg: ${{ environment.parameters.dockerOrg }}
-          repoName: ${{ parameters.backendRepoName }}
-          port: ${{ parameters.backendPort }}
-          hasDatabase: ${{ parameters.backendDatabaseConfig.dbType == 'postgres' }}
-          databaseType: ${{ parameters.backendDatabaseConfig.dbType if parameters.backendDatabaseConfig.dbType == 'postgres' else '' }}
-          databaseName: ${{ parameters.backendDatabaseConfig.dbName if parameters.backendDatabaseConfig.dbType == 'postgres' else '' }}
-          databaseVersion: ${{ parameters.backendDatabaseConfig.dbVersion if parameters.backendDatabaseConfig.dbType == 'postgres' else '' }}
-          dbType: ${{ parameters.backendDatabaseConfig.dbType }}
-          dbName: ${{ parameters.backendDatabaseConfig.dbName }}
-          dbVersion: ${{ parameters.backendDatabaseConfig.dbVersion }}
+          repoName: ${{ parameters.backendConfig.backendComponent }}
+          port: ${{ parameters.backendConfig.backendPort }}
+          hasDatabase: ${{ parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' }}
+          databaseType: ${{ parameters.backendConfig.backendDatabaseConfig.dbType if parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' else '' }}
+          databaseName: ${{ parameters.backendConfig.backendDatabaseConfig.dbName if parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' else '' }}
+          databaseVersion: ${{ parameters.backendConfig.backendDatabaseConfig.dbVersion if parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' else '' }}
+          dbType: ${{ parameters.backendConfig.backendDatabaseConfig.dbType }}
+          dbName: ${{ parameters.backendConfig.backendDatabaseConfig.dbName }}
+          dbVersion: ${{ parameters.backendConfig.backendDatabaseConfig.dbVersion }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-backend-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-backend-source'].output.remoteUrl | replace(".git", "") }}-gitops
-          testCommand: ${{ "npm test" if parameters.backendType == 'nestjs-prisma' else ("npm install && npm test" if parameters.backendType == 'nodejs' else ("dotnet test" if parameters.backendType == 'dotnet' else ("gradle test" if parameters.backendType == 'spring-boot' else ""))) }}
-          testImage: ${{ "mcr.microsoft.com/dotnet/sdk:10.0.300" if parameters.backendType == 'dotnet' else ("gradle:8.7-jdk21" if parameters.backendType == 'spring-boot' else "node:24") }}
+          testCommand: ${{ "npm test" if parameters.backendConfig.backendType == 'nestjs' else ("npm install && npm test" if parameters.backendConfig.backendType == 'nodejs' else ("dotnet test" if parameters.backendConfig.backendType == 'dotnet' else ("gradle test" if parameters.backendConfig.backendType == 'spring-boot' else ""))) }}
+          testImage: ${{ "mcr.microsoft.com/dotnet/sdk:10.0.300" if parameters.backendConfig.backendType == 'dotnet' else ("gradle:8.7-jdk21" if parameters.backendConfig.backendType == 'spring-boot' else "node:24") }}
           apiSchema: "public"
           jwtSecret: "default_secret_key_32_characters_long"
           jwtRole: "authenticated"
           anonRole: "anon"
-          migrateImage: ${{ "index.docker.io/" + environment.parameters.dockerOrg + "/" + parameters.backendRepoName + "-migrate:latest" }}
-          namespace: ${{ parameters.namespace }}
+          migrateImage: ${{ "index.docker.io/" + environment.parameters.dockerOrg + "/" + parameters.backendConfig.backendComponent + "-migrate:latest" }}
+          namespace: default
 
     # 16. Publish Backend GitOps Manifests to Gitea
     - id: publish-backend-gitops
       name: Publish Backend GitOps Manifests
-      if: ${{ parameters.backendComponent }}
+      if: ${{ parameters.backendConfig and parameters.backendConfig.connectionType == 'New' }}
       action: publish:gitea
       input:
-        description: Backend GitOps Manifests for ${{ parameters.backendComponent }}
-        # DYNAMIC ROUTING
-        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.backendRepoName }}-gitops
+        description: Backend GitOps Manifests for ${{ parameters.backendConfig.backendComponent }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.backendConfig.backendComponent }}-gitops
         sourcePath: ./backend-gitops
         repoVisibility: public
 
     # 17. Create Backend Git Credentials Secret on Kubernetes
     - id: create-backend-secret
       name: Create Backend Git Credentials Secret
-      if: ${{ parameters.backendComponent }}
+      if: ${{ parameters.backendConfig and parameters.backendConfig.connectionType == 'New' }}
       action: kubernetes:create-git-credentials-secret
       input:
-        name: ${{ parameters.backendComponent }}
-        namespace: ${{ parameters.namespace }}
+        name: ${{ parameters.backendConfig.backendComponent }}
+        namespace: default
         username: ${{ environment.parameters.gitOrg }}
-        webhookSecret: ${{ parameters.backendComponent }}
+        webhookSecret: ${{ parameters.backendConfig.backendComponent }}
 
     # 18. Deploy Backend to Kubernetes
     - id: apply-backend-helios
       name: Deploy Backend to Kubernetes
-      if: ${{ parameters.backendComponent }}
+      if: ${{ parameters.backendConfig and parameters.backendConfig.connectionType == 'New' }}
       action: kubernetes:apply
       input:
         manifestPath: ./backend-gitops/helios-app.yaml
@@ -385,11 +319,11 @@ spec:
     # 19. Register Backend Component in Catalog
     - id: register-backend
       name: Register Backend Component
-      if: ${{ parameters.backendComponent }}
+      if: ${{ parameters.backendConfig and parameters.backendConfig.connectionType == 'New' }}
       action: catalog:register
       input:
         repoContentsUrl: ${{ steps['publish-backend-source'].output.repoContentsUrl }}
-        catalogInfoPath: 'catalog-info.yaml'
+        catalogInfoPath: "catalog-info.yaml"
 
   output:
     links:

@@ -10,6 +10,9 @@ spec:
 
   parameters:
     - title: Component Information
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
       required: [name]
       properties:
         name:
@@ -21,45 +24,22 @@ spec:
         port:
           title: API Port
           type: number
-          default: 8080
-          ui:readonly: true
+          default: 3002
+          ui:field: PortPicker
           description: Standardized platform networking port for web services.
-        namespace:
-          title: Kubernetes Namespace
-          type: string
-          default: default
-
-    - title: Automated Platform Routing
-      description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
-      properties: {}
-
-    - title: Database Configuration
-      properties:
         databaseConfig:
           title: Database Settings
           type: object
           ui:field: DatabasePicker
 
-    - title: Optional Extras (Local Convenience)
-      properties:
-        registerToCatalog:
-          title: Register component in catalog
-          type: boolean
-          default: false
-        sendNotification:
-          title: Send Backstage notification
-          type: boolean
-          default: false
-
   steps:
     # 1. Source Code
     - id: fetch-source
       name: Fetch Source Code
-      action: fetch:template
+      action: fetch:local-template
       input:
-        url: ./content/source
+        templateName: nodejs-template
+        subDir: source
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
@@ -69,13 +49,15 @@ spec:
           # DYNAMIC ROUTING
           image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
           hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+          dbPort: 5432
 
     - id: fetch-source-db
       name: Fetch Database Source Files
       if: ${{ parameters.databaseConfig.dbType == 'postgres' }}
-      action: fetch:template
+      action: fetch:local-template
       input:
-        url: ./content/source-db
+        templateName: nodejs-template
+        subDir: source-db
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
@@ -96,7 +78,7 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
-        webhookUrl: http://el-${{ parameters.name }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
         # Deterministic secret so users don't have to provide one.
         # Must match the Kubernetes secret value created below.
         webhookSecret: ${{ parameters.name }}
@@ -142,7 +124,7 @@ spec:
       action: kubernetes:create-git-credentials-secret
       input:
         name: ${{ parameters.name }}
-        namespace: ${{ parameters.namespace }}
+        namespace: default
         username: ${{ environment.parameters.gitOrg }}
         webhookSecret: ${{ parameters.name }}
 
@@ -157,7 +139,6 @@ spec:
     - id: register
       name: Register Component
       action: catalog:register
-      if: '{{ parameters.registerToCatalog }}'
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
         catalogInfoPath: 'catalog-info.yaml'
@@ -165,7 +146,6 @@ spec:
     - id: notify
       name: Notify User
       action: notification:send
-      if: '{{ parameters.sendNotification }}'
       input:
         recipients: entity
         entityRefs:

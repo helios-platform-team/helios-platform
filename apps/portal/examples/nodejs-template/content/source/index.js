@@ -1,9 +1,7 @@
 const http = require('http');
 const port = ${{ values.port }};
-{% if values.hasDatabase -%}
-const { PrismaService } = require('./prisma.service');
-const prisma = new PrismaService();
-{%- endif %}
+{% if values.hasDatabase %}const { PrismaService } = require('./prisma.service');
+const prisma = new PrismaService();{% endif %}
 
 const server = http.createServer(async (req, res) => {
     // Add CORS headers for frontend integration
@@ -25,19 +23,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.url === '/health' && req.method === 'GET') {
-        {% if values.hasDatabase -%}
-        try {
+{% if values.hasDatabase %}        try {
             await prisma.$queryRaw`SELECT 1`;
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ status: 'ok', database: 'connected' }));
         } catch (err) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ status: 'error', database: `disconnected: ${err.message}` }));
-        }
-        {%- else -%}
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok' }));
-        {%- endif %}
+        }{% else %}        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok' }));{% endif %}
         return;
     }
 
@@ -49,14 +43,12 @@ const server = http.createServer(async (req, res) => {
 async function gracefulShutdown() {
     console.log('Shutting down server...');
     server.close(async () => {
-        {% if values.hasDatabase -%}
-        try {
+        {% if values.hasDatabase %}try {
             await prisma.onModuleDestroy();
             console.log('Database connection closed.');
         } catch (err) {
             console.error('Error closing database connection:', err);
-        }
-        {%- endif %}
+        }{% endif %}
         process.exit(0);
     });
 }
@@ -66,9 +58,7 @@ process.on('SIGINT', gracefulShutdown);
 
 // Initialize DB and start server
 async function start() {
-    {% if values.hasDatabase -%}
-    await prisma.onModuleInit();
-    {%- endif %}
+    {% if values.hasDatabase %}await prisma.onModuleInit();{% endif %}
     server.listen(port, () => {
         console.log(`Example app listening at http://localhost:${port}`);
     });

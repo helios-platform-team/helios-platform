@@ -10,6 +10,9 @@ spec:
 
   parameters:
     - title: Component Information
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
       required:
         - name
         - port
@@ -18,20 +21,18 @@ spec:
           title: Service Name
           type: string
           description: Unique name for the PostgREST API service.
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
           title: API Port
           type: number
-          ui:readonly: true
+          ui:field: PortPicker
           description: The port PostgREST listens on
-          default: 3000
-
-    # THE UX FIX: Dynamic routing explanation block
-    - title: Automated Platform Routing
-      description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
-      properties: {} 
+          default: 3003
+        databaseConfig:
+          title: Database Settings
+          type: object
+          ui:field: DatabasePicker
 
     - title: PostgREST Configuration
       properties:
@@ -57,13 +58,6 @@ spec:
           type: string
           description: Role for unauthenticated requests (or leave empty to disable)
           default: anon
-
-    - title: Database Configuration
-      properties:
-        databaseConfig:
-          title: Database Settings
-          type: object
-          ui:field: DatabasePicker
 
     - title: Deployment Configuration
       properties:
@@ -109,7 +103,7 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
-        webhookUrl: http://el-${{ parameters.name }}-db-migrate-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.name }}-db-migrate-listener.default.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}
         events:
           - push
@@ -127,7 +121,7 @@ spec:
           image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
           dockerOrg: ${{ environment.parameters.dockerOrg }}
           port: ${{ parameters.port }}
-          namespace: ${{ parameters.namespace }}
+          namespace: default
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
           databaseVersion: ${{ parameters.databaseConfig.version or '18.4' }}
@@ -171,7 +165,7 @@ spec:
       name: Create Kubernetes Webhook Secret
       action: kubernetes:create-secret
       input:
-        namespace: ${{ parameters.namespace }}
+        namespace: default
         secretName: ${{ parameters.name }}-webhook-secret
         data:
           # Tekton Triggers interceptor expects the shared secret under key `secret`.
