@@ -119,7 +119,7 @@ const routes = (
     <Route
       path="/create"
       element={
-        <ScaffolderPage formProps={{ showErrorList: false }}>
+        <ScaffolderPage formProps={{ showErrorList: false } as any}>
           <ScaffolderFieldExtensions>
             <DatabasePickerExtension />
             <UniqueNamePickerExtension />
