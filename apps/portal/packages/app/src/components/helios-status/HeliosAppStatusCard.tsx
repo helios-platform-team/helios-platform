@@ -835,18 +835,6 @@ export const HeliosAppStatusCard: React.FC = () => {
               </Box>
             </Grid>
           )}
-          {status.gitRepo && (
-            <Grid item xs={12} sm={3}>
-              <Box className={classes.metaItem}>
-                <Typography className={classes.metaLabel}>Git Repo</Typography>
-                <Tooltip title={status.gitRepo}>
-                  <Typography className={classes.metaValue} noWrap>
-                    {status.gitRepo.replace(/^https?:\/\//, '')}
-                  </Typography>
-                </Tooltip>
-              </Box>
-            </Grid>
-          )}
           {status.imageRepo && (
             <Grid item xs={12} sm={3}>
               <Box className={classes.metaItem}>
