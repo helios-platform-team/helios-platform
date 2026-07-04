@@ -9,6 +9,7 @@ import {
 } from '@backstage/plugin-api-docs';
 import {
   EntityAboutCard,
+  EntityDependencyOfComponentsCard,
   EntityDependsOnComponentsCard,
   EntityDependsOnResourcesCard,
   EntityHasComponentsCard,
@@ -201,6 +202,9 @@ const serviceEntityPage = (
           <EntityDependsOnComponentsCard />
         </Grid>
         <Grid item md={6}>
+          <EntityDependencyOfComponentsCard />
+        </Grid>
+        <Grid item md={6}>
           <EntityDependsOnResourcesCard />
         </Grid>
       </Grid>
@@ -236,6 +240,9 @@ const websiteEntityPage = (
       <Grid container spacing={3} alignItems="stretch">
         <Grid item md={6}>
           <EntityDependsOnComponentsCard />
+        </Grid>
+        <Grid item md={6}>
+          <EntityDependencyOfComponentsCard />
         </Grid>
         <Grid item md={6}>
           <EntityDependsOnResourcesCard />

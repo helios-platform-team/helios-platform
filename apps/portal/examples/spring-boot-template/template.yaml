@@ -2,43 +2,31 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: spring-boot-template
-  title: Java Spring Boot Template (Database-backed)
-  description: >-
-    Scaffolds a standard Java Spring Boot application (Gradle) with a PostgreSQL database.
-    The Helios Operator automatically provisions the database and injects
-    credentials (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS) into the backend pod.
+  title: Java Spring Boot Template
+  description: Create a production-ready Java Spring Boot application (Gradle) integrated with a PostgreSQL database and automatic environment credential injection.
 spec:
   owner: user:guest
   type: service
 
   parameters:
     - title: Component Information
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
       required: [name]
       properties:
         name:
           title: Project Name
           type: string
           description: Unique name of the service.
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
           title: API Port
           type: number
-          default: 8080
-          ui:readonly: true
+          default: 8081
+          ui:field: PortPicker
           description: Standardized platform networking port for web services.
-        namespace:
-          title: Kubernetes Namespace
-          type: string
-          default: default
-
-    - title: Automated Platform Routing
-      description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
-      properties: {} 
-
-    - title: Database Configuration
-      properties:
         databaseConfig:
           title: Database Settings
           type: object
@@ -58,6 +46,7 @@ spec:
           description: "Spring Boot service: ${{ parameters.name }}"
           # DYNAMIC ROUTING: Uses Docker bridge variable
           image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          dbPort: 5432
 
     - id: publish-source
       name: Publish Source Code
@@ -74,7 +63,7 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
-        webhookUrl: http://el-${{ parameters.name }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}
         events:
           - push
@@ -113,7 +102,7 @@ spec:
       action: kubernetes:create-git-credentials-secret
       input:
         name: ${{ parameters.name }}
-        namespace: ${{ parameters.namespace }}
+        namespace: default
         # Uses the dynamic environment parameter instead of trying to parse a URL string
         username: ${{ environment.parameters.gitOrg }}
         webhookSecret: ${{ parameters.name }}

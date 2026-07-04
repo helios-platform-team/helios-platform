@@ -4,6 +4,7 @@ metadata:
   name: ${{ values.repoName }}
   description: ${{ (values.description or "") | dump }}
   annotations:
+    helios.io/port: "${{ values.port }}"
     gitea.org/repo-url: http://localhost:3030/${{ values.owner }}/${{ values.repoName }}
     backstage.io/techdocs-ref: dir:.
     backstage.io/kubernetes-id: ${{ values.repoName }}

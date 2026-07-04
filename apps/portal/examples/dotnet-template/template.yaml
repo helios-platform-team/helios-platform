@@ -2,14 +2,17 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: dotnet-webapi-template
-  title: .NET Web API Template (Optional Database)
-  description: Scaffolds an ASP.NET Core Web API service with optional PostgreSQL-ready GitOps manifests.
+  title: .NET Web API Template
+  description: Create a high-performance ASP.NET Core Web API service with optional PostgreSQL database support.
 spec:
   owner: user:guest
   type: service
 
   parameters:
     - title: Component Information
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
       required: [name]
       properties:
         name:
@@ -21,22 +24,9 @@ spec:
         port:
           title: API Port
           type: number
-          default: 8080
-          ui:readonly: true
+          default: 5000
+          ui:field: PortPicker
           description: Standardized platform networking port for web services.
-        namespace:
-          title: Kubernetes Namespace
-          type: string
-          default: default
-
-    - title: Automated Platform Routing
-      description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
-      properties: {} 
-
-    - title: Database Configuration
-      properties:
         databaseConfig:
           title: Database Settings
           type: object
@@ -57,6 +47,7 @@ spec:
           # DYNAMIC ROUTING
           image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
           hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+          dbPort: 5432
 
     - id: publish-source
       name: Publish Source Code
@@ -73,7 +64,7 @@ spec:
       action: gitea:create-webhook
       input:
         repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
-        webhookUrl: http://el-${{ parameters.name }}-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}
         events:
           - push
@@ -116,7 +107,7 @@ spec:
       action: kubernetes:create-git-credentials-secret
       input:
         name: ${{ parameters.name }}
-        namespace: ${{ parameters.namespace }}
+        namespace: default
         username: ${{ environment.parameters.gitOrg }}
         webhookSecret: ${{ parameters.name }}
 

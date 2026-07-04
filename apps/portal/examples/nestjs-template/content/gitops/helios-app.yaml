@@ -33,11 +33,11 @@ spec:
         - type: service
           properties:
             port: ${{ values.port }}
-        {% if values.databaseType == "postgres" %}
+        {% if values.databaseType == "postgres" -%}
         - type: database
           properties:
             dbType: postgres
             dbName: ${{ values.databaseName | default(values.name | replace('-', '_') + "_db") }}
             version: ${{ values.databaseVersion | default("18.4") | dump }}
             storage: "1Gi"
-        {% endif %}
+        {%- endif -%}

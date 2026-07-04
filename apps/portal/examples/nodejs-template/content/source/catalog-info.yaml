@@ -1,8 +1,12 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: ${{ values.name | dump }}
+  name: ${{ values.name }}
+  description: ${{ values.description | dump }}
   annotations:
+    helios.io/port: "${{ values.port }}"
+    gitea.org/repo-url: http://localhost:3030/${{ values.owner }}/${{ values.name }}
+    backstage.io/techdocs-ref: dir:.
     backstage.io/kubernetes-id: ${{ values.name }}
     backstage.io/kubernetes-label-selector: app.kubernetes.io/name=${{ values.name }}
     backstage.io/kubernetes-namespace: default
@@ -11,7 +15,5 @@ metadata:
     argocd/app-name: ${{ values.name }}-argocd
 spec:
   type: service
-  owner: "${{ values.owner }}"
-  lifecycle: experimental
-  providesApis:
-    - ${{ values.name }}-api
+  lifecycle: production
+  owner: ${{ values.owner }}

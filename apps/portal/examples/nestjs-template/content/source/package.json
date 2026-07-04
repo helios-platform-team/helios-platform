@@ -8,11 +8,7 @@
     "build": "nest build",
     "start": "{% if values.hasDatabase %}node --env-file=.env dist/main{% else %}nest start{% endif %}",
     "start:dev": "{% if values.hasDatabase %}node --env-file=.env node_modules/.bin/nest start --watch{% else %}nest start --watch{% endif %}",
-{% if values.hasDatabase %}
-    "start:prod": "npx prisma migrate deploy && node dist/main",
-{% else %}
-    "start:prod": "node dist/main",
-{% endif %}
+    "start:prod": "{% if values.hasDatabase %}npx prisma migrate deploy && node dist/main{% else %}node dist/main{% endif %}",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",

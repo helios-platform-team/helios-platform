@@ -125,6 +125,10 @@ import "helios.io/cue/definitions/tekton"
 				        DEP_FILE="$MANIFEST_PATH/deployment.yaml"
 				            SVC_FILE="$MANIFEST_PATH/service.yaml"
 				            MANIFEST_FILES="$DEP_FILE $SVC_FILE"
+				            HELIOS_APP_FILE="$MANIFEST_PATH/helios-app.yaml"
+				            if [ -f "$HELIOS_APP_FILE" ]; then
+				                MANIFEST_FILES="$MANIFEST_FILES $HELIOS_APP_FILE"
+				            fi
 				            APP_NAME=$(basename "$MANIFEST_PATH")
 
 				            if [ ! -f "$DEP_FILE" ]; then
@@ -164,6 +168,7 @@ import "helios.io/cue/definitions/tekton"
 				          yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].ports[0].containerPort = env(PORT)' "$FILE"
 				          yq -i 'select(.kind == "Service") .spec.ports[0].port = env(PORT)' "$FILE"
 				          yq -i 'select(.kind == "Service") .spec.ports[0].targetPort = env(PORT)' "$FILE"
+				          yq -i 'select(.kind == "HeliosApp") .spec.components[0].properties.image = env(IMAGE_URL)' "$FILE"
 				      fi
 				  fi
 				done

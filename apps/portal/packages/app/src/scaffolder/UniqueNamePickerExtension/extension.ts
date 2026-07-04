@@ -33,7 +33,7 @@ export const UniqueNamePickerExtension: any = scaffolderPlugin.provide(
           );
           if (entity) {
             validation.addError(
-              `A component named "${value}" already exists in the catalog. Please choose a unique name.`,
+              `A component named "${value}" already exists. Please choose a unique name.`,
             );
           }
         }
