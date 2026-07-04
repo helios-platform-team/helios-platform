@@ -57,7 +57,7 @@ interface HeliosComponentSummary {
 }
 
 interface HeliosEvent {
-  type: string;          // Normal | Warning
+  type: string; // Normal | Warning
   reason: string;
   message: string;
   involvedObject: {
@@ -540,9 +540,11 @@ export const HeliosAppStatusCard: React.FC = () => {
           fetchApi.fetch(
             `${backendUrl}/api/helios/status/${componentName}?namespace=${namespace}`,
           ),
-          fetchApi.fetch(
-            `${backendUrl}/api/helios/events/${componentName}?namespace=${namespace}&limit=20`,
-          ).catch(() => null),
+          fetchApi
+            .fetch(
+              `${backendUrl}/api/helios/events/${componentName}?namespace=${namespace}&limit=20`,
+            )
+            .catch(() => null),
         ]);
 
         if (statusResponse.status === 404) {
@@ -553,7 +555,9 @@ export const HeliosAppStatusCard: React.FC = () => {
         }
 
         if (!statusResponse.ok) {
-          throw new Error(`HTTP ${statusResponse.status}: ${statusResponse.statusText}`);
+          throw new Error(
+            `HTTP ${statusResponse.status}: ${statusResponse.statusText}`,
+          );
         }
 
         const data = await statusResponse.json();
@@ -751,9 +755,7 @@ export const HeliosAppStatusCard: React.FC = () => {
 
         {/* Description */}
         {status.description && (
-          <Box className={classes.descriptionBox}>
-            {status.description}
-          </Box>
+          <Box className={classes.descriptionBox}>{status.description}</Box>
         )}
 
         {/* Events notification bar */}
@@ -765,7 +767,9 @@ export const HeliosAppStatusCard: React.FC = () => {
             onClick={() => setEventsOpen(prev => !prev)}
           >
             {hasWarnings ? (
-              <WarningIcon style={{ fontSize: 18, color: 'var(--bui-fg-warning)' }} />
+              <WarningIcon
+                style={{ fontSize: 18, color: 'var(--bui-fg-warning)' }}
+              />
             ) : (
               <InfoIcon style={{ fontSize: 18, color: 'var(--bui-fg-info)' }} />
             )}
@@ -774,19 +778,27 @@ export const HeliosAppStatusCard: React.FC = () => {
                 fontFamily: 'var(--font-mono)',
                 fontSize: '0.7rem',
                 fontWeight: 700,
-                color: hasWarnings ? 'var(--bui-fg-warning)' : 'var(--bui-fg-info)',
+                color: hasWarnings
+                  ? 'var(--bui-fg-warning)'
+                  : 'var(--bui-fg-info)',
                 letterSpacing: '0.04em',
                 flex: 1,
               }}
             >
               {hasWarnings
-                ? `${warningEvents.length} warning${warningEvents.length > 1 ? 's' : ''} detected`
-                : `${events.length} recent event${events.length > 1 ? 's' : ''}`}
+                ? `${warningEvents.length} warning${
+                    warningEvents.length > 1 ? 's' : ''
+                  } detected`
+                : `${events.length} recent event${
+                    events.length > 1 ? 's' : ''
+                  }`}
             </Typography>
             <NotificationsIcon
               style={{
                 fontSize: 14,
-                color: hasWarnings ? 'var(--bui-fg-warning)' : 'var(--bui-fg-info)',
+                color: hasWarnings
+                  ? 'var(--bui-fg-warning)'
+                  : 'var(--bui-fg-info)',
                 opacity: 0.6,
               }}
             />
@@ -874,10 +886,15 @@ export const HeliosAppStatusCard: React.FC = () => {
         {/* Last Applied Hash */}
         {status.lastAppliedHash && (
           <Box mb={2} display="flex" alignItems="center" style={{ gap: 8 }}>
-            <Typography className={classes.metaLabel} style={{ whiteSpace: 'nowrap' }}>
+            <Typography
+              className={classes.metaLabel}
+              style={{ whiteSpace: 'nowrap' }}
+            >
               Last Sync Hash
             </Typography>
-            <Tooltip title={`Full hash: ${status.lastAppliedHash} — Click to copy`}>
+            <Tooltip
+              title={`Full hash: ${status.lastAppliedHash} — Click to copy`}
+            >
               <span
                 className={classes.hashValue}
                 onClick={() => {
@@ -937,8 +954,8 @@ export const HeliosAppStatusCard: React.FC = () => {
                           cond.status === 'True'
                             ? 'var(--bui-fg-success)'
                             : cond.status === 'False'
-                              ? 'var(--bui-fg-danger)'
-                              : 'var(--bui-fg-warning)',
+                            ? 'var(--bui-fg-danger)'
+                            : 'var(--bui-fg-warning)',
                       }}
                     />
                     <Box className={classes.conditionContent}>
@@ -995,7 +1012,9 @@ export const HeliosAppStatusCard: React.FC = () => {
                 {status.resourcesCreated.map((res, i) => (
                   <Tooltip
                     key={i}
-                    title={`${res.apiVersion}/${res.kind} — ${res.namespace ?? 'default'}/${res.name}`}
+                    title={`${res.apiVersion}/${res.kind} — ${
+                      res.namespace ?? 'default'
+                    }/${res.name}`}
                   >
                     <Chip
                       icon={
@@ -1045,7 +1064,9 @@ export const HeliosAppStatusCard: React.FC = () => {
                 <Grid container spacing={1}>
                   {status.gitOpsRepo && (
                     <Grid item xs={12} sm={6}>
-                      <Typography className={classes.metaLabel}>GitOps Repo</Typography>
+                      <Typography className={classes.metaLabel}>
+                        GitOps Repo
+                      </Typography>
                       <Tooltip title={status.gitOpsRepo}>
                         <Typography className={classes.metaValue} noWrap>
                           {status.gitOpsRepo.replace(/^https?:\/\//, '')}
@@ -1055,7 +1076,9 @@ export const HeliosAppStatusCard: React.FC = () => {
                   )}
                   {status.gitOpsPath && (
                     <Grid item xs={12} sm={6}>
-                      <Typography className={classes.metaLabel}>GitOps Path</Typography>
+                      <Typography className={classes.metaLabel}>
+                        GitOps Path
+                      </Typography>
                       <Typography className={classes.metaValue}>
                         {status.gitOpsPath}
                       </Typography>
@@ -1082,7 +1105,9 @@ export const HeliosAppStatusCard: React.FC = () => {
               <Typography className={classes.sectionLabel}>
                 Recent Events ({events.length})
                 {hasWarnings && (
-                  <span style={{ color: 'var(--bui-fg-warning)', marginLeft: 8 }}>
+                  <span
+                    style={{ color: 'var(--bui-fg-warning)', marginLeft: 8 }}
+                  >
                     ⚠ {warningEvents.length}
                   </span>
                 )}

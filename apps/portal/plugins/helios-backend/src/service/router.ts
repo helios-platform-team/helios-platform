@@ -117,8 +117,10 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
           );
         })
         .sort((a, b) => {
-          const ta = a.lastTimestamp ?? a.eventTime ?? a.metadata?.creationTimestamp;
-          const tb = b.lastTimestamp ?? b.eventTime ?? b.metadata?.creationTimestamp;
+          const ta =
+            a.lastTimestamp ?? a.eventTime ?? a.metadata?.creationTimestamp;
+          const tb =
+            b.lastTimestamp ?? b.eventTime ?? b.metadata?.creationTimestamp;
           return (
             new Date(String(tb ?? 0)).getTime() -
             new Date(String(ta ?? 0)).getTime()
@@ -134,9 +136,14 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
             name: evt.involvedObject?.name ?? '',
           },
           count: evt.count ?? 1,
-          firstTimestamp: String(evt.firstTimestamp ?? evt.metadata?.creationTimestamp ?? ''),
+          firstTimestamp: String(
+            evt.firstTimestamp ?? evt.metadata?.creationTimestamp ?? '',
+          ),
           lastTimestamp: String(
-            evt.lastTimestamp ?? evt.eventTime ?? evt.metadata?.creationTimestamp ?? '',
+            evt.lastTimestamp ??
+              evt.eventTime ??
+              evt.metadata?.creationTimestamp ??
+              '',
           ),
           source: evt.source?.component ?? '',
         }));
