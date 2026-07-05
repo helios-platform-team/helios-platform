@@ -87,6 +87,79 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
   const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
   const customApi = kc.makeApiClient(k8s.CustomObjectsApi);
 
+  // ----------------------------------------------------------------
+  // GET /events/:componentName — K8s Events for the HeliosApp
+  // ----------------------------------------------------------------
+  router.get('/events/:componentName', async (req, res) => {
+    const { componentName } = req.params;
+    const namespace =
+      typeof req.query.namespace === 'string' ? req.query.namespace : 'default';
+    const limit =
+      typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 50;
+
+    try {
+      // Fetch all events in the namespace and filter by involvedObject
+      const eventsResponse: unknown = await k8sApi.listNamespacedEvent({
+        namespace,
+      });
+      const eventList =
+        (eventsResponse as { body?: { items?: unknown[] } }).body ??
+        (eventsResponse as { items?: unknown[] });
+      const items = (eventList?.items ?? []) as Array<Record<string, any>>;
+
+      // Filter events that relate to the component (by name prefix or label)
+      const relatedEvents = items
+        .filter(evt => {
+          const involvedName = evt.involvedObject?.name ?? '';
+          return (
+            involvedName === componentName ||
+            involvedName.startsWith(`${componentName}-`)
+          );
+        })
+        .sort((a, b) => {
+          const ta =
+            a.lastTimestamp ?? a.eventTime ?? a.metadata?.creationTimestamp;
+          const tb =
+            b.lastTimestamp ?? b.eventTime ?? b.metadata?.creationTimestamp;
+          return (
+            new Date(String(tb ?? 0)).getTime() -
+            new Date(String(ta ?? 0)).getTime()
+          );
+        })
+        .slice(0, limit)
+        .map(evt => ({
+          type: evt.type ?? 'Normal',
+          reason: evt.reason ?? '',
+          message: evt.message ?? '',
+          involvedObject: {
+            kind: evt.involvedObject?.kind ?? '',
+            name: evt.involvedObject?.name ?? '',
+          },
+          count: evt.count ?? 1,
+          firstTimestamp: String(
+            evt.firstTimestamp ?? evt.metadata?.creationTimestamp ?? '',
+          ),
+          lastTimestamp: String(
+            evt.lastTimestamp ??
+              evt.eventTime ??
+              evt.metadata?.creationTimestamp ??
+              '',
+          ),
+          source: evt.source?.component ?? '',
+        }));
+
+      return res.json({ events: relatedEvents });
+    } catch (err: unknown) {
+      logger.error(
+        `Failed to fetch events for ${componentName}: ${String(err)}`,
+      );
+      return res.status(500).json({
+        error: err instanceof Error ? err.message : String(err),
+        events: [],
+      });
+    }
+  });
+
   router.get('/health', (_, response) => {
     response.json({ status: 'ok' });
   });
@@ -181,6 +254,198 @@ export async function createRouter(options: RouterOptions): Promise<Router> {
       database: decode(data.DB_NAME) || dbName,
       status,
     });
+  });
+
+  // ----------------------------------------------------------------
+  // GET /logs/:componentName — Real-time Pod Logs
+  // ----------------------------------------------------------------
+  router.get('/logs/:componentName', async (req, res) => {
+    const { componentName } = req.params;
+    const namespace =
+      typeof req.query.namespace === 'string' ? req.query.namespace : 'default';
+
+    try {
+      // 1. List all pods in the namespace
+      const podsResponse: unknown = await k8sApi.listNamespacedPod({
+        namespace,
+      });
+      const podList =
+        (podsResponse as { body?: k8s.V1PodList }).body ??
+        (podsResponse as k8s.V1PodList);
+      const items = podList?.items ?? [];
+
+      // 2. Filter pods related to this component
+      const relatedPods = items.filter(pod => {
+        const name = pod.metadata?.name ?? '';
+        const labels = pod.metadata?.labels ?? {};
+        return (
+          name === componentName ||
+          name.startsWith(`${componentName}-`) ||
+          labels['app'] === componentName ||
+          labels['app.kubernetes.io/name'] === componentName ||
+          labels['app.kubernetes.io/instance'] === componentName
+        );
+      });
+
+      if (relatedPods.length === 0) {
+        return res.json({ logs: 'No active pods found for this component.' });
+      }
+
+      // Sort by creation timestamp descending to get the newest pod
+      relatedPods.sort((a, b) => {
+        const ta = new Date(a.metadata?.creationTimestamp ?? 0).getTime();
+        const tb = new Date(b.metadata?.creationTimestamp ?? 0).getTime();
+        return tb - ta;
+      });
+
+      const targetPod = relatedPods[0];
+      const podName = targetPod.metadata?.name ?? '';
+
+      // Get containers to fetch logs from
+      const containers = [
+        ...(targetPod.spec?.containers ?? []),
+        ...(targetPod.spec?.initContainers ?? []),
+      ];
+
+      if (containers.length === 0) {
+        return res.json({ logs: 'No containers found in the pod.' });
+      }
+
+      // Fetch logs of the last container (for Tekton pods, the last step is usually the most relevant)
+      const containerName = containers[containers.length - 1].name;
+
+      const logResponse = await k8sApi.readNamespacedPodLog({
+        name: podName,
+        namespace,
+        container: containerName,
+        tailLines: 100,
+      });
+
+      const logsText =
+        (logResponse as { body?: string }).body ?? String(logResponse);
+
+      return res.json({
+        podName,
+        containerName,
+        logs: logsText,
+      });
+    } catch (err: unknown) {
+      return res.status(500).json({
+        error: err instanceof Error ? err.message : String(err),
+        logs: 'Failed to fetch logs from cluster.',
+      });
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // GET /status/:componentName — HeliosApp CRD real-time status
+  // ----------------------------------------------------------------
+  router.get('/status/:componentName', async (req, res) => {
+    const { componentName } = req.params;
+    const namespace =
+      typeof req.query.namespace === 'string' ? req.query.namespace : 'default';
+
+    try {
+      const raw: unknown = await customApi.getNamespacedCustomObject({
+        group: 'app.helios.io',
+        version: 'v1alpha1',
+        namespace,
+        plural: 'heliosapps',
+        name: componentName,
+      });
+
+      // The client may return { body: … } or the object directly.
+      const obj = (raw as { body?: Record<string, unknown> }).body ?? raw;
+      const body = obj as Record<string, unknown>;
+
+      const metadata = (body.metadata ?? {}) as Record<string, unknown>;
+      const spec = (body.spec ?? {}) as Record<string, unknown>;
+      const status = (body.status ?? {}) as Record<string, unknown>;
+
+      // Extract conditions ([]metav1.Condition)
+      const rawConditions = Array.isArray(status.conditions)
+        ? status.conditions
+        : [];
+      const conditions = rawConditions.map((c: Record<string, unknown>) => ({
+        type: String(c.type ?? ''),
+        status: String(c.status ?? ''),
+        reason: String(c.reason ?? ''),
+        message: String(c.message ?? ''),
+        lastTransitionTime: String(c.lastTransitionTime ?? ''),
+      }));
+
+      // Extract resourcesCreated ([]ResourceRef)
+      const rawResources = Array.isArray(status.resourcesCreated)
+        ? status.resourcesCreated
+        : [];
+      const resourcesCreated = rawResources.map(
+        (r: Record<string, unknown>) => ({
+          apiVersion: String(r.apiVersion ?? ''),
+          kind: String(r.kind ?? ''),
+          name: String(r.name ?? ''),
+          namespace: r.namespace ? String(r.namespace) : undefined,
+        }),
+      );
+
+      // Extract components summary from spec
+      const rawComponents = Array.isArray(spec.components)
+        ? spec.components
+        : [];
+      const components = rawComponents.map((c: Record<string, unknown>) => ({
+        name: String(c.name ?? ''),
+        type: String(c.type ?? ''),
+      }));
+
+      return res.json({
+        name: String(metadata.name ?? componentName),
+        namespace: String(metadata.namespace ?? namespace),
+        phase: String(status.phase ?? 'Unknown'),
+        message: String(status.message ?? ''),
+        conditions,
+        resourcesCreated,
+        initialBuildTriggered: Boolean(status.initialBuildTriggered),
+        lastAppliedHash: String(status.lastAppliedHash ?? ''),
+        observedGeneration: Number(metadata.generation ?? 0),
+        // Spec context
+        owner: String(spec.owner ?? ''),
+        description: String(spec.description ?? ''),
+        gitRepo: String(spec.gitRepo ?? ''),
+        gitBranch: String(spec.gitBranch ?? ''),
+        gitOpsRepo: String(spec.gitopsRepo ?? spec.gitOpsRepo ?? ''),
+        gitOpsPath: String(spec.gitopsPath ?? spec.gitOpsPath ?? ''),
+        imageRepo: String(spec.imageRepo ?? ''),
+        replicas: Number(spec.replicas ?? 0),
+        port: Number(spec.port ?? 0),
+        pipelineName: String(spec.pipelineName ?? ''),
+        components,
+        createdAt: String(metadata.creationTimestamp ?? ''),
+      });
+    } catch (err: unknown) {
+      if (isNotFoundError(err)) {
+        return res.status(404).json({
+          name: componentName,
+          namespace,
+          phase: 'Unknown',
+          message: 'HeliosApp CR not found in the cluster',
+          conditions: [],
+          resourcesCreated: [],
+          initialBuildTriggered: false,
+          owner: '',
+          gitRepo: '',
+          imageRepo: '',
+          replicas: 0,
+          components: [],
+          createdAt: '',
+        });
+      }
+
+      logger.error(
+        `Failed to fetch HeliosApp status for ${componentName}: ${String(err)}`,
+      );
+      return res.status(500).json({
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   });
 
   return router;
