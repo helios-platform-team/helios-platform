@@ -46,8 +46,6 @@
   "resolutions": {
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@protobufjs/inquire@npm:^1.1.1": "patch:@protobufjs/inquire@npm%3A1.1.1#./.yarn/patches/@protobufjs-inquire-npm-1.1.1-1f267bc97f.patch",
-    "@protobufjs/inquire@npm:^1.1.0": "patch:@protobufjs/inquire@npm%3A1.1.1#./.yarn/patches/@protobufjs-inquire-npm-1.1.1-1f267bc97f.patch",
     "@mui/material": "^5.16.7",
     "@mui/icons-material": "^5.16.7",
     "@mui/system": "^5.16.7",
