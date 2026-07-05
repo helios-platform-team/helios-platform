@@ -1,6 +1,6 @@
-import type { Secret } from '../../api';
+import type { SecretDto } from '../../api';
 
-export type SecretTableRow = Secret & {
+export type SecretTableRow = SecretDto & {
   id: string;
   actions: string;
 };

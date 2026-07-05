@@ -1,4 +1,3 @@
-import Grid from '@mui/material/Grid';
 import { SecretEntryItem } from './SecretEntryItem.tsx';
 import Typography from '@mui/material/Typography';
 

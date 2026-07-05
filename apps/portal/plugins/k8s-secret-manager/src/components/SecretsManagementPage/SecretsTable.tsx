@@ -32,11 +32,6 @@ type SecretTableProps = {
 export const SecretTable = ({
   data,
   loading,
-  page,
-  rowsPerPage,
-  hasNextPage,
-  onPageChange,
-  onRowsPerPageChange,
   onDeleteSecret,
 }: SecretTableProps) => {
   const navigate = useNavigate();
