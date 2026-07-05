@@ -42,6 +42,8 @@ import { ScaffolderFieldExtensions } from '@backstage/plugin-scaffolder-react';
 import {
   DatabasePickerExtension,
   UniqueNamePickerExtension,
+  BackendComponentPickerExtension,
+  PortPickerExtension,
 } from './scaffolder';
 import { UnifiedThemeProvider } from '@backstage/theme';
 import { darkTheme, lightTheme } from './themes/heliosThemes';
@@ -119,10 +121,12 @@ const routes = (
     <Route
       path="/create"
       element={
-        <ScaffolderPage>
+        <ScaffolderPage formProps={{ showErrorList: false } as any}>
           <ScaffolderFieldExtensions>
             <DatabasePickerExtension />
             <UniqueNamePickerExtension />
+            <BackendComponentPickerExtension />
+            <PortPickerExtension />
           </ScaffolderFieldExtensions>
         </ScaffolderPage>
       }

@@ -2,7 +2,7 @@
 FROM graphile/postgraphile:latest
 
 # Expose the API port
-EXPOSE 5000
+EXPOSE 8080
 
 # Copy our configuration file into the container.
 # PostGraphile's internal cosmiconfig automatically detects this file on startup.

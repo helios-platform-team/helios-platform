@@ -67,10 +67,10 @@ tasks:
       - echo "  task clean                        Destroy cluster (keeps registry cache)"
       - echo ""
       - echo "Useful targeted commands:"
-      - echo "  task setup:terraform             Recreate cluster/apps from Terraform"
-      - echo "  task reset:generated APP=name(s) Remove generated runtime state"
+      - echo "  task setup:terraform              Recreate cluster/apps from Terraform"
+      - echo "  task reset:generated APP=name(s)  Remove generated runtime state"
       - echo "  task reset:gitea-repo APP=name(s) Delete generated Gitea repos"
-      - echo "  task clean:registry              Remove local registry cache"
+      - echo "  task clean:registry               Remove local registry cache"
       - echo ""
       - echo "APP=name(s) can be a single app, comma-separated (APP=app1,app2), or"
       - echo "'all' to discover and reset every generated app."
@@ -264,29 +264,30 @@ tasks:
       - kubectl get deployment/tekton-triggers-webhook -n tekton-pipelines
     cmds:
       - echo "Waiting for ArgoCD to deploy Tekton Pipelines..."
+      # ponytail: Wait for both deployments to exist and be ready before applying triggers to avoid webhook connection errors.
       - cmd: |
           for i in {1..120}; do
-            if kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines >/dev/null 2>&1; then
-              echo "Tekton Pipelines controller deployment found."
+            if kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines >/dev/null 2>&1 && kubectl get deployment/tekton-pipelines-webhook -n tekton-pipelines >/dev/null 2>&1; then
+              echo "Tekton Pipelines controller and webhook deployments found."
               exit 0
             fi
-            echo "Waiting for deployment to be created..."
+            echo "Waiting for deployments to be created..."
             sleep 5
           done
-          echo "Timeout waiting for Tekton Pipelines deployment"
+          echo "Timeout waiting for Tekton Pipelines deployments"
           exit 1
         platforms: [linux, darwin]
       - cmd: |
-          powershell -ExecutionPolicy Bypass -Command "for ($i=1; $i -le 120; $i++) { if (kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines 2>$null) { echo 'Tekton Pipelines controller deployment found.'; exit 0 }; echo 'Waiting for deployment to be created...'; Start-Sleep -Seconds 5 }; echo 'Timeout waiting for Tekton Pipelines deployment'; exit 1"
+          powershell -ExecutionPolicy Bypass -Command "for ($i=1; $i -le 120; $i++) { if ((kubectl get deployment/tekton-pipelines-controller -n tekton-pipelines 2>$null) -and (kubectl get deployment/tekton-pipelines-webhook -n tekton-pipelines 2>$null)) { echo 'Tekton Pipelines controller and webhook deployments found.'; exit 0 }; echo 'Waiting for deployments to be created...'; Start-Sleep -Seconds 5 }; echo 'Timeout waiting for Tekton Pipelines deployments'; exit 1"
         platforms: [windows]
-      - echo "Installing Tekton Triggers..."
-      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml --request-timeout=120s
-      - echo "Installing Tekton Interceptors..."
-      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml --request-timeout=120s
       - echo "Waiting for Tekton Pipelines controller..."
       - kubectl rollout status deployment/tekton-pipelines-controller -n tekton-pipelines --timeout=600s
       - echo "Waiting for Tekton Pipelines webhook..."
       - kubectl rollout status deployment/tekton-pipelines-webhook -n tekton-pipelines --timeout=600s
+      - echo "Installing Tekton Triggers..."
+      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml --request-timeout=120s
+      - echo "Installing Tekton Interceptors..."
+      - kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml --request-timeout=120s
       - echo "Ensuring Tekton webhook deployment is still healthy..."
       - cmd: kubectl rollout status deployment/tekton-pipelines-webhook -n tekton-pipelines --timeout=120s
         platforms: [linux, darwin]
@@ -813,6 +814,18 @@ tasks:
           GITEA_BASE="${GITEA_URL:-http://localhost:{{.GITEA_PORT}}}"
           GITEA_USER="${GITEA_USER:-${GITEA_ADMIN_USER:-helios}}"
           GITEA_PASS="${GITEA_ADMIN_PASS:-helios123}"
+
+          # If we are checking localhost, free port 3030 if occupied (avoiding stale kubectl port-forward issues)
+          if [ "${GITEA_BASE}" = "http://localhost:3030" ] && command -v lsof >/dev/null 2>&1; then
+            PIDS="$(lsof -t -iTCP:3030 -sTCP:LISTEN || true)"
+            if [ -n "$PIDS" ]; then
+              echo "Port 3030 busy before Gitea repo cleanup. Stopping stale process(es): $PIDS"
+              for PID in $PIDS; do
+                /bin/kill -9 "$PID" 2>/dev/null || command kill -9 "$PID" 2>/dev/null || true
+              done
+              sleep 1
+            fi
+          fi
 
           PF_PID=0
           # If Gitea is unreachable on localhost, try to start a temporary port-forward

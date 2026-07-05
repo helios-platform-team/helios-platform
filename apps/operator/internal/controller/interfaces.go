@@ -27,5 +27,5 @@ type DatabaseReconciler interface {
 
 // GitOpsSyncReconciler handles GitOps manifest sync.
 type GitOpsSyncReconciler interface {
-	Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, manifestBytes []byte) error
+	Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, crBytes []byte) error
 }

@@ -5,6 +5,18 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck source=../../scripts/lib/env_helpers.sh
 source "$SCRIPT_DIR/../../scripts/lib/env_helpers.sh"
 
+# Ensure Node version is v22 or v24. If not and mise is available, re-exec via mise
+NODE_VER=$(node --version | sed -E 's/^v//' | head -1)
+if [[ ! "$NODE_VER" =~ ^22\..* && ! "$NODE_VER" =~ ^24\..* ]]; then
+  if command -v mise &>/dev/null; then
+    echo -e "${YELLOW}⚠️  Unsupported Node.js version v$NODE_VER. Re-executing via 'mise exec'...${NC}"
+    exec mise exec -- "$0" "$@"
+  else
+    echo -e "${RED}❌ Error: Node.js version v$NODE_VER is not supported. Backstage requires Node 22 or 24.${NC}" >&2
+    exit 1
+  fi
+fi
+
 decode_base64() {
   if printf 'Zg==' | base64 --decode >/dev/null 2>&1; then
     base64 --decode

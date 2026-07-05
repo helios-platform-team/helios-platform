@@ -9,6 +9,7 @@ import {
 } from '@backstage/plugin-api-docs';
 import {
   EntityAboutCard,
+  EntityDependencyOfComponentsCard,
   EntityDependsOnComponentsCard,
   EntityDependsOnResourcesCard,
   EntityHasComponentsCard,
@@ -185,6 +186,31 @@ const serviceEntityPage = (
       <EntityKubernetesContent refreshIntervalMs={30000} />
     </EntityLayout.Route>
 
+    <EntityLayout.Route path="/api" title="API">
+      <Grid container spacing={3} alignItems="stretch">
+        <Grid item md={6}>
+          <EntityProvidedApisCard />
+        </Grid>
+        <Grid item md={6}>
+          <EntityConsumedApisCard />
+        </Grid>
+      </Grid>
+    </EntityLayout.Route>
+
+    <EntityLayout.Route path="/dependencies" title="Dependencies">
+      <Grid container spacing={3} alignItems="stretch">
+        <Grid item md={6}>
+          <EntityDependsOnComponentsCard />
+        </Grid>
+        <Grid item md={6}>
+          <EntityDependencyOfComponentsCard />
+        </Grid>
+        <Grid item md={6}>
+          <EntityDependsOnResourcesCard />
+        </Grid>
+      </Grid>
+    </EntityLayout.Route>
+
     <EntityLayout.Route path="/database" title="Database">
       <DatabaseTab />
     </EntityLayout.Route>
@@ -215,6 +241,9 @@ const websiteEntityPage = (
       <Grid container spacing={3} alignItems="stretch">
         <Grid item md={6}>
           <EntityDependsOnComponentsCard />
+        </Grid>
+        <Grid item md={6}>
+          <EntityDependencyOfComponentsCard />
         </Grid>
         <Grid item md={6}>
           <EntityDependsOnResourcesCard />

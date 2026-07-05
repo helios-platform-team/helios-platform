@@ -8,7 +8,7 @@ spec:
   owner: ${{ values.owner }}
   gitRepo: ${{ values.sourceRepo }}
   gitBranch: main
-  imageRepo: ${{ values.image }}
+  imageRepo: ${{ values.dockerOrg }}/${{ values.repoName }}
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: ${{ values.name }}
   webhookSecret: ${{ values.name }}-webhook-secret
@@ -20,7 +20,7 @@ spec:
     - name: ${{ values.name }}
       type: web-service
       properties:
-        image: ${{ values.image }}:latest
+        image: ${{ values.dockerOrg }}/${{ values.repoName }}:main
         port: ${{ values.port }}
         env:
           # Directly reference the fully formatted, URL-encoded connection string
@@ -39,7 +39,7 @@ spec:
             dbType: ${{ values.databaseType | default("postgres") }}
             dbName: ${{ values.databaseName or values.name }}-db
             port: 5432
-            version: "${{ values.databaseVersion or '16' }}"
+            version: "${{ values.databaseVersion or '18.4' }}"
             storage: "1Gi"
         - type: service
           properties:

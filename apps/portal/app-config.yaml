@@ -101,6 +101,10 @@ auth:
 scaffolder:
   # see https://backstage.io/docs/features/software-templates/configuration for software template options
   defaultEnvironment:
+    parameters:
+      dockerOrg: ${DOCKER_USERNAME}
+      gitOrg: ${GITEA_USER}
+      gitHost: ${GITEA_HOST}
     secrets:
       GITEA_TOKEN: ${GITEA_TOKEN}
 
@@ -111,31 +115,27 @@ catalog:
   rules:
     - allow: [Component, System, API, Resource, Location, Template]
   locations:
-    # Local example data, file locations are relative to the backend process, typically `packages/backend`
-    - type: file
-      target: ../../examples/entities.yaml
-
-    # Local example template
-    - type: file
-      target: ../../examples/template/template.yaml
-      rules:
-        - allow: [Template]
-
     # Local example organizational data
     - type: file
       target: ../../examples/org.yaml
       rules:
         - allow: [User, Group]
 
-    # Advanced Node.js Template
+    # Node.js Template
     - type: file
-      target: ../../examples/advanced-template/template.yaml
+      target: ../../examples/nodejs-template/template.yaml
       rules:
         - allow: [Template]
 
-    # NestJS + Prisma Template
+    # React Template
     - type: file
-      target: ../../examples/nestjs-prisma-template/template.yaml
+      target: ../../examples/react-template/template.yaml
+      rules:
+        - allow: [Template]
+
+    # NestJS Template
+    - type: file
+      target: ../../examples/nestjs-template/template.yaml
       rules:
         - allow: [Template]
 
@@ -172,10 +172,6 @@ catalog:
     ## Uncomment these lines to add more example data
     # - type: url
     #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml
-
-    # Registered applications (auto-discovered from GitHub)
-    - type: url
-      target: https://github.com/hoangphuc841/advanced-nodejs-app-v22/blob/main/catalog-info.yaml
 
   providers:
     gitea:

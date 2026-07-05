@@ -1,0 +1,28 @@
+apiVersion: app.helios.io/v1alpha1
+kind: HeliosApp
+metadata:
+  name: ${{ values.repoName }}
+  namespace: ${{ values.namespace }}
+spec:
+  owner: ${{ values.owner }}
+  description: "React application: ${{ values.name }}"
+  gitRepo: ${{ values.sourceRepo }}
+  gitBranch: main
+  imageRepo: ${{ values.dockerOrg }}/${{ values.repoName }}
+  gitopsRepo: ${{ values.gitopsRepo }}
+  gitopsPath: ${{ values.repoName }}
+  pipelineName: from-code-to-cluster
+  webhookSecret: git-credentials-${{ values.repoName }}
+  port: ${{ values.port }}
+  testCommand: ${{ values.testCommand }}
+  components:
+    - name: ${{ values.repoName }}
+      type: web-service
+      properties:
+        image: ${{ values.dockerOrg }}/${{ values.repoName }}:main
+        port: ${{ values.port }}
+        replicas: 1
+      traits:
+        - type: service
+          properties:
+            port: ${{ values.port }}

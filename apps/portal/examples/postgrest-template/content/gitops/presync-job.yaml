@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${{ values.name }}-db-migration
+  namespace: ${{ values.namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      name: ${{ values.name }}-db-migration
+    spec:
+      serviceAccountName: ${{ values.name }}-migrator
+      restartPolicy: Never
+      containers:
+        - name: migrator
+          image: ${{ values.migrateImage }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if [ -d "db/migrations" ]; then
+                echo "Running migrations..."
+                migrate -path db/migrations -database "$PGRST_DB_URI" up
+              else
+                echo "No db/migrations directory found."
+              fi
+          env:
+            - name: PGRST_DB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ${{ values.name }}-db-secret
+                  key: PGRST_DB_URI

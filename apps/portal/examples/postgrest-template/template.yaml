@@ -3,36 +3,36 @@ kind: Template
 metadata:
   name: postgrest-template
   title: PostgREST API Template
-  description: >-
-    Scaffolds a PostgREST instant REST API over a PostgreSQL database.
-    PostgREST automatically generates CRUD endpoints from your database schema.
-    The Helios Operator automatically provisions the database and injects
-    the connection string (PGRST_DB_URI) into the PostgREST pod.
+  description: Expose a fully-featured, instant RESTful API directly from any PostgreSQL database schema using PostgREST.
 spec:
   owner: user:guest
   type: service
 
   parameters:
     - title: Component Information
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
       required:
         - name
         - port
-        - dockerOrg
       properties:
         name:
           title: Service Name
           type: string
-          description: Unique name for the PostgREST API service and Docker repository (e.g. my-api)
+          description: Unique name for the PostgREST API service.
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
           title: API Port
           type: number
+          ui:field: PortPicker
           description: The port PostgREST listens on
-          default: 3000
-        dockerOrg:
-          title: Docker Registry Org/User
-          type: string
-          description: Your Docker Hub username or Organization
+          default: 3003
+        databaseConfig:
+          title: Database Settings
+          type: object
+          ui:field: DatabasePicker
 
     - title: PostgREST Configuration
       properties:
@@ -59,40 +59,14 @@ spec:
           description: Role for unauthenticated requests (or leave empty to disable)
           default: anon
 
-    - title: Database Configuration
+    - title: Deployment Configuration
       properties:
-        databaseConfig:
-          title: Database Settings
-          type: object
-          ui:field: DatabasePicker
-
-    - title: Repository & Webhook
-      required:
-        - repoUrl
-      properties:
-        repoUrl:
-          title: Source Repository Location
-          type: string
-          ui:field: RepoUrlPicker
-          ui:options:
-            allowedHosts:
-              - localhost:3030
         namespace:
           title: Kubernetes Namespace
           type: string
           description: Namespace where the service will be deployed
           default: default
 
-    - title: Optional Extras (Local Convenience)
-      properties:
-        registerToCatalog:
-          title: Register component in catalog
-          type: boolean
-          default: false
-        sendNotification:
-          title: Send Backstage notification
-          type: boolean
-          default: false
 
   steps:
     # 1. Source Code (config files + Dockerfile)
@@ -107,7 +81,8 @@ spec:
           owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: "PostgREST API: ${{ parameters.name }}"
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.name }}
+          # DYNAMIC ROUTING: Uses Docker bridge variable
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
           apiSchema: ${{ parameters.apiSchema }}
           jwtSecret: ${{ secrets.jwtSecret }}
           jwtRole: ${{ parameters.jwtRole }}
@@ -118,7 +93,8 @@ spec:
       action: publish:gitea
       input:
         description: PostgREST Configuration for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}
+        # DYNAMIC ROUTING: Uses Git bridge variable
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
         sourcePath: ./source
         repoVisibility: public
 
@@ -126,8 +102,8 @@ spec:
       name: Create Webhook for DB Migration Trigger
       action: gitea:create-webhook
       input:
-        repoUrl: ${{ parameters.repoUrl }}
-        webhookUrl: http://el-${{ parameters.name }}-db-migrate-listener.${{ parameters.namespace }}.svc.cluster.local:8080
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        webhookUrl: http://el-${{ parameters.name }}-db-migrate-listener.default.svc.cluster.local:8080
         webhookSecret: ${{ parameters.name }}
         events:
           - push
@@ -141,13 +117,14 @@ spec:
         targetPath: ./gitops
         values:
           name: ${{ parameters.name }}
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.name }}
-          dockerOrg: ${{ parameters.dockerOrg }}
+          # DYNAMIC ROUTING
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          dockerOrg: ${{ environment.parameters.dockerOrg }}
           port: ${{ parameters.port }}
-          namespace: ${{ parameters.namespace }}
+          namespace: default
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
-          databaseVersion: ${{ parameters.databaseConfig.version or '16' }}
+          databaseVersion: ${{ parameters.databaseConfig.version or '18.4' }}
           apiSchema: ${{ parameters.apiSchema }}
           jwtSecret: ${{ secrets.jwtSecret }}
           jwtRole: ${{ parameters.jwtRole }}
@@ -156,30 +133,39 @@ spec:
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           # Migration image configuration for PreSync Job
-          migrateImage: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.name }}-migrate:latest
+          migrateImage: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}-migrate:latest
 
     - id: publish-gitops
       name: Publish GitOps Manifests
       action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl | replace('.git', '') }}-gitops
+        # DYNAMIC ROUTING
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
         sourcePath: ./gitops
         repoVisibility: public
 
-    # 3. Apply namespace to cluster
+    # 3. Apply namespace to cluster (INTENTIONALLY LEFT FOR YOUR FRIEND)
     - id: apply-namespace
       name: Create Kubernetes Namespace
       action: kubernetes:apply
       input:
         manifestPath: ./gitops/namespace.yaml
 
+    # 3.1 Apply service account
+    - id: apply-rbac
+      name: Apply RBAC for Migration
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/serviceaccount.yaml
+
+
     # 4. Create webhook secret in cluster
     - id: create-webhook-secret
       name: Create Kubernetes Webhook Secret
       action: kubernetes:create-secret
       input:
-        namespace: ${{ parameters.namespace }}
+        namespace: default
         secretName: ${{ parameters.name }}-webhook-secret
         data:
           # Tekton Triggers interceptor expects the shared secret under key `secret`.

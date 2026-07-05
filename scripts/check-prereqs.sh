@@ -122,9 +122,18 @@ check_optional_tool "helm" \
   "https://helm.sh/docs/intro/install/"
 
 echo -e "\n${BOLD}Node.js / Frontend${NC}"
-check_tool "node" "22.0.0" \
-  "node --version | sed -E 's/^v//'" \
-  "https://nodejs.org/ or use nvm: nvm install 22 (or 24)"
+  if ! command -v node &>/dev/null; then
+    fail "node not found. Install: https://nodejs.org/ or use nvm: nvm install 22 (or 24)"
+  else
+    node_ver=$(node --version | sed -E 's/^v//' | head -1)
+    if [[ "$node_ver" =~ ^22\..* || "$node_ver" =~ ^24\..* ]]; then
+      pass "node $node_ver (v22 or v24)"
+    else
+      fail "node $node_ver is not supported. Backstage requires Node 22 or 24. Please switch your Node version."
+    fi
+  fi
+
+
 
 check_tool "yarn" "4.15.0" \
   "yarn --version 2>/dev/null | head -1" \
