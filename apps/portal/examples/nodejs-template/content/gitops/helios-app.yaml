@@ -10,7 +10,7 @@ spec:
   gitBranch: main
   imageRepo: ${{ values.dockerOrg }}/${{ values.repoName }}
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: ${{ values.name }}
+  gitopsPath: "."
   pipelineName: from-code-to-cluster
   webhookSecret: git-credentials-${{ values.name }}
   gitopsSecretRef: git-credentials-${{ values.name }}

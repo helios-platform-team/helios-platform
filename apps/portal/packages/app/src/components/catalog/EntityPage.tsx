@@ -69,6 +69,7 @@ import {
   isKubernetesAvailable,
 } from '@backstage/plugin-kubernetes';
 import { DatabaseTab } from '../database';
+import { SecretsManagementPage } from '@internal/backstage-plugin-k8s-secret-manager/src/components/SecretsManagementPage/SecretsManagementPage.tsx';
 
 const techdocsContent = (
   <EntityTechdocsContent>
@@ -214,8 +215,8 @@ const serviceEntityPage = (
       <DatabaseTab />
     </EntityLayout.Route>
 
-    <EntityLayout.Route path="/docs" title="Docs">
-      {techdocsContent}
+    <EntityLayout.Route path="/secrets" title="Secrets">
+      <SecretsManagementPage />
     </EntityLayout.Route>
   </EntityLayout>
 );

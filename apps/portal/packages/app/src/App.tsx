@@ -50,6 +50,8 @@ import { darkTheme, lightTheme } from './themes/heliosThemes';
 import './styles.css';
 import { HeliosHomepage } from './components/home/HeliosHomepage.tsx'; // Backstage UI (BUI) theme
 import { HomepageCompositionRoot } from '@backstage/plugin-home';
+import { K8SSecretManagerPage } from '@internal/backstage-plugin-k8s-secret-manager';
+import { Toaster } from 'react-hot-toast';
 
 const app = createApp({
   apis,
@@ -144,12 +146,15 @@ const routes = (
     <Route path="/settings" element={<UserSettingsPage />} />
     <Route path="/catalog-graph" element={<CatalogGraphPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
+    <Route path="/k8s-secret-manager" element={<K8SSecretManagerPage />} />
   </FlatRoutes>
 );
 
 export default app.createRoot(
   <>
+    <meta name="viewport" content="initial-scale=1, width=device-width" />
     <HeliosBackground />
+    <Toaster />
     <AlertDisplay />
     <OAuthRequestDialog />
     <SignalsDisplay />
