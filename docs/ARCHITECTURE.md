@@ -206,7 +206,7 @@ kubernetesObjects[]  →  Multi-doc YAML pushed to GitOps repo
     │
     ├── Task Registry
     │     ├── git-clone        (checkout source)
-    │     ├── kaniko-build     (container image build + push)
+    │     ├── buildah-build     (container image build + push)
     │     └── git-update-manifest (update GitOps repo with new image)
     │
     ├── Pipeline Registry
@@ -244,7 +244,7 @@ Git Push → Gitea Webhook → EventListener → TriggerTemplate → PipelineRun
                     ├────────────────────┤
                     │  2. run-tests      │  Execute test command (inline taskSpec)
                     ├────────────────────┤
-                    │  3. kaniko-build   │  Build container image, push to registry
+                    │  3. buildah-build   │  Build container image, push to registry
                     ├────────────────────┤
                     │  4. git-update-    │  Update GitOps repo with new image tag
                     │     manifest       │  → Argo CD syncs automatically

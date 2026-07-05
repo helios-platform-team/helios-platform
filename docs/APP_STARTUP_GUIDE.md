@@ -216,7 +216,7 @@ make -C apps/operator run
 ## Step 5: Create Tekton Resources
 
 > [!NOTE]
-> This installs: `git-clone`, `kaniko-build`, `git-update-manifest`, and the pipeline itself.
+> This installs: `git-clone`, `buildah-build`, `git-update-manifest`, and the pipeline itself.
 
 ```bash
 # Generate YAML from CUE

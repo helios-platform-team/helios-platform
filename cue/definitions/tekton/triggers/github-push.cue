@@ -44,9 +44,8 @@ import (
                 apiVersion: "tekton.dev/v1beta1"
                 kind:       "PipelineRun"
                 metadata: {
-                    // Truncate to at most 46 chars: "{prefix}-run-$(uid)" stays ≤63.
-                    let _namePrefix = [if len(_bp.appName) > 46 {_bp.appName[:46]}, _bp.appName][0]
-                    name:      "\(_namePrefix)-run-$(uid)"
+                    // Use operator-provided repo URL (already rewritten to in-cluster URL if needed).
+                    name:      "\(_bp.appName)-run-$(uid)"
                     namespace: _bp.namespace
                     labels: {
                         "helios.io/managed-by":       "helios-operator"
@@ -65,13 +64,13 @@ import (
                         {name: "app-repo-url", value:       _bp.gitRepo},
                         {name: "app-repo-revision", value:  "$(tt.params.git-revision)"},
                         {name: "image-repo", value:         _bp.imageRepo},
-                        {name: "GITOPS_REPO_URL", value:    _bp.gitopsRepo},
-                        {name: "MANIFEST_PATH", value:      _bp.gitopsPath},
-                        {name: "GITOPS_REPO_BRANCH", value: _bp.gitopsBranch},
-                        {name: "GITOPS_SECRET_REF", value:  _bp.gitopsSecret},
-                        {name: "GITOPS_AUTHOR_NAME", value: "Helios Bot"},
-                        {name: "GITOPS_AUTHOR_EMAIL", value: "helios-bot@helios.local"},
-                        {name: "CONTEXT_SUBPATH", value:    _bp.contextSubpath},
+                        {name: "gitops-repo-url", value:    _bp.gitopsRepo},
+                        {name: "manifest-path", value:      _bp.gitopsPath},
+                        {name: "gitops-repo-branch", value: _bp.gitopsBranch},
+                        {name: "gitops-secret-ref", value:  _bp.gitopsSecret},
+                        {name: "gitops-author-name", value: "Helios Bot"},
+                        {name: "gitops-author-email", value: "helios-bot@helios.local"},
+                        {name: "context-subpath", value:    _bp.contextSubpath},
                         {name: "replicas", value:           "\(_bp.replicas)"},
                         {name: "port", value:               "\(_bp.port)"},
                         {name: "docker-secret", value:      _bp.dockerSecret},
@@ -122,9 +121,8 @@ import (
                 apiVersion: "tekton.dev/v1beta1"
                 kind:       "PipelineRun"
                 metadata: {
-                    // Truncate to at most 32 chars: "{prefix}-migrate-$(uid)" stays ≤63.
-                    let _namePrefix = [if len(_bp.appName) > 32 {_bp.appName[:32]}, _bp.appName][0]
-                    name:      "\(_namePrefix)-migrate-$(uid)"
+                    // Use operator-provided repo URL (already rewritten to in-cluster URL if needed).
+                    name:      "\(_bp.appName)-migrate-$(uid)"
                     namespace: _bp.namespace
                     labels: {
                         "helios.io/managed-by":       "helios-operator"
@@ -140,22 +138,45 @@ import (
                     serviceAccountName: _bp.serviceAccount
 
                     params: [
-                        {name: "app-repo-url", value: _bp.gitRepo},
-                        {name: "app-repo-revision", value: "$(tt.params.git-revision)"},
-                        {name: "db-secret-name", value: _bp.databaseSecretRef},
-                        {name: "migration-source", value: "db/migrations"},
-                        {name: "namespace", value: _bp.namespace},
+                        {name: "app-repo-url", value:       _bp.gitRepo},
+                        {name: "app-repo-revision", value:  "$(tt.params.git-revision)"},
+                        {name: "image-repo", value:         _bp.imageRepo},
+                        {name: "gitops-repo-url", value:    _bp.gitopsRepo},
+                        {name: "manifest-path", value:      _bp.gitopsPath},
+                        {name: "gitops-repo-branch", value: _bp.gitopsBranch},
+                        {name: "gitops-secret-ref", value:  _bp.gitopsSecret},
+                        {name: "gitops-author-name", value: "Helios Bot"},
+                        {name: "gitops-author-email", value: "helios-bot@helios.local"},
+                        {name: "context-subpath", value:    _bp.contextSubpath},
+                        {name: "replicas", value:           "\(_bp.replicas)"},
+                        {name: "port", value:               "\(_bp.port)"},
+                        {name: "docker-secret", value:      _bp.dockerSecret},
+                        {name: "test-command", value:       _bp.testCommand},
+                        {name: "test-image", value:         _bp.testImage},
+                        {name: "argocd-namespace", value: _bp.argoCDNamespace},
+                        {name: "argocd-app-name", value:  _bp.argoCDAppName},
                     ]
 
-                    workspaces: [{
-                        name: "source"
-                        volumeClaimTemplate: {
-                            spec: {
-                                accessModes: ["ReadWriteOnce"]
-                                resources: requests: storage: "1Gi"
+                    workspaces: [
+                        {
+                            name: "source-workspace"
+                            volumeClaimTemplate: {
+                                spec: {
+                                    accessModes: ["ReadWriteOnce"]
+                                    resources: requests: storage: "1Gi"
+                                }
                             }
-                        }
-                    }]
+                        },
+                        {
+                            name: "gitops-workspace"
+                            volumeClaimTemplate: {
+                                spec: {
+                                    accessModes: ["ReadWriteOnce"]
+                                    resources: requests: storage: "1Gi"
+                                }
+                            }
+                        },
+                    ]
                 }
             }]
         }

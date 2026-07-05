@@ -43,12 +43,12 @@ export default createBackendModule({
             };
 
             // Extract values (support both DB_* and lowercase keys)
-            const host = decode(data['DB_HOST'] || data['host']);
-            const user = decode(data['DB_USER'] || data['user']);
-            const password = decode(data['DB_PASS'] || data['password']);
-            const portStr = decode(data['DB_PORT'] || data['port']);
+            const host = decode(data.DB_HOST || data.host);
+            const user = decode(data.DB_USER || data.user);
+            const password = decode(data.DB_PASS || data.password);
+            const portStr = decode(data.DB_PORT || data.port);
             const port = portStr ? parseInt(portStr, 10) : 5432;
-            const database = decode(data['DB_NAME'] || data['database']) || `${componentName}-db`;
+            const database = decode(data.DB_NAME || data.database) || `${componentName}-db`;
 
             // Get pod status
             let status = 'Unknown';

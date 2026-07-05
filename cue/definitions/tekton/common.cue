@@ -9,10 +9,11 @@ package tekton
 #Defaults: {
 	// Container images - PIN VERSION for reproducibility
 	images: {
-		gitClone: "alpine/git:v2.52.0"
-		kaniko:   "gcr.io/kaniko-project/executor:v1.24.0"
+		// Use a lightweight Alpine base and install git in the step script.
+		gitClone: "alpine:3.23"
+		buildah:  "quay.io/buildah/stable:v1.43.1"
 		alpine:   "alpine:3.23"
-		yq:       "mikefarah/yq:4.52.5"
+		yq:       "mikefarah/yq:4.53.2"
 		kubectl:  "bitnami/kubectl:latest"
 	}
 
@@ -58,20 +59,20 @@ package tekton
 		}
 	}
 
-	// Image params for Kaniko
+	// Image params for Buildah
 	image: {
 		name: {
-			name:        "IMAGE"
+			name:        "image"
 			description: "Full image name with registry"
 			type:        "string"
 		}
 		dockerfile: {
-			name:    "DOCKERFILE"
+			name:    "dockerfile"
 			type:    "string"
 			default: "Dockerfile"
 		}
 		contextSubpath: {
-			name:        "CONTEXT_SUBPATH"
+			name:        "context-subpath"
 			description: "Subdirectory where Dockerfile is located"
 			type:        "string"
 			default:     ""
@@ -82,44 +83,62 @@ package tekton
 			type:        "string"
 			default:     "docker-credentials"
 		}
+		storageDriver: {
+			name:        "storage-driver"
+			description: "Buildah storage driver (overlay or vfs)"
+			type:        "string"
+			default:     "overlay"
+		}
+		buildahIsolation: {
+			name:        "buildah-isolation"
+			description: "Buildah isolation mode (chroot or oci)"
+			type:        "string"
+			default:     "oci"
+		}
+		buildPlatforms: {
+			name:        "build-platforms"
+			description: "Target platform architectures for multi-arch build"
+			type:        "string"
+			default:     "linux/amd64"
+		}
 	}
 
 	// GitOps params for manifest updates
 	gitops: {
 		repoUrl: {
-			name:        "GITOPS_REPO_URL"
+			name:        "gitops-repo-url"
 			description: "GitOps repository URL"
 			type:        "string"
 		}
 		secretRef: {
-			name:        "GITOPS_SECRET_REF"
+			name:        "gitops-secret-ref"
 			description: "Kubernetes Secret name containing Git credentials (basic-auth)"
 			type:        "string"
 			default:     #Defaults.secrets.gitops
 		}
 		branch: {
-			name:    "GITOPS_REPO_BRANCH"
+			name:    "gitops-repo-branch"
 			type:    "string"
 			default: "main"
 		}
 		manifestPath: {
-			name:        "MANIFEST_PATH"
+			name:        "manifest-path"
 			description: "Path to manifest file in GitOps repo"
 			type:        "string"
 		}
 		newImageUrl: {
-			name:        "NEW_IMAGE_URL"
+			name:        "new-image-url"
 			description: "New image URL to update in manifest"
 			type:        "string"
 		}
 		authorName: {
-			name:        "GITOPS_AUTHOR_NAME"
+			name:        "gitops-author-name"
 			description: "Git author name for automated GitOps commits"
 			type:        "string"
 			default:     "Helios Bot"
 		}
 		authorEmail: {
-			name:        "GITOPS_AUTHOR_EMAIL"
+			name:        "gitops-author-email"
 			description: "Git author email for automated GitOps commits"
 			type:        "string"
 			default:     "helios-bot@helios.local"

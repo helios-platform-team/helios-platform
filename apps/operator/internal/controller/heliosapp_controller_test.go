@@ -37,7 +37,7 @@ import (
 	"github.com/helios-platform-team/helios-platform/apps/operator/internal/gitops"
 )
 
-// MockGitOpsClient is a mock implementation of GitOpsClientInterface.
+// MockGitOpsClient is a mock implementation of ClientInterface.
 type MockGitOpsClient struct {
 	SyncedFiles map[string]string
 }
@@ -108,7 +108,7 @@ var _ = Describe("HeliosApp Controller", func() {
 				Tekton:    tekton.NewReconciler(k8sClient, k8sClient.Scheme(), nil),
 				ArgoCD:    argocd.NewReconciler(k8sClient, k8sClient.Scheme()),
 				Database:  database.NewReconciler(k8sClient, k8sClient.Scheme()),
-				GitOps: gitopssync.NewReconciler(k8sClient, k8sClient.Scheme(), func(repo, user, token string) gitops.GitOpsClientInterface {
+				GitOps: gitopssync.NewReconciler(k8sClient, k8sClient.Scheme(), func(repo, user, token string) gitops.ClientInterface {
 					return mockGit
 				}),
 			}

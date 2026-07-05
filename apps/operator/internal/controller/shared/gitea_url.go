@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// RewriteGiteaURL translates an external Gitea URL (e.g. http://localhost:3030/...)
+// RewriteGiteaURL translates an external Gitea URL (e.g., http://localhost:3030/...)
 // to the in-cluster service URL so in-cluster components can reach it.
 //
 // Falls back to the original URL if GITEA_URL / GITEA_INTERNAL_URL are not set.

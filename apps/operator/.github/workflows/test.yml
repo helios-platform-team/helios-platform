@@ -8,6 +8,9 @@ jobs:
   test:
     name: Run on Ubuntu
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/operator
     steps:
       - name: Clone the code
         uses: actions/checkout@v6
@@ -15,7 +18,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: apps/operator/go.mod
 
       - name: Running Tests
         run: |

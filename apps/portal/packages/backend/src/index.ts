@@ -76,4 +76,7 @@ backend.add(import('@backstage/plugin-signals-backend'));
 // database info extension
 backend.add(import('./extensions/database-router-simple'));
 
+// secrets management (env variables)
+backend.add(import('@internal/backstage-plugin-k8s-secret-manager-backend'));
+
 backend.start();

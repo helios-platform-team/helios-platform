@@ -20,18 +20,40 @@ export const DatabasePicker = ({
   rawErrors,
   required,
   formData,
+  formContext,
 }: FieldExtensionComponentProps<DatabaseConfig>) => {
+  const rootFormData = formContext?.formData || {};
+  const componentName = rootFormData.name || '';
+
   // Default to 'none' if no data is present
   const dbType = formData?.dbType || 'none';
   const dbName = formData?.dbName || '';
-  const dbVersion = formData?.dbVersion || '18.3';
+  const dbVersion = formData?.dbVersion || '18.4';
+
+  // Keep dbName in sync with componentName by default unless customized by the user
+  const prevComponentNameRef = React.useRef(componentName);
+
+  React.useEffect(() => {
+    const oldComponent = prevComponentNameRef.current;
+    prevComponentNameRef.current = componentName;
+
+    if (dbType === 'postgres') {
+      if (!dbName || dbName === oldComponent) {
+        onChange({
+          dbType,
+          dbName: componentName,
+          dbVersion,
+        });
+      }
+    }
+  }, [componentName, dbType, dbName, dbVersion, onChange]);
 
   const handleTypeChange = (event: React.ChangeEvent<{ value: unknown }>) => {
     const newType = event.target.value as string;
     onChange({
       dbType: newType,
       ...(newType === 'postgres'
-        ? { dbName: dbName, dbVersion: dbVersion }
+        ? { dbName: dbName || componentName, dbVersion: dbVersion }
         : { dbName: '', dbVersion: '' }),
     });
   };
@@ -73,15 +95,15 @@ export const DatabasePicker = ({
             fullWidth
             margin="normal"
             required
-            helperText="The name of the database to create (e.g., my_custom_db)"
-            error={rawErrors?.length > 0 && !dbName}
+            helperText="The name of the database to create (by default this matches the component name)."
+            error={rawErrors && rawErrors.length > 0 && !dbName}
           />
 
           <FormControl fullWidth margin="normal" required>
             <InputLabel>Database Version</InputLabel>
             <Select value={dbVersion} onChange={handleVersionChange}>
               <MenuItem value="18">18</MenuItem>
-              <MenuItem value="18.3">18.3</MenuItem>
+              <MenuItem value="18.4">18.4</MenuItem>
             </Select>
           </FormControl>
         </>

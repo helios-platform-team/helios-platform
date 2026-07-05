@@ -29,7 +29,7 @@
 **Tekton** là một framework CI/CD chạy trên Kubernetes. Trong Helios Platform, Tekton được dùng để:
 
 1. **Clone source code** từ GitHub
-2. **Build Docker image** với Kaniko
+2. **Build Docker image** với Buildah
 3. **Push image** lên registry (Docker Hub, GCR, ...)
 4. **Update manifest** trong GitOps repo
 
@@ -45,7 +45,7 @@ flowchart TD
     
     subgraph Pipeline["Pipeline Tasks"]
         E --> F[git-clone]
-        F --> G[kaniko-build]
+        F --> G[buildah-build]
         G --> H[git-update]
     end
 ```
@@ -277,7 +277,7 @@ cue/
 │       ├── tasks/           # CONCRETE TASKS: Tasks cụ thể
 │       │   ├── _registry.cue
 │       │   ├── git-clone.cue
-│       │   ├── kaniko-build.cue
+│       │   ├── buildah-build.cue
 │       │   └── git-update.cue
 │       │
 │       ├── pipelines/       # CONCRETE PIPELINES
@@ -312,9 +312,9 @@ flowchart TD
     end
     
     subgraph Layer4["Layer 4: CONCRETE"]
-        D1["git-clone"]
-        D2["kaniko-build"]
-        D3["git-update"]
+		D1["git-clone"]
+		D2["buildah-build"]
+		D3["git-update"]
         D4["from-code-to-cluster"]
         D5["github-push"]
     end
@@ -402,9 +402,9 @@ package tekton
 #Defaults: {
     // Container images - PIN VERSION, không dùng :latest
     images: {
-        gitClone: "alpine/git:v2.43.0"
-        kaniko:   "gcr.io/kaniko-project/executor:v1.19.2"
-        alpine:   "alpine:3.19"
+        gitClone: "alpine/git:v2.52.0"
+        buildah:  "quay.io/buildah/stable:v1.43.1"
+        alpine:   "alpine:3.23"
     }
     
     // Secret names
@@ -441,7 +441,7 @@ package tekton
         }
     }
     
-    // Image params - dùng trong kaniko-build
+    // Image params - dùng trong buildah-build
     image: {
         name: {
             name:        "IMAGE"
@@ -674,13 +674,13 @@ package tekton
     ]
 }
 
-// Pattern: Build image với Kaniko
+// Pattern: Build image với Buildah
 #BuildImagePattern: {
     _workspace: string | *"source-workspace"
     _runAfter:  [...string] | *["fetch-source-code"]
     
     name: "build-and-push-image"
-    taskRef: name: "kaniko-build"
+    taskRef: name: "buildah-build"
     runAfter: _runAfter
     workspaces: [{
         name:      "source"
@@ -831,7 +831,7 @@ package tekton
 // Thêm task mới = thêm 1 dòng ở đây
 #TaskRegistry: {
     "git-clone":           #GitCloneTask
-    "kaniko-build":        #KanikoBuildTask
+    "buildah-build":       #BuildahBuildTask
     "git-update-manifest": #GitUpdateManifestTask
     // Thêm task mới:
     // "my-new-task":      #MyNewTask
@@ -1031,7 +1031,7 @@ flowchart TD
     
     subgraph Created["Created Resources"]
         F --> G[Task: git-clone]
-        F --> H[Task: kaniko-build]
+        F --> H[Task: buildah-build]
         F --> I[Task: git-update]
         F --> J[Pipeline]
         F --> K[EventListener]
@@ -1051,7 +1051,7 @@ flowchart TD
     
     subgraph Tasks["Pipeline Tasks"]
         G --> H[1. git-clone]
-        H --> I[2. kaniko-build]
+        H --> I[2. buildah-build]
         I --> J[3. git-update]
     end
     

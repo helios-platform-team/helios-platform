@@ -12,6 +12,9 @@
   "compilerOptions": {
     "outDir": "dist-types",
     "rootDir": ".",
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "target": "ES2025",
+    "stableTypeOrdering": true,
+    "noImplicitOverride": true
   }
 }

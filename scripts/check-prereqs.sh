@@ -52,7 +52,7 @@ check_tool() {
   if [[ -n "$min_ver" ]]; then
     local actual_ver
     actual_ver=$(eval "$ver_cmd" 2>/dev/null || echo "unknown")
-    if [[ "$actual_ver" == "unknown" ]]; then
+    if [[ "$actual_ver" == "unknown" || -z "$actual_ver" ]]; then
       warn "$name installed but could not determine version"
     elif version_gte "$actual_ver" "$min_ver"; then
       pass "$name $actual_ver (>= $min_ver)"
@@ -87,31 +87,55 @@ check_tool "go" "1.26" \
   "go version | awk '{print \$3}' | sed -E 's/^go//' | head -1" \
   "https://go.dev/dl/"
 
-check_tool "docker" "" \
+check_tool "docker" "29" \
   "docker --version | sed -E 's/.* ([0-9]+\.[0-9]+\.[0-9]+).*/\\1/' | head -1" \
   "https://docs.docker.com/get-docker/"
 
-check_tool "kubectl" "" \
+check_tool "kubectl" "1.36" \
   "kubectl version --client -o json 2>/dev/null | sed -n -E 's/.*\"gitVersion\"[[:space:]]*:[[:space:]]*\"v([^\"]+)\".*/\\1/p' | head -1" \
   "https://kubernetes.io/docs/tasks/tools/"
 
-check_tool "k3d" "" \
+check_tool "k3d" "5.8" \
   "k3d version | head -1 | sed -n -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
   "https://k3d.io/ or: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash"
 
-check_tool "cue" "" \
+check_tool "cue" "0.16" \
   "cue version | head -1 | sed -n -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
   "go install cuelang.org/go/cmd/cue@latest"
+
+check_optional_tool "make" \
+  "apt-get install make (or brew install make)"
+
+check_tool "operator-sdk" "1.42" \
+  "operator-sdk version | head -1 | sed -n -E 's/.*\"v([0-9]+\.[0-9]+\.[0-9]+)\".*/\\1/p'" \
+  "https://sdk.operatorframework.io/docs/installation/"
+
+check_tool "terraform" "1.15" \
+  "terraform version | head -1 | sed -n -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
+  "https://developer.hashicorp.com/terraform/downloads"
+
+check_tool "task" "3.51" \
+  "task --version | head -1 | sed -n -E 's/v?([0-9]+\.[0-9]+\.[0-9]+).*/\\1/p'" \
+  "https://taskfile.dev/installation/"
 
 check_optional_tool "helm" \
   "https://helm.sh/docs/intro/install/"
 
 echo -e "\n${BOLD}Node.js / Frontend${NC}"
-check_tool "node" "22.0.0" \
-  "node --version | sed -E 's/^v//'" \
-  "https://nodejs.org/ or use nvm: nvm install 22"
+  if ! command -v node &>/dev/null; then
+    fail "node not found. Install: https://nodejs.org/ or use nvm: nvm install 22 (or 24)"
+  else
+    node_ver=$(node --version | sed -E 's/^v//' | head -1)
+    if [[ "$node_ver" =~ ^22\..* || "$node_ver" =~ ^24\..* ]]; then
+      pass "node $node_ver (v22 or v24)"
+    else
+      fail "node $node_ver is not supported. Backstage requires Node 22 or 24. Please switch your Node version."
+    fi
+  fi
 
-check_tool "yarn" "" \
+
+
+check_tool "yarn" "4.15.0" \
   "yarn --version 2>/dev/null | head -1" \
   "corepack enable && corepack prepare yarn@4 --activate"
 

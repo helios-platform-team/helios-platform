@@ -1,0 +1,136 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: postgraphile-template
+  title: PostGraphile GraphQL API Template
+  description: Generate an instant, high-performance GraphQL API directly from your PostgreSQL database schema using PostGraphile.
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Component Information
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+      required: [name]
+      properties:
+        name:
+          title: Project Name
+          type: string
+          description: Unique name of the service.
+          ui:field: UniqueNamePicker
+          ui:autofocus: true
+        port:
+          title: API Port
+          type: number
+          default: 5433
+          ui:field: PortPicker
+          description: Standardized platform networking port for web services.
+        databaseConfig:
+          title: Database Settings
+          type: object
+          ui:field: DatabasePicker
+
+  steps:
+    - id: fetch-source
+      name: Fetch Source Code
+      action: fetch:template
+      input:
+        url: ./content/source
+        targetPath: ./source
+        values:
+          name: ${{ parameters.name }}
+          port: ${{ parameters.port }} # Safely reads the locked 8080 value
+          namespace: default
+          owner: ${{ user.entity.metadata.name or 'guest' }}
+
+    - id: publish-source
+      name: Publish Source Code
+      action: publish:gitea
+      input:
+        description: PostGraphile Source for ${{ parameters.name }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        sourcePath: ./source
+        repoVisibility: public
+
+    - id: create-webhook
+      name: Create Webhook for DB Migration Trigger
+      action: gitea:create-webhook
+      input:
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        webhookUrl: http://el-${{ parameters.name }}-db-migrate-listener.default.svc.cluster.local:8080
+        webhookSecret: ${{ parameters.name }}
+        events:
+          - push
+
+    - id: fetch-gitops
+      name: Fetch GitOps Manifests
+      action: fetch:template
+      input:
+        url: ./content/gitops
+        targetPath: ./gitops
+        values:
+          name: ${{ parameters.name }}
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          port: ${{ parameters.port }} # Safely reads the locked 8080 value
+          namespace: default
+          databaseType: ${{ parameters.databaseConfig.dbType }}
+          databaseName: ${{ parameters.databaseConfig.dbName }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
+          sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
+          gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
+          migrateImage: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}-migrate:main
+
+    - id: publish-gitops
+      name: Publish GitOps Manifests
+      action: publish:gitea
+      input:
+        description: GitOps Manifests for ${{ parameters.name }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
+        sourcePath: ./gitops
+        repoVisibility: public
+
+    - id: create-webhook-secret
+      name: Create Kubernetes Webhook Secret
+      action: kubernetes:create-secret
+      input:
+        namespace: default
+        secretName: ${{ parameters.name }}-webhook-secret
+        data:
+          secret: ${{ parameters.name }}
+
+    - id: apply-rbac
+      name: Apply RBAC for Migration
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/serviceaccount.yaml
+
+    - id: apply-presync
+      name: Run Initial Database Migration
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/presync-job.yaml
+
+    - id: apply-heliosapp
+      name: Apply HeliosApp to Cluster
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/helios-app.yaml
+
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
+        catalogInfoPath: 'catalog-info.yaml'
+
+  output:
+    links:
+      - title: View Source Code Repository
+        url: ${{ steps['publish-source'].output.remoteUrl }}
+      - title: View GitOps Repository
+        url: ${{ steps['publish-gitops'].output.remoteUrl }}
+      - title: Open Component in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}

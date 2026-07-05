@@ -1,0 +1,164 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: nodejs-template
+  title: Node.js Template
+  description: Scaffold a lightweight, pure Node.js service. Features out-of-the-box Prisma ORM and PostgreSQL support.
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Component Information
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+      required: [name]
+      properties:
+        name:
+          title: Project Name
+          type: string
+          description: Unique name of the service.
+          ui:field: UniqueNamePicker
+          ui:autofocus: true
+        port:
+          title: API Port
+          type: number
+          default: 3002
+          ui:field: PortPicker
+          description: Standardized platform networking port for web services.
+        databaseConfig:
+          title: Database Settings
+          type: object
+          ui:field: DatabasePicker
+
+  steps:
+    # 1. Source Code
+    - id: fetch-source
+      name: Fetch Source Code
+      action: fetch:local-template
+      input:
+        templateName: nodejs-template
+        subDir: source
+        targetPath: ./source
+        values:
+          name: ${{ parameters.name }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
+          port: ${{ parameters.port }}
+          description: "Node.js service: ${{ parameters.name }}"
+          # DYNAMIC ROUTING
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+          dbPort: 5432
+
+    - id: fetch-source-db
+      name: Fetch Database Source Files
+      if: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+      action: fetch:local-template
+      input:
+        templateName: nodejs-template
+        subDir: source-db
+        targetPath: ./source
+        values:
+          name: ${{ parameters.name }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+
+    - id: publish-source
+      name: Publish Source Code
+      action: publish:gitea
+      input:
+        description: Source Code for ${{ parameters.name }}
+        # DYNAMIC ROUTING
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        sourcePath: ./source
+        repoVisibility: public
+
+    - id: create-webhook
+      name: Create Webhook
+      action: gitea:create-webhook
+      input:
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
+        # Deterministic secret so users don't have to provide one.
+        # Must match the Kubernetes secret value created below.
+        webhookSecret: ${{ parameters.name }}
+        events:
+          - push
+
+    # 2. GitOps
+    - id: fetch-gitops
+      name: Fetch GitOps Manifests
+      action: fetch:template
+      input:
+        url: ./content/gitops
+        targetPath: ./gitops
+        values:
+          name: ${{ parameters.name }}
+          image: ${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          dockerOrg: ${{ environment.parameters.dockerOrg }}
+          repoName: ${{ parameters.name }}
+          port: ${{ parameters.port }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+          databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          databaseName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          databaseVersion: ${{ parameters.databaseConfig.dbVersion if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          owner: ${{ user.entity.metadata.name or 'guest' }}
+          sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
+          gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
+          testCommand: "npm test"
+          testImage: "node:24"
+
+    - id: publish-gitops
+      name: Publish GitOps Manifests
+      action: publish:gitea
+      input:
+        description: GitOps Manifests for ${{ parameters.name }}
+        # DYNAMIC ROUTING
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
+        sourcePath: ./gitops
+        repoVisibility: public
+
+    # 3. Secret + Deploy
+    - id: create-secret
+      name: Create Git Credentials Secret
+      action: kubernetes:create-git-credentials-secret
+      input:
+        name: ${{ parameters.name }}
+        namespace: default
+        username: ${{ environment.parameters.gitOrg }}
+        webhookSecret: ${{ parameters.name }}
+
+    - id: apply-helios
+      name: Deploy to Kubernetes
+      action: kubernetes:apply
+      input:
+        manifestPath: ./gitops/helios-app.yaml
+        namespaced: true
+
+    # 4. Registration
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
+        catalogInfoPath: 'catalog-info.yaml'
+
+    - id: notify
+      name: Notify User
+      action: notification:send
+      input:
+        recipients: entity
+        entityRefs:
+          - user:default/guest
+        title: 'Advanced Template Executed'
+        info: 'Your advanced Node.js service has been scaffolded with GitOps and Webhooks!'
+
+  output:
+    links:
+      - title: Source Repository
+        url: ${{ steps['publish-source'].output.remoteUrl }}
+      - title: GitOps Repository
+        url: ${{ steps['publish-gitops'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}

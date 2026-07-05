@@ -39,12 +39,19 @@ import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/
 import { NotificationsPage } from '@backstage/plugin-notifications';
 import { SignalsDisplay } from '@backstage/plugin-signals';
 import { ScaffolderFieldExtensions } from '@backstage/plugin-scaffolder-react';
-import { DatabasePickerExtension } from './scaffolder';
+import {
+  DatabasePickerExtension,
+  UniqueNamePickerExtension,
+  BackendComponentPickerExtension,
+  PortPickerExtension,
+} from './scaffolder';
 import { UnifiedThemeProvider } from '@backstage/theme';
 import { darkTheme, lightTheme } from './themes/heliosThemes';
 import './styles.css';
 import { HeliosHomepage } from './components/home/HeliosHomepage.tsx'; // Backstage UI (BUI) theme
 import { HomepageCompositionRoot } from '@backstage/plugin-home';
+import { K8SSecretManagerPage } from '@internal/backstage-plugin-k8s-secret-manager';
+import { Toaster } from 'react-hot-toast';
 
 const app = createApp({
   apis,
@@ -114,9 +121,12 @@ const routes = (
     <Route
       path="/create"
       element={
-        <ScaffolderPage>
+        <ScaffolderPage formProps={{ showErrorList: false } as any}>
           <ScaffolderFieldExtensions>
             <DatabasePickerExtension />
+            <UniqueNamePickerExtension />
+            <BackendComponentPickerExtension />
+            <PortPickerExtension />
           </ScaffolderFieldExtensions>
         </ScaffolderPage>
       }
@@ -136,12 +146,15 @@ const routes = (
     <Route path="/settings" element={<UserSettingsPage />} />
     <Route path="/catalog-graph" element={<CatalogGraphPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
+    <Route path="/k8s-secret-manager" element={<K8SSecretManagerPage />} />
   </FlatRoutes>
 );
 
 export default app.createRoot(
   <>
+    <meta name="viewport" content="initial-scale=1, width=device-width" />
     <HeliosBackground />
+    <Toaster />
     <AlertDisplay />
     <OAuthRequestDialog />
     <SignalsDisplay />

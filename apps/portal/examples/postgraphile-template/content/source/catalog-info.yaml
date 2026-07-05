@@ -1,0 +1,37 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  annotations:
+    helios.io/port: "${{ values.port }}"
+    backstage.io/techdocs-ref: dir:.
+    backstage.io/kubernetes-id: ${{ values.name }}
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/name=${{ values.name }}
+    backstage.io/kubernetes-namespace: ${{ values.namespace }}
+    janus-idp.io/tekton: ${{ values.name }}
+    tekton.dev/ci-cd: "true"
+    argocd/app-name: ${{ values.name }}-argocd
+spec:
+  type: service
+  lifecycle: production
+  owner: ${{ values.owner }}
+  provides:
+    - name: GraphQL API
+      type: graphql
+      uri: /graphql
+  consumesApis:
+    - database-postgres
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: ${{ values.name }}-api
+  description: PostGraphile Auto-Generated GraphQL API
+spec:
+  type: graphql
+  owner: ${{ values.owner }}
+  lifecycle: production
+  definition: |
+    # PostGraphile dynamically reflects the underlying PostgreSQL database schema 
+    # into a fully featured GraphQL schema at runtime. 
+    # There are no static schema definitions required in version control.

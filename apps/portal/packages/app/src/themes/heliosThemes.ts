@@ -5,7 +5,7 @@ import {
   palettes,
   shapes,
 } from '@backstage/theme';
-import { alpha } from '@mui/material/styles';
+import { alpha } from '@material-ui/core/styles';
 
 // --- HELIOS CONSTANTS ---
 const COLORS_LIGHT = {
@@ -51,7 +51,7 @@ const COLORS_DARK = {
 };
 
 const FONTS = {
-  sans: '"Inter", "San Francisco", "Helvetica Neue", sans-serif',
+  sans: '"Plus Jakarta Sans", "Inter", "San Francisco", "Helvetica Neue", sans-serif',
   mono: '"JetBrains Mono", "Roboto Mono", monospace',
 };
 
@@ -125,24 +125,26 @@ const heliosPaletteLight = {
 
 const heliosTypography = {
   htmlFontSize: 16,
-  fontFamily: FONTS.sans, // Base font for body
+  fontFamily: FONTS.sans,
 
   // Display XL
   h1: {
     fontFamily: FONTS.sans,
     fontSize: 34,
     fontWeight: 700,
-    marginBottom: 16,
+    lineHeight: 1.2,
     letterSpacing: '-0.02em',
+    marginBottom: 16,
   },
 
   // Heading L
   h2: {
-    fontFamily: FONTS.mono,
+    fontFamily: FONTS.sans,
     fontSize: 28,
     fontWeight: 700,
+    lineHeight: 1.3,
+    letterSpacing: '-0.02em',
     marginBottom: 12,
-    letterSpacing: '-0.03em',
   },
 
   // Heading M
@@ -150,8 +152,9 @@ const heliosTypography = {
     fontFamily: FONTS.sans,
     fontSize: 22,
     fontWeight: 700,
-    marginBottom: 10,
+    lineHeight: 1.3,
     letterSpacing: '-0.01em',
+    marginBottom: 10,
   },
 
   // Lower level headings
@@ -159,37 +162,46 @@ const heliosTypography = {
     fontFamily: FONTS.sans,
     fontSize: 18,
     fontWeight: 700,
+    lineHeight: 1.4,
     marginBottom: 8,
   },
   h5: {
     fontFamily: FONTS.sans,
     fontSize: 16,
     fontWeight: 700,
+    lineHeight: 1.4,
     marginBottom: 6,
   },
   h6: {
     fontFamily: FONTS.sans,
     fontSize: 14,
     fontWeight: 700,
+    lineHeight: 1.4,
     marginBottom: 4,
   },
 
-  // System / Technical elements
-  button: { fontFamily: FONTS.mono, fontWeight: 700 },
+  // UI Elements
+  button: {
+    fontFamily: FONTS.sans,
+    fontSize: 14,
+    fontWeight: 600,
+    lineHeight: 1.5,
+  },
 
   // Label S
   caption: {
-    fontFamily: FONTS.mono,
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    fontWeight: 400,
+    lineHeight: 1.4,
   },
 
   // Micro
   overline: {
-    fontFamily: FONTS.mono,
-    fontWeight: 400,
-    textTransform: 'uppercase',
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    fontWeight: 600,
+    lineHeight: 1.4,
     letterSpacing: '0.05em',
   },
 };
@@ -300,10 +312,6 @@ export const darkTheme = createUnifiedTheme({
       styleOverrides: {
         root: {
           borderRadius: '2px',
-          textTransform: 'uppercase',
-          fontFamily: 'monospace',
-          fontWeight: 'bold',
-          letterSpacing: '0.05em',
           overflow: 'hidden',
           transition: 'all 0.15s ease',
           '&:active': {
@@ -642,10 +650,6 @@ export const lightTheme = createUnifiedTheme({
       styleOverrides: {
         root: {
           borderRadius: '2px',
-          textTransform: 'uppercase',
-          fontFamily: 'monospace',
-          fontWeight: 'bold',
-          letterSpacing: '0.05em',
           overflow: 'hidden',
           transition: 'all 0.15s ease',
           '&:active': {
@@ -782,36 +786,36 @@ export const lightTheme = createUnifiedTheme({
       },
     },
     // TABLES
-    MuiTableHead: {
-      styleOverrides: {
-        root: {
-          backgroundColor: '#fafafa', // zinc-50
-        },
-      },
-    },
-    MuiTableCell: {
-      styleOverrides: {
-        head: {
-          color: '#71717a', // zinc-500
-          fontFamily: '"JetBrains Mono", monospace',
-          textTransform: 'uppercase',
-          fontSize: '11px',
-        },
-        body: {
-          borderBottom: '1px solid #e4e4e7', // zinc-200
-        },
-      },
-    },
-    MuiTableRow: {
-      styleOverrides: {
-        root: {
-          borderBottom: '1px solid #e4e4e7',
-          '&:hover': {
-            backgroundColor: '#f4f4f5 !important', // hover:bg-zinc-100
-          },
-        },
-      },
-    },
+    // MuiTableHead: {
+    //   styleOverrides: {
+    //     root: {
+    //       backgroundColor: '#fafafa', // zinc-50
+    //     },
+    //   },
+    // },
+    // MuiTableCell: {
+    //   styleOverrides: {
+    //     head: {
+    //       color: '#71717a', // zinc-500
+    //       fontFamily: '"JetBrains Mono", monospace',
+    //       textTransform: 'uppercase',
+    //       fontSize: '11px',
+    //     },
+    //     body: {
+    //       borderBottom: '1px solid #e4e4e7', // zinc-200
+    //     },
+    //   },
+    // },
+    // MuiTableRow: {
+    //   styleOverrides: {
+    //     root: {
+    //       borderBottom: '1px solid #e4e4e7',
+    //       '&:hover': {
+    //         backgroundColor: '#f4f4f5 !important', // hover:bg-zinc-100
+    //       },
+    //     },
+    //   },
+    // },
     // BACKSTAGE HEADER
     BackstageHeader: {
       styleOverrides: {

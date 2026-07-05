@@ -20,12 +20,16 @@ import "helios.io/cue/definitions/tekton"
 			tekton.#CommonParams.gitops.secretRef,
 			tekton.#CommonParams.gitops.authorName,
 			tekton.#CommonParams.gitops.authorEmail, {
-			name:    "REPLICAS"
+			name:    "replicas"
 			default: "2"
 			type:    "string"
 		}, {
-			name:    "PORT"
+			name:    "port"
 			default: "8080"
+			type:    "string"
+		}, {
+			name:    "image-type"
+			default: "app"
 			type:    "string"
 		}]
 		workspaces: [{
@@ -38,20 +42,37 @@ import "helios.io/cue/definitions/tekton"
 			script: """
 				#!/bin/sh
 				set -e
+				if ! command -v git >/dev/null 2>&1; then
+					apk add --no-cache git
+				fi
 				
-				# Clean workspace
-				cd "$(workspaces.gitops-repo.path)"
-				rm -rf ./*
-				rm -rf ./.??*
-				rm -rf .git
-				
-				# Clone
-				echo "Cloning $(params.GITOPS_REPO_URL) to current dir..."
-				git clone "$(params.GITOPS_REPO_URL)" .
-				git checkout -B "$(params.GITOPS_REPO_BRANCH)"
+				WORKSPACE_PATH="$(workspaces.gitops-repo.path)"
+				cd "$WORKSPACE_PATH"
 
-				# Ensure subsequent steps (possibly running as non-root) can modify files.
-				chmod -R a+rwX "$(workspaces.gitops-repo.path)"
+				# Tekton PVC ownership can differ from the running UID.
+				# Force git to trust this workspace path.
+				git_safe() {
+					git -c safe.directory="$WORKSPACE_PATH" "$@"
+				}
+
+				# Prepare repo content using git primitives (no rm dependency).
+				echo "Cloning $(params.gitops-repo-url) to current dir..."
+				if [ -d .git ]; then
+					git_safe remote remove origin || true
+				else
+					git_safe init
+				fi
+				git_safe remote add origin "$(params.gitops-repo-url)"
+				git_safe fetch --depth=1 origin "$(params.gitops-repo-branch)"
+				git_safe checkout -B "$(params.gitops-repo-branch)" FETCH_HEAD
+				git_safe reset --hard FETCH_HEAD
+				git_safe clean -fdx
+
+				# Ensure subsequent steps can modify files when chmod is available.
+				# Some minimal git images do not ship coreutils.
+				if command -v chmod >/dev/null 2>&1; then
+					chmod -R a+rwX "$WORKSPACE_PATH"
+				fi
 				"""
 		}, {
 			// Step 2: Update Manifests using YQ image
@@ -65,9 +86,10 @@ import "helios.io/cue/definitions/tekton"
 				set -e
 				cd "$(workspaces.gitops-repo.path)"
 
-				export IMAGE_URL="$(params.NEW_IMAGE_URL)"
-				export REPLICAS="$(params.REPLICAS)"
-				export PORT="$(params.PORT)"
+				export IMAGE_URL="$(params.new-image-url)"
+				export REPLICAS="$(params.replicas)"
+				export PORT="$(params.port)"
+				export IMAGE_TYPE="$(params.image-type)"
 
 				# Defensive defaults: avoid generating invalid manifests when inputs are empty/0
 				if [ -z "${REPLICAS}" ] || [ "${REPLICAS}" = "0" ]; then
@@ -76,7 +98,7 @@ import "helios.io/cue/definitions/tekton"
 				if [ -z "${PORT}" ] || [ "${PORT}" = "0" ]; then
 				  export PORT="8080"
 				fi
-				MANIFEST_PATH="$(params.MANIFEST_PATH)"
+				MANIFEST_PATH="$(params.manifest-path)"
 
 				# Logic tạo file tự động
 				if echo "$MANIFEST_PATH" | grep -qvE '\\.ya?ml$'; then
@@ -86,20 +108,35 @@ import "helios.io/cue/definitions/tekton"
 				    # If the operator already renders a combined manifest.yaml in this directory,
 				    # prefer updating that file rather than creating separate default manifests.
 				    COMBINED_FILE="$MANIFEST_PATH/manifest.yaml"
-				    if [ -f "$COMBINED_FILE" ]; then
+				    if [ "$IMAGE_TYPE" = "migrate" ]; then
+				        # Ensure presync-job is inside MANIFEST_PATH so ArgoCD can sync it
+				        if [ -f "presync-job.yaml" ] && [ ! -f "$MANIFEST_PATH/presync-job.yaml" ]; then
+				            mkdir -p "$MANIFEST_PATH"
+				            git mv "presync-job.yaml" "$MANIFEST_PATH/presync-job.yaml" || mv "presync-job.yaml" "$MANIFEST_PATH/presync-job.yaml"
+				        fi
+				        if [ -f "$MANIFEST_PATH/presync-job.yaml" ]; then
+				            MANIFEST_FILES="$MANIFEST_PATH/presync-job.yaml"
+				        else
+				            MANIFEST_FILES="presync-job.yaml"
+				        fi
+				    elif [ -f "$COMBINED_FILE" ]; then
 				        MANIFEST_FILES="$COMBINED_FILE"
 				    else
 				        DEP_FILE="$MANIFEST_PATH/deployment.yaml"
-				        SVC_FILE="$MANIFEST_PATH/service.yaml"
-				        MANIFEST_FILES="$DEP_FILE $SVC_FILE"
-				        APP_NAME=$(basename "$MANIFEST_PATH")
+				            SVC_FILE="$MANIFEST_PATH/service.yaml"
+				            MANIFEST_FILES="$DEP_FILE $SVC_FILE"
+				            HELIOS_APP_FILE="$MANIFEST_PATH/helios-app.yaml"
+				            if [ -f "$HELIOS_APP_FILE" ]; then
+				                MANIFEST_FILES="$MANIFEST_FILES $HELIOS_APP_FILE"
+				            fi
+				            APP_NAME=$(basename "$MANIFEST_PATH")
 
-				        if [ ! -f "$DEP_FILE" ]; then
-				            echo "Creating default manifests..."
-				            printf "apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  replicas: ${REPLICAS}\\n  selector:\\n    matchLabels:\\n      app: ${APP_NAME}\\n  template:\\n    metadata:\\n      labels:\\n        app: ${APP_NAME}\\n    spec:\\n      containers:\\n        - name: app\\n          image: ${IMAGE_URL}\\n          ports:\\n            - containerPort: ${PORT}\\n" > "$DEP_FILE"
+				            if [ ! -f "$DEP_FILE" ]; then
+				                echo "Creating default manifests..."
+				                printf "apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  replicas: ${REPLICAS}\\n  selector:\\n    matchLabels:\\n      app: ${APP_NAME}\\n  template:\\n    metadata:\\n      labels:\\n        app: ${APP_NAME}\\n    spec:\\n      containers:\\n        - name: app\\n          image: ${IMAGE_URL}\\n          ports:\\n            - containerPort: ${PORT}\\n" > "$DEP_FILE"
 
-				            printf "apiVersion: v1\\nkind: Service\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  selector:\\n    app: ${APP_NAME}\\n  ports:\\n    - protocol: TCP\\n      port: ${PORT}\\n      targetPort: ${PORT}\\n  type: ClusterIP\\n" > "$SVC_FILE"
-				        fi
+				                printf "apiVersion: v1\\nkind: Service\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  selector:\\n    app: ${APP_NAME}\\n  ports:\\n    - protocol: TCP\\n      port: ${PORT}\\n      targetPort: ${PORT}\\n  type: ClusterIP\\n" > "$SVC_FILE"
+				            fi
 				    fi
 				else
 				    echo "Path '$MANIFEST_PATH' treated as FILE."
@@ -117,11 +154,22 @@ import "helios.io/cue/definitions/tekton"
 				for FILE in $MANIFEST_FILES; do
 				  if [ -f "$FILE" ]; then
 				      echo "Updating $FILE..."
-				      yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].image = env(IMAGE_URL)' "$FILE"
-				      yq -i 'select(.kind == "Deployment") .spec.replicas = env(REPLICAS)' "$FILE"
-				      yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].ports[0].containerPort = env(PORT)' "$FILE"
-				      yq -i 'select(.kind == "Service") .spec.ports[0].port = env(PORT)' "$FILE"
-				      yq -i 'select(.kind == "Service") .spec.ports[0].targetPort = env(PORT)' "$FILE"
+				      if [ "$IMAGE_TYPE" = "migrate" ]; then
+				          yq -i 'select(.kind == "Job") .spec.template.spec.containers[0].image = env(IMAGE_URL)' "$FILE"
+				          # Force ArgoCD out-of-sync by adding an annotation to the Deployment
+				          if [ -f "$MANIFEST_PATH/manifest.yaml" ]; then
+				              yq -i 'select(.kind == "Deployment") .metadata.annotations["helios.dev/last-migration"] = env(IMAGE_URL)' "$MANIFEST_PATH/manifest.yaml"
+				          elif [ -f "$MANIFEST_PATH/deployment.yaml" ]; then
+				              yq -i 'select(.kind == "Deployment") .metadata.annotations["helios.dev/last-migration"] = env(IMAGE_URL)' "$MANIFEST_PATH/deployment.yaml"
+				          fi
+				      else
+				          yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].image = env(IMAGE_URL)' "$FILE"
+				          yq -i 'select(.kind == "Deployment") .spec.replicas = env(REPLICAS)' "$FILE"
+				          yq -i 'select(.kind == "Deployment") .spec.template.spec.containers[].ports[0].containerPort = env(PORT)' "$FILE"
+				          yq -i 'select(.kind == "Service") .spec.ports[0].port = env(PORT)' "$FILE"
+				          yq -i 'select(.kind == "Service") .spec.ports[0].targetPort = env(PORT)' "$FILE"
+				          yq -i 'select(.kind == "HeliosApp") .spec.components[0].properties.image = env(IMAGE_URL)' "$FILE"
+				      fi
 				  fi
 				done
 				"""
@@ -131,41 +179,61 @@ import "helios.io/cue/definitions/tekton"
 			image: _config.images.gitClone
 			envFrom: [{
 				secretRef: {
-					name:     "helios-gitops-bot"
-					optional: false
+					// Use task param instead of hardcoded secret so environments can vary.
+					name:     "$(params.gitops-secret-ref)"
+					// Keep step runnable even when secret is absent; script handles missing creds.
+					optional: true
 				}
 			}]
 			script: """
 				#!/bin/sh
 				set -e
-				cd "$(workspaces.gitops-repo.path)"
+					if ! command -v git >/dev/null 2>&1; then
+						apk add --no-cache git
+					fi
+				WORKSPACE_PATH="$(workspaces.gitops-repo.path)"
+				cd "$WORKSPACE_PATH"
+				git_safe() {
+					git -c safe.directory="$WORKSPACE_PATH" "$@"
+				}
 
-				git config user.email "$(params.GITOPS_AUTHOR_EMAIL)"
-				git config user.name "$(params.GITOPS_AUTHOR_NAME)"
+				git_safe config user.email "$(params.gitops-author-email)"
+				git_safe config user.name "$(params.gitops-author-name)"
 
 				if [ -n "${username:-}" ] && [ -n "${password:-}" ]; then
-				  RAW_URL="$(params.GITOPS_REPO_URL)"
-				  # Strip any embedded credentials from http/https URL first.
-				  RAW_URL="$(echo "$RAW_URL" | sed -e 's|^https://[^@]*@|https://|' -e 's|^http://[^@]*@|http://|')"
-				  if echo "$RAW_URL" | grep -q '^https://'; then
-				    REPO_URL_WITH_AUTH="$(echo "$RAW_URL" | sed "s|^https://|https://${username}:${password}@|")"
-				  elif echo "$RAW_URL" | grep -q '^http://'; then
-				    REPO_URL_WITH_AUTH="$(echo "$RAW_URL" | sed "s|^http://|http://${username}:${password}@|")"
-				  else
-				    echo "Unsupported GitOps repo URL scheme: $RAW_URL"
-				    exit 1
-				  fi
-				  git remote set-url origin "${REPO_URL_WITH_AUTH}"
+				  RAW_URL="$(params.gitops-repo-url)"
+				  # Strip embedded credentials without sed (minimal images may not include it).
+				  case "$RAW_URL" in
+				    https://*@*)
+				      RAW_URL="https://${RAW_URL#https://*@}"
+				      ;;
+				    http://*@*)
+				      RAW_URL="http://${RAW_URL#http://*@}"
+				      ;;
+				  esac
+				  case "$RAW_URL" in
+				    https://*)
+				      REPO_URL_WITH_AUTH="https://${username}:${password}@${RAW_URL#https://}"
+				      ;;
+				    http://*)
+				      REPO_URL_WITH_AUTH="http://${username}:${password}@${RAW_URL#http://}"
+				      ;;
+				    *)
+				      echo "Unsupported GitOps repo URL scheme: $RAW_URL"
+				      exit 1
+				      ;;
+				  esac
+				  git_safe remote set-url origin "${REPO_URL_WITH_AUTH}"
 				else
 				    echo "WARNING: username or password env vars not set. Push might fail."
 				fi
 
-				git add .
-				if git diff-index --quiet HEAD --; then
+				git_safe add .
+				if git_safe diff-index --quiet HEAD --; then
 				    echo "No changes to commit"
 				else
-				    git commit -m "chore: Update image=$(params.NEW_IMAGE_URL) [skip-ci]"
-				    git push origin "$(params.GITOPS_REPO_BRANCH)"
+				    git_safe commit -m "chore: Update image=$(params.new-image-url) [skip-ci]"
+				    git_safe push origin "$(params.gitops-repo-branch)"
 				fi
 				"""
 		}]

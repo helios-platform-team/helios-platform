@@ -36,9 +36,9 @@ var databaseSecretEnvVarNames = []string{"DB_HOST", "DB_USER", "DB_PASS", "PGRST
 // InjectDatabaseEnvVars patches a Deployment's first container to include
 // DB_HOST, DB_USER, DB_PASS env vars referencing the given K8s Secret.
 // The function is idempotent.
-// dbName is the logical database name (e.g. from the database trait); when empty,
+// dbName is the logical database name (e.g., from the database trait); when empty,
 // DB_NAME is not injected.
-// dbType selects whether DATABASE_URL is set (only types with a known URL template, e.g. postgres).
+// dbType selects whether DATABASE_URL is set (only types with a known URL template, e.g., postgres).
 func InjectDatabaseEnvVars(deploy *appsv1.Deployment, secretName, dbName, dbType string) bool {
 	changed, _ := InjectDatabaseEnvVarsForContainer(deploy, secretName, "", DefaultPostgresPort, dbName, dbType)
 	return changed
@@ -48,7 +48,7 @@ func InjectDatabaseEnvVars(deploy *appsv1.Deployment, secretName, dbName, dbType
 // DB_HOST, DB_USER, DB_PASS env vars referencing the given K8s Secret, plus a
 // literal DB_PORT value. When dbName is non-empty, it sets DB_NAME. DATABASE_URL
 // is added only when dbType has a defined connection string template (see connectionURLTemplateForDBType).
-// If preferredContainerName is not found, it falls back to the first container.
+// If the preferredContainerName is not found, it falls back to the first container.
 // Returns (changed, exactMatch).
 func InjectDatabaseEnvVarsForContainer(deploy *appsv1.Deployment, secretName, preferredContainerName string, dbPort int32, dbName, dbType string) (bool, bool) {
 	if len(deploy.Spec.Template.Spec.Containers) == 0 {

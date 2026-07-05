@@ -1,0 +1,1 @@
+export { BackendComponentPickerExtension } from './extension';

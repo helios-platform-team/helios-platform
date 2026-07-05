@@ -27,30 +27,33 @@ func TestNewTektonRenderer(t *testing.T) {
 	}
 }
 
-// validTektonInput returns a fully-populated TektonInput for testing.
+// validTektonInput returns a fully populated TektonInput for testing.
 func validTektonInput() TektonInput {
 	return TektonInput{
-		AppName:         "test-app",
-		Namespace:       "default",
-		GitRepo:         "http://gitea-http.gitea.svc.cluster.local:3000/myuser/test-app.git",
-		GitBranch:       "main",
-		ImageRepo:       "docker.io/myuser/test-app",
-		GitOpsRepo:      "http://gitea-http.gitea.svc.cluster.local:3000/myuser/gitops-repo.git",
-		GitOpsPath:      "./apps/test-app",
-		GitOpsBranch:    "main",
-		GitOpsSecretRef: "helios-gitops-bot",
-		WebhookDomain:   "hooks.helios.dev",
-		WebhookSecret:   "gitea-webhook-secret",
-		PipelineName:    "from-code-to-cluster",
-		PipelineType:    "from-code-to-cluster",
-		TriggerType:     "gitea-push",
-		ServiceAccount:  "tekton-sa",
-		PVCName:         "shared-workspace-pvc",
-		ContextSubpath:  "",
-		Replicas:        1,
-		Port:            8080,
-		DockerSecret:    "docker-creds",
-		ArgoCDNamespace: "argocd",
+		AppName:          "test-app",
+		Namespace:        "default",
+		GitRepo:          "http://gitea-http.gitea.svc.cluster.local:3000/myuser/test-app.git",
+		GitBranch:        "main",
+		ImageRepo:        "docker.io/myuser/test-app",
+		GitOpsRepo:       "http://gitea-http.gitea.svc.cluster.local:3000/myuser/gitops-repo.git",
+		GitOpsPath:       "./apps/test-app",
+		GitOpsBranch:     "main",
+		GitOpsSecretRef:  "helios-gitops-bot",
+		WebhookDomain:    "hooks.helios.dev",
+		WebhookSecret:    "gitea-webhook-secret",
+		PipelineName:     "from-code-to-cluster",
+		PipelineType:     "from-code-to-cluster",
+		TriggerType:      "gitea-push",
+		ServiceAccount:   "tekton-sa",
+		PVCName:          "shared-workspace-pvc",
+		ContextSubpath:   "",
+		Replicas:         1,
+		Port:             8080,
+		DockerSecret:     "docker-creds",
+		ArgoCDNamespace:  "argocd",
+		StorageDriver:    "overlay",
+		BuildahIsolation: "chroot",
+		BuildPlatforms:   "linux/amd64,linux/arm64",
 	}
 }
 
@@ -68,7 +71,7 @@ func TestRenderTektonResources_AllResources(t *testing.T) {
 	}
 
 	// With webhookDomain set, we expect 13 objects:
-	// 6 Tasks (git-clone, kaniko-build, git-update-manifest, argocd-sync, db-migrate, postgrest-reload)
+	// 6 Tasks (git-clone, buildah-build, git-update-manifest, argocd-sync, db-migrate, postgrest-reload)
 	// + 2 Pipelines (from-code-to-cluster + db-migrate)
 	// + 1 TriggerBinding + 2 TriggerTemplates (gitea + db-migrate) + 1 EventListener + 1 Ingress
 	expectedCount := 13
@@ -174,7 +177,7 @@ func TestRenderTektonResources_CorrectTaskNames(t *testing.T) {
 
 	expectedTaskNames := map[string]bool{
 		"git-clone":           false,
-		"kaniko-build":        false,
+		"buildah-build":       false,
 		"git-update-manifest": false,
 		"argocd-sync":         false,
 		"db-migrate":          false,
@@ -258,7 +261,7 @@ func TestRenderTektonResources_BuildOnlyPipeline(t *testing.T) {
 		t.Fatalf("RenderTektonResources failed: %v", err)
 	}
 
-	// Verify the primary pipeline with name "build-only" exists among rendered pipelines.
+	// Verify the primary pipeline with the name "build-only" exists among rendered pipelines.
 	// Note: db-migrate pipeline is always rendered alongside the primary pipeline.
 	foundBuildOnly := false
 	for _, obj := range objects {
@@ -268,5 +271,29 @@ func TestRenderTektonResources_BuildOnlyPipeline(t *testing.T) {
 	}
 	if !foundBuildOnly {
 		t.Error("Expected primary pipeline 'build-only' not found in rendered objects")
+	}
+}
+
+func TestRenderTektonResources_ValidationConstraints(t *testing.T) {
+	cuePath := getCuePath(t)
+	renderer, err := NewTektonRenderer(cuePath)
+	if err != nil {
+		t.Fatalf("Failed to create TektonRenderer: %v", err)
+	}
+
+	// 1. Test imageRepo with space
+	inputSpace := validTektonInput()
+	inputSpace.ImageRepo = "docker.io/my user/test-app"
+	_, err = renderer.RenderTektonResources(inputSpace)
+	if err == nil {
+		t.Error("Expected error for imageRepo containing spaces, got nil")
+	}
+
+	// 2. Test contextSubpath with parent directory escape
+	inputEscape := validTektonInput()
+	inputEscape.ContextSubpath = "../escape"
+	_, err = renderer.RenderTektonResources(inputEscape)
+	if err == nil {
+		t.Error("Expected error for contextSubpath containing traversal, got nil")
 	}
 }

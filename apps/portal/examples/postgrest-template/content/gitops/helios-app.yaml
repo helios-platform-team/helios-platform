@@ -10,11 +10,12 @@ spec:
   gitBranch: main
   imageRepo: ${{ values.image }}
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: ${{ values.name }}
+  gitopsPath: "."
   webhookSecret: ${{ values.name }}-webhook-secret
   port: ${{ values.port }}
   replicas: 1
   triggerType: db-migrate
+  pipelineName: db-migrate
 
   components:
     - name: ${{ values.name }}
@@ -46,7 +47,7 @@ spec:
             dbType: postgres
             dbName: ${{ values.databaseName or values.name }}-db
             port: 5432
-            version: "${{ values.databaseVersion or '16' }}"
+            version: "${{ values.databaseVersion or '18.4' }}"
             storage: "1Gi"
         - type: service
           properties:

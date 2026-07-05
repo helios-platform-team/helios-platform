@@ -30,22 +30,27 @@
     ]
   },
   "devDependencies": {
-    "@backstage/cli": "^0.36.0",
-    "@backstage/cli-defaults": "^0.1.0",
+    "@backstage/cli": "^0.36.2",
+    "@backstage/cli-defaults": "^0.1.2",
     "@backstage/e2e-test-utils": "^0.1.2",
-    "@jest/environment-jsdom-abstract": "^30.0.0",
-    "@playwright/test": "^1.32.3",
-    "@types/jest": "^30.0.0",
-    "jest": "^30.2.0",
-    "jsdom": "^27.1.0",
-    "node-gyp": "^10.0.0",
-    "prettier": "^2.3.2",
-    "typescript": "~5.8.0",
-    "webpack": "~5.103.0"
+    "@jest/environment-jsdom-abstract": "30.0.0",
+    "@playwright/test": "^1.60.0",
+    "@types/jest": "30.0.0",
+    "jest": "30.2.0",
+    "jsdom": "26.1.0",
+    "node-gyp": "^12.3.0",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
+    "webpack": "^5.107.1"
   },
   "resolutions": {
     "@types/react": "^18",
-    "@types/react-dom": "^18"
+    "@types/react-dom": "^18",
+    "@mui/material": "^5.16.7",
+    "@mui/icons-material": "^5.16.7",
+    "@mui/system": "^5.16.7",
+    "@mui/utils": "^5.16.7",
+    "@mui/styled-engine": "^5.16.7"
   },
   "prettier": "@backstage/cli/config/prettier",
   "lint-staged": {
@@ -57,8 +62,10 @@
       "prettier --write"
     ]
   },
-  "packageManager": "yarn@4.4.1",
+  "packageManager": "yarn@4.15.0",
   "dependencies": {
-    "lucide-react": "^0.577.0"
+    "@kubernetes/client-node": "^1.4.0",
+    "lucide-react": "^1.16.0",
+    "react-hot-toast": "2.6.0"
   }
 }

@@ -1,0 +1,136 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #0f172a;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+.app-container {
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.app-card {
+  max-width: 600px;
+  width: 100%;
+  background-color: #1e293b;
+  border-radius: 0.75rem;
+  padding: 2rem;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  border: 1px solid #334155;
+  box-sizing: border-box;
+}
+
+.app-title {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 700;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(to right, #22d3ee, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.tech-stack-panel {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: rgba(51, 65, 85, 0.5);
+  border-radius: 0.5rem;
+}
+
+.section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #67e8f9;
+}
+
+.tech-stack-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  list-style-type: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.counter-section {
+  margin-bottom: 2rem;
+}
+
+.counter-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  background-color: #334155;
+  border: none;
+  border-radius: 0.25rem;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn:hover {
+  background-color: #475569;
+}
+
+.btn-primary {
+  background-color: #0891b2;
+}
+
+.btn-primary:hover {
+  background-color: #06b6d4;
+}
+
+.counter-value {
+  font-family: monospace;
+  font-size: 1.5rem;
+  width: 3rem;
+  text-align: center;
+}
+
+.data-section {
+  border-top: 1px solid #334155;
+  padding-top: 1.5rem;
+}
+
+.stats-grid {
+  font-size: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.error-msg {
+  color: #f87171;
+}

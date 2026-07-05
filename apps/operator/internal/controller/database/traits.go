@@ -16,22 +16,22 @@ const (
 	PasswordCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"
 	UsernameCharset = "abcdefghijklmnopqrstuvwxyz0123456789"
 
-	DatabaseTraitType      = "database"
-	DefaultPostgresVersion = "18.3"
+	TraitType              = "database"
+	DefaultPostgresVersion = "18.4"
 	DefaultPostgresPort    = 5432
 	DefaultDatabaseStorage = "1Gi"
 	PostgresDataPath       = "/var/lib/postgresql/data"
 	PostgresDataSubPath    = "pgdata"
 )
 
-// DatabaseCredentials holds generated database credentials.
-type DatabaseCredentials struct {
+// Credentials holds generated database credentials.
+type Credentials struct {
 	Username string
 	Password string
 }
 
-// DatabaseTraitProperties represents the properties of a database trait.
-type DatabaseTraitProperties struct {
+// TraitProperties represents the properties of a database trait.
+type TraitProperties struct {
 	DBType  string `json:"dbType"`
 	DBName  string `json:"dbName"`
 	Port    int    `json:"port"`
@@ -39,22 +39,22 @@ type DatabaseTraitProperties struct {
 	Storage string `json:"storage"`
 }
 
-// DatabaseTrait pairs a component name with its database trait properties.
-type DatabaseTrait struct {
+// Trait pairs a component name with its database trait properties.
+type Trait struct {
 	ComponentName string
-	Properties    DatabaseTraitProperties
+	Properties    TraitProperties
 }
 
 // ExtractDatabaseTraits extracts all database traits from HeliosApp components.
-func ExtractDatabaseTraits(app *appv1alpha1.HeliosApp) []DatabaseTrait {
+func ExtractDatabaseTraits(app *appv1alpha1.HeliosApp) []Trait {
 	log := logf.Log.WithName("database-traits")
 
-	var dbTraits []DatabaseTrait
+	var dbTraits []Trait
 
 	for _, component := range app.Spec.Components {
 		for _, trait := range component.Traits {
-			if strings.ToLower(trait.Type) == DatabaseTraitType {
-				var props DatabaseTraitProperties
+			if strings.ToLower(trait.Type) == TraitType {
+				var props TraitProperties
 				if trait.Properties != nil && trait.Properties.Raw != nil {
 					if err := json.Unmarshal(trait.Properties.Raw, &props); err != nil {
 						log.Error(err, "Failed to parse database trait properties, skipping trait",
@@ -64,7 +64,7 @@ func ExtractDatabaseTraits(app *appv1alpha1.HeliosApp) []DatabaseTrait {
 						continue
 					}
 				}
-				dbTraits = append(dbTraits, DatabaseTrait{
+				dbTraits = append(dbTraits, Trait{
 					ComponentName: component.Name,
 					Properties:    props,
 				})
@@ -87,7 +87,7 @@ func GetDatabaseHost(componentName string) string {
 
 // EffectiveDatabaseName returns the logical Postgres database name for a trait,
 // matching ReconcileInstances (POSTGRES_DB / connection string).
-func EffectiveDatabaseName(tr DatabaseTrait) string {
+func EffectiveDatabaseName(tr Trait) string {
 	if tr.Properties.DBName != "" {
 		return tr.Properties.DBName
 	}

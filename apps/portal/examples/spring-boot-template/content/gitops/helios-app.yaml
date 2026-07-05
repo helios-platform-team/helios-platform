@@ -8,9 +8,9 @@ spec:
   description: "Spring Boot service: ${{ values.name }}"
   gitRepo: ${{ values.sourceRepo }}
   gitBranch: main
-  imageRepo: ${{ values.image }}
+  imageRepo: ${{ values.dockerOrg }}/${{ values.repoName }}
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: ${{ values.name }}
+  gitopsPath: "."
   pipelineName: from-code-to-cluster
   webhookSecret: git-credentials-${{ values.name }}
   port: ${{ values.port }}
@@ -19,7 +19,7 @@ spec:
     - name: ${{ values.name }}
       type: web-service
       properties:
-        image: ${{ values.image }}:latest
+        image: ${{ values.dockerOrg }}/${{ values.repoName }}:main
         port: ${{ values.port }}
         replicas: 1
       traits:
@@ -30,5 +30,5 @@ spec:
           properties:
             dbType: ${{ values.databaseType | default("postgres") }}
             dbName: ${{ values.name | replace('-', '_') }}_db
-            version: "16"
+            version: "18.4"
             storage: "1Gi"

@@ -22,7 +22,7 @@ import "helios.io/cue/definitions/tekton"
 
 		steps: [{
 			name:  "reload-schema"
-			image: "postgres:15-alpine"
+			image: "postgres:18.4-alpine"
 			env: [{
 				name: "DATABASE_URL"
 				valueFrom: {

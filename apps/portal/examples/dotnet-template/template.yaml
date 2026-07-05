@@ -2,68 +2,35 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: dotnet-webapi-template
-  title: .NET Web API Template (Database-backed)
-  description: Scaffolds an ASP.NET Core Web API service with PostgreSQL-ready GitOps manifests.
+  title: .NET Web API Template
+  description: Create a high-performance ASP.NET Core Web API service with optional PostgreSQL database support.
 spec:
   owner: user:guest
   type: service
 
   parameters:
     - title: Component Information
-      required:
-        - name
-        - port
-        - dockerOrg
-        - repoName
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+      required: [name]
       properties:
         name:
-          title: Name
+          title: Project Name
           type: string
-          description: Unique name of the component
+          description: Unique name of the service.
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
-          title: Port
+          title: API Port
           type: number
-          description: The port the .NET API listens on
-          default: 8080
-        dockerOrg:
-          title: Docker Registry Org/User
-          type: string
-          description: Your Docker Hub username or Organization
-        repoName:
-          title: Docker Repository Name
-          type: string
-          description: The name of the Docker repository (e.g. my-dotnet-api)
-
-    - title: Database Configuration
-      properties:
+          default: 5000
+          ui:field: PortPicker
+          description: Standardized platform networking port for web services.
         databaseConfig:
           title: Database Settings
           type: object
           ui:field: DatabasePicker
-
-    - title: Repository & Webhook
-      required:
-        - repoUrl
-      properties:
-        repoUrl:
-          title: Source Repository Location
-          type: string
-          ui:field: RepoUrlPicker
-          ui:options:
-            allowedHosts:
-              - localhost:3030
-
-    - title: Optional Extras (Local Convenience)
-      properties:
-        registerToCatalog:
-          title: Register component in catalog
-          type: boolean
-          default: false
-        sendNotification:
-          title: Send Backstage notification
-          type: boolean
-          default: false
 
   steps:
     - id: fetch-source
@@ -73,18 +40,22 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           owner: user:default/${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: ".NET Web API service for ${{ parameters.name }}"
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          # DYNAMIC ROUTING
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+          dbPort: 5432
 
     - id: publish-source
       name: Publish Source Code
       action: publish:gitea
       input:
         description: Source Code for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}
+        # DYNAMIC ROUTING
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
         sourcePath: ./source
         repoVisibility: public
 
@@ -92,9 +63,9 @@ spec:
       name: Create Webhook
       action: gitea:create-webhook
       input:
-        repoUrl: ${{ parameters.repoUrl }}
-        webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
-        webhookSecret: ${{ parameters.repoName }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
+        webhookSecret: ${{ parameters.name }}
         events:
           - push
 
@@ -105,28 +76,29 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
-          dockerOrg: ${{ parameters.dockerOrg }}
-          repoName: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
+          image: ${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          dockerOrg: ${{ environment.parameters.dockerOrg }}
+          repoName: ${{ parameters.name }}
           port: ${{ parameters.port }}
-          databaseType: ${{ parameters.databaseConfig.dbType }}
-          databaseName: ${{ parameters.databaseConfig.dbName }}
+          hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
+          databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          databaseName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
           owner: user:default/${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "dotnet test"
-          testImage: "mcr.microsoft.com/dotnet/sdk:10.0.202"
-          dbType: ${{ parameters.databaseConfig.dbType }}
-          dbName: ${{ parameters.databaseConfig.dbName }}
-          dbVersion: ${{ parameters.databaseConfig.dbVersion }}
+          testImage: "mcr.microsoft.com/dotnet/sdk:10.0.300"
+          dbType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          dbName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
+          dbVersion: ${{ parameters.databaseConfig.dbVersion if parameters.databaseConfig.dbType == 'postgres' else '' }}
 
     - id: publish-gitops
       name: Publish GitOps Manifests
       action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}-gitops
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
         sourcePath: ./gitops
         repoVisibility: public
 
@@ -134,10 +106,10 @@ spec:
       name: Create Git Credentials Secret
       action: kubernetes:create-git-credentials-secret
       input:
-        name: ${{ parameters.repoName }}
+        name: ${{ parameters.name }}
         namespace: default
-        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-        webhookSecret: ${{ parameters.repoName }}
+        username: ${{ environment.parameters.gitOrg }}
+        webhookSecret: ${{ parameters.name }}
 
     - id: apply-helios
       name: Deploy to Kubernetes
@@ -149,21 +121,9 @@ spec:
     - id: register
       name: Register Component
       action: catalog:register
-      if: '{{ parameters.registerToCatalog }}'
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
-        catalogInfoPath: 'catalog-info.yaml'
-
-    - id: notify
-      name: Notify User
-      action: notification:send
-      if: '{{ parameters.sendNotification }}'
-      input:
-        recipients: entity
-        entityRefs:
-          - user:default/guest
-        title: '.NET Template Executed'
-        info: 'Your .NET Web API service has been scaffolded and deployed via GitOps.'
+        catalogInfoPath: "catalog-info.yaml"
 
   output:
     links:

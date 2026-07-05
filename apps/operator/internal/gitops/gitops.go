@@ -16,13 +16,13 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
-// GitOpsClientInterface defines the methods for GitOps operations
-type GitOpsClientInterface interface {
+// ClientInterface defines the methods for GitOps operations
+type ClientInterface interface {
 	SyncManifest(ctx context.Context, filePath, content string) error
 }
 
-// GitOpsClient handles interactions with the GitOps repository
-type GitOpsClient struct {
+// Client handles interactions with the GitOps repository
+type Client struct {
 	RepoURL     string
 	Auth        *http.BasicAuth
 	AuthorName  string
@@ -31,13 +31,13 @@ type GitOpsClient struct {
 	inMemory bool
 }
 
-// NewGitOpsClient creates a new client
+// NewClient creates a new client
 // token should be a Personal Access Token (PAT)
-func NewGitOpsClient(repoURL, username, token string) *GitOpsClient {
+func NewClient(repoURL, username, token string) *Client {
 	authorName := cmp.Or(os.Getenv("GIT_AUTHOR_NAME"), "Helios Operator")
 	authorEmail := cmp.Or(os.Getenv("GIT_AUTHOR_EMAIL"), "operator@helios.io")
 
-	return &GitOpsClient{
+	return &Client{
 		RepoURL: repoURL,
 		Auth: &http.BasicAuth{
 			Username: username,
@@ -51,7 +51,7 @@ func NewGitOpsClient(repoURL, username, token string) *GitOpsClient {
 
 // SyncManifest clones the repo, updates the manifest file, commits, and pushes the changes.
 // filePath: relative path to the manifest file in the repo (e.g. "apps/my-app/manifest.yaml")
-func (c *GitOpsClient) SyncManifest(ctx context.Context, filePath, content string) error {
+func (c *Client) SyncManifest(ctx context.Context, filePath, content string) error {
 	var r *git.Repository
 	var err error
 	var w *git.Worktree
@@ -73,7 +73,7 @@ func (c *GitOpsClient) SyncManifest(ctx context.Context, filePath, content strin
 			},
 		})
 	} else {
-		// 1. Create temporary directory
+		// 1. Create a temporary directory
 		tempDir, err := os.MkdirTemp("", "helios-gitops-*")
 		if err != nil {
 			return fmt.Errorf("failed to create temp dir: %w", err)
@@ -157,7 +157,7 @@ func (c *GitOpsClient) SyncManifest(ctx context.Context, filePath, content strin
 	}
 
 	// 5. Git Commit
-	msg := fmt.Sprintf("Update manifest: %s", filePath)
+	msg := fmt.Sprintf("Update HeliosApp CR: %s", filePath)
 	commitHash, err := w.Commit(msg, &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  c.AuthorName,

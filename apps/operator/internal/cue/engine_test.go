@@ -127,6 +127,87 @@ func TestEngine_Render(t *testing.T) {
 	})
 }
 
+func TestEngine_RenderWithExternalSecretReferenceTrait(t *testing.T) {
+	cuePath := filepath.Join("..", "..", "..", "..", "cue")
+	if _, err := os.Stat(cuePath); os.IsNotExist(err) {
+		t.Skipf("CUE path does not exist: %s", cuePath)
+	}
+
+	engine, err := NewEngine(cuePath)
+	if err != nil {
+		t.Fatalf("Failed to create engine: %v", err)
+	}
+
+	const secretName = "api-server-app-credentials"
+
+	app := Application{
+		App: AppSpec{
+			Name:      "secret-ref-app",
+			Namespace: "default",
+			Components: []Component{
+				{
+					Name: "api-server",
+					Type: "web-service",
+					Properties: map[string]any{
+						"image": "myregistry/api:v1.0.0",
+						"port":  3000,
+					},
+					Traits: []Trait{
+						{
+							Type: "service",
+							Properties: map[string]any{
+								"port": 3000,
+							},
+						},
+						{
+							Type: "external-secret-reference",
+							Properties: map[string]any{
+								"secretName": secretName,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	objects, err := engine.RenderToObjects(app)
+	if err != nil {
+		t.Fatalf("Failed to render: %v", err)
+	}
+
+	// Deployment + Service; external-secret-reference only affects Deployment envFrom (no extra object).
+	if len(objects) != 2 {
+		t.Fatalf("Expected 2 objects (Deployment + Service), got %d", len(objects))
+	}
+
+	var deploy map[string]any
+	for _, obj := range objects {
+		if obj["kind"] == "Deployment" {
+			deploy = obj
+			break
+		}
+	}
+	if deploy == nil {
+		t.Fatal("Deployment not found")
+	}
+
+	spec := deploy["spec"].(map[string]any)
+	template := spec["template"].(map[string]any)
+	podSpec := template["spec"].(map[string]any)
+	containers := podSpec["containers"].([]any)
+	container := containers[0].(map[string]any)
+	envFrom, ok := container["envFrom"].([]any)
+	if !ok || len(envFrom) != 1 {
+		t.Fatalf("Expected one envFrom entry, got %#v", container["envFrom"])
+	}
+	es := envFrom[0].(map[string]any)
+	secretRef := es["secretRef"].(map[string]any)
+	if secretRef["name"] != secretName {
+		t.Errorf("envFrom secretRef.name = %q, want %q", secretRef["name"], secretName)
+	}
+}
+
 func TestEngine_NewEngine_InvalidPath(t *testing.T) {
 	_, err := NewEngine("/nonexistent/path")
 	if err == nil {
@@ -174,7 +255,7 @@ func TestEngine_RenderWithDatabaseTrait(t *testing.T) {
 							Properties: map[string]any{
 								"dbType":  "postgres",
 								"dbName":  "my_custom_db",
-								"version": "18.3",
+								"version": "18.4",
 							},
 						},
 					},

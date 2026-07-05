@@ -2,73 +2,37 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: spring-boot-template
-  title: Java Spring Boot Template (Database-backed)
-  description: >-
-    Scaffolds a standard Java Spring Boot application (Gradle) with a PostgreSQL database.
-    The Helios Operator automatically provisions the database and injects
-    credentials (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS) into the backend pod.
+  title: Java Spring Boot Template
+  description: Create a production-ready Java Spring Boot application (Gradle) integrated with a PostgreSQL database and automatic environment credential injection.
 spec:
   owner: user:guest
   type: service
 
   parameters:
     - title: Component Information
-      required:
-        - name
-        - port
-        - dockerOrg
-        - repoName
+      description: >-
+        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
+        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+      required: [name]
       properties:
         name:
-          title: Name
+          title: Project Name
           type: string
-          description: Unique name of the component
+          description: Unique name of the service.
+          ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
-          title: Port
+          title: API Port
           type: number
-          description: The port the Spring Boot app listens on
-          default: 8080
-        dockerOrg:
-          title: Docker Registry Org/User
-          type: string
-          description: Your Docker Hub username or Organization
-        repoName:
-          title: Docker Repository Name
-          type: string
-          description: The name of the Docker repository (e.g. my-service)
-
-    - title: Database Configuration
-      properties:
+          default: 8081
+          ui:field: PortPicker
+          description: Standardized platform networking port for web services.
         databaseConfig:
           title: Database Settings
           type: object
           ui:field: DatabasePicker
 
-    - title: Repository & Webhook
-      required:
-        - repoUrl
-      properties:
-        repoUrl:
-          title: Source Repository Location
-          type: string
-          ui:field: RepoUrlPicker
-          ui:options:
-            allowedHosts:
-              - localhost:3030
-    - title: Optional Extras (Local Convenience)
-      properties:
-        registerToCatalog:
-          title: Register component in catalog
-          type: boolean
-          default: false
-        sendNotification:
-          title: Send Backstage notification
-          type: boolean
-          default: false
-
   steps:
-    # 1. Source Code
     - id: fetch-source
       name: Fetch Source Code
       action: fetch:template
@@ -76,19 +40,21 @@ spec:
         url: ./content/source
         targetPath: ./source
         values:
-          # Use repoName as the app identifier to keep it Kubernetes/URL safe.
-          name: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.port }}
           description: "Spring Boot service: ${{ parameters.name }}"
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
+          # DYNAMIC ROUTING: Uses Docker bridge variable
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          dbPort: 5432
 
     - id: publish-source
       name: Publish Source Code
       action: publish:gitea
       input:
         description: Source Code for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}
+        # DYNAMIC ROUTING: Uses Git bridge variable
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
         sourcePath: ./source
         repoVisibility: public
 
@@ -96,16 +62,12 @@ spec:
       name: Create Webhook
       action: gitea:create-webhook
       input:
-        repoUrl: ${{ parameters.repoUrl }}
-        # Tekton EventListener address is the service root.
-        webhookUrl: http://el-${{ parameters.repoName }}-listener.default.svc.cluster.local:8080
-        # Deterministic secret so users don't have to provide one.
-        # Must match the Kubernetes secret value created below.
-        webhookSecret: ${{ parameters.repoName }}
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}
+        webhookUrl: http://el-${{ parameters.name }}-listener.default.svc.cluster.local:8080
+        webhookSecret: ${{ parameters.name }}
         events:
           - push
 
-    # 2. GitOps
     - id: fetch-gitops
       name: Fetch GitOps Manifests
       action: fetch:template
@@ -113,10 +75,10 @@ spec:
         url: ./content/gitops
         targetPath: ./gitops
         values:
-          name: ${{ parameters.repoName }}
-          image: index.docker.io/${{ parameters.dockerOrg }}/${{ parameters.repoName }}
-          dockerOrg: ${{ parameters.dockerOrg }}
-          repoName: ${{ parameters.repoName }}
+          name: ${{ parameters.name }}
+          image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
+          dockerOrg: ${{ environment.parameters.dockerOrg }}
+          repoName: ${{ parameters.name }}
           port: ${{ parameters.port }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
@@ -131,19 +93,19 @@ spec:
       action: publish:gitea
       input:
         description: GitOps Manifests for ${{ parameters.name }}
-        repoUrl: ${{ parameters.repoUrl }}-gitops
+        repoUrl: ${{ environment.parameters.gitHost }}?owner=${{ environment.parameters.gitOrg }}&repo=${{ parameters.name }}-gitops
         sourcePath: ./gitops
         repoVisibility: public
 
-    # 3. Secret + Deploy
     - id: create-secret
       name: Create Git Credentials Secret
       action: kubernetes:create-git-credentials-secret
       input:
-        name: ${{ parameters.repoName }}
+        name: ${{ parameters.name }}
         namespace: default
-        username: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-        webhookSecret: ${{ parameters.repoName }}
+        # Uses the dynamic environment parameter instead of trying to parse a URL string
+        username: ${{ environment.parameters.gitOrg }}
+        webhookSecret: ${{ parameters.name }}
 
     - id: apply-helios
       name: Deploy to Kubernetes
@@ -152,25 +114,12 @@ spec:
         manifestPath: ./gitops/helios-app.yaml
         namespaced: true
 
-    # 4. Registration
     - id: register
       name: Register Component
       action: catalog:register
-      if: '{{ parameters.registerToCatalog }}'
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
         catalogInfoPath: 'catalog-info.yaml'
-
-    - id: notify
-      name: Notify User
-      action: notification:send
-      if: '{{ parameters.sendNotification }}'
-      input:
-        recipients: entity
-        entityRefs:
-          - user:default/guest
-        title: 'Spring Boot Template Executed'
-        info: 'Your Spring Boot application has been scaffolded with a PostgreSQL database!'
 
   output:
     links:

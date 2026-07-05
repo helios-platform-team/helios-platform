@@ -385,7 +385,7 @@ spec:
           properties:
             dbType: postgres
             dbName: test_backend_db
-            version: "16"
+            version: "18.4"
             storage: "1Gi"
 EOF
 ```
