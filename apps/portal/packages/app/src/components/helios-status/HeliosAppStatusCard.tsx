@@ -954,8 +954,8 @@ export const HeliosAppStatusCard: React.FC = () => {
                           cond.status === 'True'
                             ? 'var(--bui-fg-success)'
                             : cond.status === 'False'
-                            ? 'var(--bui-fg-danger)'
-                            : 'var(--bui-fg-warning)',
+                              ? 'var(--bui-fg-danger)'
+                              : 'var(--bui-fg-warning)',
                       }}
                     />
                     <Box className={classes.conditionContent}>
