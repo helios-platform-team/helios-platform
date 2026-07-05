@@ -4,18 +4,19 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "apps/portal/**"
   pull_request:
     branches:
       - main
       - "features/*"
+    paths:
+      - 'apps/portal/**'
 
 jobs:
   build-and-test:
-    name: Build and Check (Node ${{ matrix.node-version }})
+    name: Build and Check
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: ["22", "24"]
     defaults:
       run:
         working-directory: apps/portal
@@ -27,7 +28,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: "22"
           cache: "yarn"
           cache-dependency-path: "apps/portal/yarn.lock"
 
