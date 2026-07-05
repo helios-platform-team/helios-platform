@@ -25,14 +25,17 @@ export const SecretEntriesTable = ({
 
   return (
     <div>
-      <Grid container sx={{ marginBottom: '16px' }}>
-        <Grid item xs={5}>
-          Key
-        </Grid>
-        <Grid item xs={6}>
-          Value
-        </Grid>
-      </Grid>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '5fr 6fr 1fr',
+          gap: '16px',
+        }}
+      >
+        <p style={{ fontSize: '17px', fontWeight: 'bold' }}>Key</p>
+        <p style={{ fontSize: '17px', fontWeight: 'bold' }}>Value</p>
+        <div />
+      </div>
 
       {keys.map(key => (
         <SecretEntryItem

@@ -51,46 +51,49 @@ export const SecretEntryItem = ({
 
   return (
     <>
-      <Grid container sx={{ marginBottom: '12px' }}>
-        <Grid item xs={5}>
-          <OutlinedInput
-            size="small"
-            disabled
-            value={entryKey}
-            sx={{ width: '100%' }}
-          />
-        </Grid>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '5fr 6fr 1fr',
+          gap: '16px',
+          marginBottom: '12px',
+        }}
+      >
+        <OutlinedInput
+          size="small"
+          disabled
+          value={entryKey}
+          sx={{ width: '100%' }}
+        />
 
-        <Grid item xs={6}>
-          <OutlinedInput
-            size="small"
-            type={
-              showEnvValue && !isEditing
-                ? 'text'
-                : isEditing
+        <OutlinedInput
+          size="small"
+          type={
+            showEnvValue && !isEditing
+              ? 'text'
+              : isEditing
                 ? 'text'
                 : 'password'
-            }
-            disabled={!isEditing || isSaving}
-            value={isEditing ? editValue : entryValue}
-            onChange={e => setEditValue(e.target.value)}
-            sx={{ width: '100%' }}
-            endAdornment={
-              !isEditing && (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowEnvValue(!showEnvValue)}
-                    edge="end"
-                  >
-                    {showEnvValue ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              )
-            }
-          />
-        </Grid>
+          }
+          disabled={!isEditing || isSaving}
+          value={isEditing ? editValue : entryValue}
+          onChange={e => setEditValue(e.target.value)}
+          sx={{ width: '100%' }}
+          endAdornment={
+            !isEditing && (
+              <InputAdornment position="end">
+                <IconButton
+                  onClick={() => setShowEnvValue(!showEnvValue)}
+                  edge="end"
+                >
+                  {showEnvValue ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            )
+          }
+        />
 
-        <Grid item xs={1} sx={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           {isEditing ? (
             <React.Fragment>
               <IconButton
@@ -121,8 +124,8 @@ export const SecretEntryItem = ({
               </IconButton>
             </React.Fragment>
           )}
-        </Grid>
-      </Grid>
+        </div>
+      </div>
 
       {/* Confirmation Dialog */}
       <Dialog

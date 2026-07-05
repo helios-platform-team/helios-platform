@@ -9,7 +9,7 @@ spec:
   gitBranch: main
   imageRepo: ${{ values.image }}
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: ${{ values.name }}
+  gitopsPath: "."
   webhookSecret: ${{ values.name }}-webhook-secret
   port: ${{ values.port }}
   replicas: 1
