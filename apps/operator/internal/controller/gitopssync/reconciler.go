@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -67,7 +68,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, app *appv1alpha1.HeliosApp, 
 	}
 
 	gitClient := r.GitFactory(app.Spec.GitOpsRepo, username, token)
-	targetPath := fmt.Sprintf("%s/helios-app.yaml", app.Spec.GitOpsPath)
+	targetPath := path.Join(app.Spec.GitOpsPath, "helios-app.yaml")
 
 	if err := gitClient.SyncManifest(ctx, targetPath, string(crBytes)); err != nil {
 		log.Error(err, "GitOps sync failed")

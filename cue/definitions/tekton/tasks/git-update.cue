@@ -20,18 +20,18 @@ import "helios.io/cue/definitions/tekton"
 			tekton.#CommonParams.gitops.secretRef,
 			tekton.#CommonParams.gitops.authorName,
 			tekton.#CommonParams.gitops.authorEmail, {
-			name:    "replicas"
-			default: "2"
-			type:    "string"
-		}, {
-			name:    "port"
-			default: "8080"
-			type:    "string"
-		}, {
-			name:    "image-type"
-			default: "app"
-			type:    "string"
-		}]
+				name:    "replicas"
+				default: "2"
+				type:    "string"
+			}, {
+				name:    "port"
+				default: "8080"
+				type:    "string"
+			}, {
+				name:    "image-type"
+				default: "app"
+				type:    "string"
+			}]
 		workspaces: [{
 			name: "gitops-repo"
 		}]
@@ -124,18 +124,20 @@ import "helios.io/cue/definitions/tekton"
 				    else
 				        DEP_FILE="$MANIFEST_PATH/deployment.yaml"
 				            SVC_FILE="$MANIFEST_PATH/service.yaml"
-				            MANIFEST_FILES="$DEP_FILE $SVC_FILE"
 				            HELIOS_APP_FILE="$MANIFEST_PATH/helios-app.yaml"
+				            
 				            if [ -f "$HELIOS_APP_FILE" ]; then
-				                MANIFEST_FILES="$MANIFEST_FILES $HELIOS_APP_FILE"
-				            fi
-				            APP_NAME=$(basename "$MANIFEST_PATH")
+				                MANIFEST_FILES="$HELIOS_APP_FILE"
+				            else
+				                MANIFEST_FILES="$DEP_FILE $SVC_FILE"
+				                APP_NAME=$(basename "$MANIFEST_PATH")
 
-				            if [ ! -f "$DEP_FILE" ]; then
-				                echo "Creating default manifests..."
-				                printf "apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  replicas: ${REPLICAS}\\n  selector:\\n    matchLabels:\\n      app: ${APP_NAME}\\n  template:\\n    metadata:\\n      labels:\\n        app: ${APP_NAME}\\n    spec:\\n      containers:\\n        - name: app\\n          image: ${IMAGE_URL}\\n          ports:\\n            - containerPort: ${PORT}\\n" > "$DEP_FILE"
+				                if [ ! -f "$DEP_FILE" ]; then
+				                    echo "Creating default manifests..."
+				                    printf "apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  replicas: ${REPLICAS}\\n  selector:\\n    matchLabels:\\n      app: ${APP_NAME}\\n  template:\\n    metadata:\\n      labels:\\n        app: ${APP_NAME}\\n    spec:\\n      containers:\\n        - name: app\\n          image: ${IMAGE_URL}\\n          ports:\\n            - containerPort: ${PORT}\\n" > "$DEP_FILE"
 
-				                printf "apiVersion: v1\\nkind: Service\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  selector:\\n    app: ${APP_NAME}\\n  ports:\\n    - protocol: TCP\\n      port: ${PORT}\\n      targetPort: ${PORT}\\n  type: ClusterIP\\n" > "$SVC_FILE"
+				                    printf "apiVersion: v1\\nkind: Service\\nmetadata:\\n  name: ${APP_NAME}\\nspec:\\n  selector:\\n    app: ${APP_NAME}\\n  ports:\\n    - protocol: TCP\\n      port: ${PORT}\\n      targetPort: ${PORT}\\n  type: ClusterIP\\n" > "$SVC_FILE"
+				                fi
 				            fi
 				    fi
 				else
@@ -169,6 +171,10 @@ import "helios.io/cue/definitions/tekton"
 				          yq -i 'select(.kind == "Service") .spec.ports[0].port = env(PORT)' "$FILE"
 				          yq -i 'select(.kind == "Service") .spec.ports[0].targetPort = env(PORT)' "$FILE"
 				          yq -i 'select(.kind == "HeliosApp") .spec.components[0].properties.image = env(IMAGE_URL)' "$FILE"
+				          yq -i 'select(.kind == "HeliosApp") .spec.replicas = env(REPLICAS)' "$FILE"
+				          yq -i 'select(.kind == "HeliosApp") .spec.components[0].properties.replicas = env(REPLICAS)' "$FILE"
+				          yq -i 'select(.kind == "HeliosApp") .spec.port = env(PORT)' "$FILE"
+				          yq -i 'select(.kind == "HeliosApp") .spec.components[0].properties.port = env(PORT)' "$FILE"
 				      fi
 				  fi
 				done
@@ -180,7 +186,7 @@ import "helios.io/cue/definitions/tekton"
 			envFrom: [{
 				secretRef: {
 					// Use task param instead of hardcoded secret so environments can vary.
-					name:     "$(params.gitops-secret-ref)"
+					name: "$(params.gitops-secret-ref)"
 					// Keep step runnable even when secret is absent; script handles missing creds.
 					optional: true
 				}
