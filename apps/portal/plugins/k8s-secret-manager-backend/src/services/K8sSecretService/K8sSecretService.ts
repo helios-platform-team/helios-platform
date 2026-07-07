@@ -35,32 +35,47 @@ export class K8sSecretServiceImpl implements K8sSecretService {
   ): Promise<PaginatedSecretResponse> {
     const prefix = `${serviceName}-`;
 
-    let allMatchingSecrets: SecretDto[] = [];
+    const startIndex = continueToken ? parseInt(continueToken, 10) : 0;
+    if (isNaN(startIndex) || startIndex < 0) {
+      throw new Error(`Invalid continueToken: ${continueToken}`);
+    }
+
     let k8sContinue: string | undefined = undefined;
+    let matchingFoundSoFar = 0;
+    const paginatedItems: SecretDto[] = [];
+    let hasMore = false;
 
     do {
       const response = await this.#k8sCoreApi.listNamespacedSecret({
         namespace,
+        limit: 100, // Fetch in chunks to reduce memory footprint
         _continue: k8sContinue,
       });
 
-      const matching = (response?.items || [])
-        .filter(s => s.metadata?.name?.startsWith(prefix))
-        .map(s => this.#mapSecretResponse(s, namespace));
+      const secrets = response.items || [];
 
-      allMatchingSecrets = allMatchingSecrets.concat(matching);
+      for (const s of secrets) {
+        if (s.metadata?.name?.startsWith(prefix)) {
+          matchingFoundSoFar++;
+          if (matchingFoundSoFar > startIndex) {
+            if (paginatedItems.length < limit) {
+              paginatedItems.push(this.#mapSecretResponse(s, namespace));
+            } else {
+              hasMore = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (hasMore) {
+        break;
+      }
+
       k8sContinue = response.metadata?._continue;
     } while (k8sContinue);
 
-    const startIndex = continueToken ? parseInt(continueToken, 10) : 0;
-    const paginatedItems = allMatchingSecrets.slice(
-      startIndex,
-      startIndex + limit,
-    );
-    const nextPageToken =
-      startIndex + limit < allMatchingSecrets.length
-        ? (startIndex + limit).toString()
-        : undefined;
+    const nextPageToken = hasMore ? String(startIndex + limit) : undefined;
 
     return {
       items: paginatedItems,

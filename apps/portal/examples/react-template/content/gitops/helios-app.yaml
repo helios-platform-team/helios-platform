@@ -5,12 +5,12 @@ metadata:
   namespace: ${{ values.namespace }}
 spec:
   owner: ${{ values.owner }}
-  description: "React application: ${{ values.name }}"
+  description: 'React application: ${{ values.name }}'
   gitRepo: ${{ values.sourceRepo }}
   gitBranch: main
   imageRepo: ${{ values.dockerOrg }}/${{ values.repoName }}
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: "."
+  gitopsPath: '.'
   pipelineName: from-code-to-cluster
   webhookSecret: ${{ values.repoName }}-git-credentials
   port: ${{ values.port }}
@@ -26,11 +26,3 @@ spec:
         - type: service
           properties:
             port: ${{ values.port }}
-        {% if values.hasDatabase -%}
-        - type: database
-          properties:
-            dbType: postgres
-            dbName: ${{ values.databaseName | default(values.repoName | replace('-', '_') + "_db") }}
-            version: ${{ values.databaseVersion | default("18.4") | dump }}
-            storage: "1Gi"
-        {%- endif -%}
