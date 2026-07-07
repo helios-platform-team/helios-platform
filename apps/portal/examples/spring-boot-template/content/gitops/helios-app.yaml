@@ -12,7 +12,7 @@ spec:
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: "."
   pipelineName: from-code-to-cluster
-  webhookSecret: git-credentials-${{ values.name }}
+  webhookSecret: ${{ values.name }}-git-credentials
   port: ${{ values.port }}
   testCommand: "gradle test"
   components:

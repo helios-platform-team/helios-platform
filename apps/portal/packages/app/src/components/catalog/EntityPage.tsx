@@ -258,6 +258,14 @@ const websiteEntityPage = (
     <EntityLayout.Route path="/docs" title="Docs">
       {techdocsContent}
     </EntityLayout.Route>
+
+    <EntityLayout.Route path="/database" title="Database">
+      <DatabaseTab />
+    </EntityLayout.Route>
+
+    <EntityLayout.Route path="/secrets" title="Secrets">
+      <SecretsManagementPage />
+    </EntityLayout.Route>
   </EntityLayout>
 );
 

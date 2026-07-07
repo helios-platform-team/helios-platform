@@ -81,7 +81,7 @@ spec:
           params:
             - name: secretRef
               value:
-                secretName: git-credentials-${{ values.repoName }}
+                secretName: ${{ values.repoName }}-git-credentials
                 secretKey: secret
             - name: eventTypes
               value:

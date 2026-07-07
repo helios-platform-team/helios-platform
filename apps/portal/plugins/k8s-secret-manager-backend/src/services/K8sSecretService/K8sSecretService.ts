@@ -35,19 +35,32 @@ export class K8sSecretServiceImpl implements K8sSecretService {
   ): Promise<PaginatedSecretResponse> {
     const prefix = `${serviceName}-`;
 
-    const response = await this.#k8sCoreApi.listNamespacedSecret({
-      namespace,
-      limit,
-      _continue: continueToken,
-    });
+    let allMatchingSecrets: SecretDto[] = [];
+    let k8sContinue: string | undefined = undefined;
 
-    const matchingSecrets = response?.items
-      .filter(s => s.metadata?.name?.startsWith(prefix))
-      .map(s => this.#mapSecretResponse(s, namespace));
+    do {
+      const response = await this.#k8sCoreApi.listNamespacedSecret({
+        namespace,
+        _continue: k8sContinue,
+      });
+
+      const matching = (response?.items || [])
+        .filter(s => s.metadata?.name?.startsWith(prefix))
+        .map(s => this.#mapSecretResponse(s, namespace));
+
+      allMatchingSecrets = allMatchingSecrets.concat(matching);
+      k8sContinue = response.metadata?._continue;
+    } while (k8sContinue);
+
+    const startIndex = continueToken ? parseInt(continueToken, 10) : 0;
+    const paginatedItems = allMatchingSecrets.slice(startIndex, startIndex + limit);
+    const nextPageToken = startIndex + limit < allMatchingSecrets.length 
+      ? (startIndex + limit).toString() 
+      : undefined;
 
     return {
-      items: matchingSecrets,
-      nextPageToken: response.metadata?._continue,
+      items: paginatedItems,
+      nextPageToken,
     };
   }
 

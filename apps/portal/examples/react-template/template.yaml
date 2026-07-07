@@ -154,6 +154,9 @@ spec:
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "npm install && npm run build"
+          hasDatabase: ${{ parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' if parameters.backendConfig else false }}
+          databaseName: ${{ parameters.backendConfig.backendDatabaseConfig.dbName if parameters.backendConfig and parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' else '' }}
+          databaseVersion: ${{ parameters.backendConfig.backendDatabaseConfig.dbVersion if parameters.backendConfig and parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' else '' }}
 
     # 7. Publish GitOps Manifests to Gitea
     - id: publish-gitops

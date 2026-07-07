@@ -43,7 +43,7 @@ export const createGitCredentialsSecretAction = () => {
         );
       }
 
-      const secretName = `git-credentials-${name}`;
+      const secretName = `${name}-git-credentials`;
 
       ctx.logger.info(
         `Creating secret ${secretName} in namespace ${namespace}`,

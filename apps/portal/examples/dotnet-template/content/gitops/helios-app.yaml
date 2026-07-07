@@ -17,8 +17,8 @@ spec:
   testCommand: ${{ values.testCommand }}
   testImage: ${{ values.testImage | dump }}
 
-  webhookSecret: "git-credentials-${{ values.name }}"
-  gitopsSecretRef: "git-credentials-${{ values.name }}"
+  webhookSecret: "${{ values.name }}-git-credentials"
+  gitopsSecretRef: "${{ values.name }}-git-credentials"
 
   components:
     - name: ${{ values.name }}

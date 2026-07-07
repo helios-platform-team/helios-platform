@@ -12,8 +12,8 @@ spec:
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: "."
   pipelineName: from-code-to-cluster
-  webhookSecret: git-credentials-${{ values.name }}
-  gitopsSecretRef: git-credentials-${{ values.name }}
+  webhookSecret: ${{ values.name }}-git-credentials
+  gitopsSecretRef: ${{ values.name }}-git-credentials
   port: ${{ values.port }}
   # testCommand runs inside the pipeline's run-tests step.
   testCommand: "npm test"

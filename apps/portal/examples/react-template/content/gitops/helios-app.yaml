@@ -12,7 +12,7 @@ spec:
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: "."
   pipelineName: from-code-to-cluster
-  webhookSecret: git-credentials-${{ values.repoName }}
+  webhookSecret: ${{ values.repoName }}-git-credentials
   port: ${{ values.port }}
   testCommand: ${{ values.testCommand }}
   components:
@@ -26,3 +26,11 @@ spec:
         - type: service
           properties:
             port: ${{ values.port }}
+        {% if values.hasDatabase -%}
+        - type: database
+          properties:
+            dbType: postgres
+            dbName: ${{ values.databaseName | default(values.repoName | replace('-', '_') + "_db") }}
+            version: ${{ values.databaseVersion | default("18.4") | dump }}
+            storage: "1Gi"
+        {%- endif -%}
