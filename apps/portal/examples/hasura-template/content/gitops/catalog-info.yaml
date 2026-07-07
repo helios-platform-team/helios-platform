@@ -3,7 +3,7 @@ kind: Component
 metadata:
   name: ${{ values.name | dump }}
   annotations:
-    helios.io/port: "${{ values.port }}"
+    helios.io/port: '${{ values.port }}'
     backstage.io/kubernetes-id: ${{ values.name }}
     argocd/app-name: ${{ values.name }}
 spec:

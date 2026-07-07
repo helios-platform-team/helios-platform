@@ -89,7 +89,7 @@ spec:
         values:
           name: ${{ parameters.name }}
           repoName: ${{ parameters.name }}
-          description: "React application: ${{ parameters.name }}"
+          description: 'React application: ${{ parameters.name }}'
           buildTool: ${{ parameters.buildTool }}
           styling: ${{ parameters.styling }}
           stateManagement: ${{ parameters.stateManagement }}
@@ -153,7 +153,7 @@ spec:
           owner: ${{ user.entity.metadata.name or 'guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
-          testCommand: "npm install && npm run build"
+          testCommand: 'npm install && npm run build'
           hasDatabase: ${{ parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' if parameters.backendConfig else false }}
           databaseName: ${{ parameters.backendConfig.backendDatabaseConfig.dbName if parameters.backendConfig and parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' else '' }}
           databaseVersion: ${{ parameters.backendConfig.backendDatabaseConfig.dbVersion if parameters.backendConfig and parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' else '' }}
@@ -192,7 +192,7 @@ spec:
       action: catalog:register
       input:
         repoContentsUrl: ${{ steps['publish-source'].output.repoContentsUrl }}
-        catalogInfoPath: "catalog-info.yaml"
+        catalogInfoPath: 'catalog-info.yaml'
 
     # 11. Fetch Backend Source Code
     - id: fetch-backend-source
@@ -207,16 +207,16 @@ spec:
           name: ${{ parameters.backendConfig.backendComponent }}
           owner: ${{ user.entity.metadata.name or 'guest' }}
           port: ${{ parameters.backendConfig.backendPort }}
-          description: "Backend service for ${{ parameters.name }}"
+          description: 'Backend service for ${{ parameters.name }}'
           image: ${{ "index.docker.io/" + environment.parameters.dockerOrg + "/" + parameters.backendConfig.backendComponent }}
           hasDatabase: ${{ parameters.backendConfig.backendDatabaseConfig.dbType == 'postgres' }}
           repoName: ${{ parameters.backendConfig.backendComponent }}
           dockerOrg: ${{ environment.parameters.dockerOrg }}
           databaseConfig: ${{ parameters.backendConfig.backendDatabaseConfig }}
-          apiSchema: "public"
-          jwtSecret: "default_secret_key_32_characters_long"
-          jwtRole: "authenticated"
-          anonRole: "anon"
+          apiSchema: 'public'
+          jwtSecret: 'default_secret_key_32_characters_long'
+          jwtRole: 'authenticated'
+          anonRole: 'anon'
 
     # 12. Fetch Backend Database Source Files (NestJS & Node.js)
     - id: fetch-backend-source-db
@@ -281,10 +281,10 @@ spec:
           gitopsRepo: ${{ steps['publish-backend-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: ${{ "npm test" if parameters.backendConfig.backendType == 'nestjs' else ("npm install && npm test" if parameters.backendConfig.backendType == 'nodejs' else ("dotnet test" if parameters.backendConfig.backendType == 'dotnet' else ("gradle test" if parameters.backendConfig.backendType == 'spring-boot' else ""))) }}
           testImage: ${{ "mcr.microsoft.com/dotnet/sdk:10.0.300" if parameters.backendConfig.backendType == 'dotnet' else ("gradle:8.7-jdk21" if parameters.backendConfig.backendType == 'spring-boot' else "node:24") }}
-          apiSchema: "public"
-          jwtSecret: "default_secret_key_32_characters_long"
-          jwtRole: "authenticated"
-          anonRole: "anon"
+          apiSchema: 'public'
+          jwtSecret: 'default_secret_key_32_characters_long'
+          jwtRole: 'authenticated'
+          anonRole: 'anon'
           migrateImage: ${{ "index.docker.io/" + environment.parameters.dockerOrg + "/" + parameters.backendConfig.backendComponent + "-migrate:latest" }}
           namespace: default
 
@@ -326,7 +326,7 @@ spec:
       action: catalog:register
       input:
         repoContentsUrl: ${{ steps['publish-backend-source'].output.repoContentsUrl }}
-        catalogInfoPath: "catalog-info.yaml"
+        catalogInfoPath: 'catalog-info.yaml'
 
   output:
     links:

@@ -10,7 +10,7 @@ spec:
   gitBranch: main
   imageRepo: ${{ values.image }}
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: "."
+  gitopsPath: '.'
   webhookSecret: ${{ values.name }}-webhook-secret
   port: ${{ values.port }}
   replicas: 1
@@ -30,17 +30,17 @@ spec:
           # The Operator automatically injects DB_HOST, DB_USER, DB_PASS, DB_PORT, DB_NAME from the database trait
           # The native operator Phase 0.9 reconciliation builds the PGRST_DB_URI from these and injects it
           - name: PGRST_DB_SCHEMA
-            value: "${{ values.apiSchema }}"
+            value: '${{ values.apiSchema }}'
           - name: PGRST_DB_ANON_ROLE
-            value: "${{ values.anonRole }}"
+            value: '${{ values.anonRole }}'
           - name: PGRST_JWT_AUDIENCE
-            value: "${{ values.jwtRole }}"
+            value: '${{ values.jwtRole }}'
           - name: PGRST_JWT_SECRET
-            value: "${{ values.jwtSecret }}"
+            value: '${{ values.jwtSecret }}'
           - name: PGRST_MAX_ROWS
-            value: "1000"
+            value: '1000'
           - name: PGRST_LOG_LEVEL
-            value: "info"
+            value: 'info'
       traits:
         - type: database
           properties:
@@ -48,7 +48,7 @@ spec:
             dbName: ${{ values.databaseName or values.name }}-db
             port: 5432
             version: "${{ values.databaseVersion or '18.4' }}"
-            storage: "1Gi"
+            storage: '1Gi'
         - type: service
           properties:
             port: ${{ values.port }}

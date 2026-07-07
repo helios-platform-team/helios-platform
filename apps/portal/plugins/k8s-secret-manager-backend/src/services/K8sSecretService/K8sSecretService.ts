@@ -53,10 +53,14 @@ export class K8sSecretServiceImpl implements K8sSecretService {
     } while (k8sContinue);
 
     const startIndex = continueToken ? parseInt(continueToken, 10) : 0;
-    const paginatedItems = allMatchingSecrets.slice(startIndex, startIndex + limit);
-    const nextPageToken = startIndex + limit < allMatchingSecrets.length 
-      ? (startIndex + limit).toString() 
-      : undefined;
+    const paginatedItems = allMatchingSecrets.slice(
+      startIndex,
+      startIndex + limit,
+    );
+    const nextPageToken =
+      startIndex + limit < allMatchingSecrets.length
+        ? (startIndex + limit).toString()
+        : undefined;
 
     return {
       items: paginatedItems,

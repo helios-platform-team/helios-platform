@@ -37,21 +37,21 @@ spec:
           - name: app-repo-revision
             value: $(tt.params.git-revision)
           - name: image-repo
-            value: "${{ values.image }}" 
+            value: '${{ values.image }}'
           - name: GITOPS_REPO_URL
-            value: "${{ values.gitopsRepo }}"
+            value: '${{ values.gitopsRepo }}'
           - name: GITOPS_REPO_BRANCH
-            value: "main"
+            value: 'main'
           - name: MANIFEST_PATH
-            value: "helios-app.yaml"
+            value: 'helios-app.yaml'
           - name: docker-secret
-            value: "docker-credentials"
+            value: 'docker-credentials'
           - name: test-command
-            value: "${{ values.testCommand }}"
+            value: '${{ values.testCommand }}'
           - name: argocd-namespace
-            value: "argocd"
+            value: 'argocd'
           - name: argocd-app-name
-            value: "${{ values.repoName }}-argocd"
+            value: '${{ values.repoName }}-argocd'
         workspaces:
           - name: source-workspace
             volumeClaimTemplate:

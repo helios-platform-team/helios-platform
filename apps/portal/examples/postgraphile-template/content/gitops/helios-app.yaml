@@ -9,11 +9,11 @@ spec:
   gitBranch: main
   imageRepo: ${{ values.image }}
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: "."
+  gitopsPath: '.'
   webhookSecret: ${{ values.name }}-webhook-secret
   port: ${{ values.port }}
   replicas: 1
-  
+
   # Connects this app to the same zero-downtime golang-migrate pipeline as PostgREST!
   triggerType: db-migrate
 
@@ -36,8 +36,8 @@ spec:
             dbType: ${{ values.databaseType | default("postgres") }}
             dbName: ${{ values.databaseName or values.name }}-db
             port: 5432
-            version: "18.4"
-            storage: "1Gi"
+            version: '18.4'
+            storage: '1Gi'
         - type: service
           properties:
             port: ${{ values.port }}

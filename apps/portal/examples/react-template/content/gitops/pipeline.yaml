@@ -9,32 +9,32 @@ spec:
   pipelineRef:
     name: from-code-to-cluster
   params:
-  - name: image-repo
-    value: ${{ values.image }}
-  - name: app-repo-url
-    value: ${{ values.sourceRepo }}
-  - name: app-repo-revision
-    value: main
-  - name: GITOPS_REPO_URL
-    value: ${{ values.gitopsRepo }}
-  - name: GITOPS_REPO_BRANCH
-    value: main
-  - name: MANIFEST_PATH
-    value: ./helios-app.yaml
-  - name: docker-secret
-    value: docker-credentials 
-  - name: test-command
-    value: ${{ values.testCommand }}
-  - name: argocd-namespace
-    value: argocd
-  - name: argocd-app-name
-    value: ${{ values.repoName }}-argocd
+    - name: image-repo
+      value: ${{ values.image }}
+    - name: app-repo-url
+      value: ${{ values.sourceRepo }}
+    - name: app-repo-revision
+      value: main
+    - name: GITOPS_REPO_URL
+      value: ${{ values.gitopsRepo }}
+    - name: GITOPS_REPO_BRANCH
+      value: main
+    - name: MANIFEST_PATH
+      value: ./helios-app.yaml
+    - name: docker-secret
+      value: docker-credentials
+    - name: test-command
+      value: ${{ values.testCommand }}
+    - name: argocd-namespace
+      value: argocd
+    - name: argocd-app-name
+      value: ${{ values.repoName }}-argocd
   workspaces:
-  - name: source-workspace
-    volumeClaimTemplate:
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
+    - name: source-workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

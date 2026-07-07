@@ -10,7 +10,7 @@ spec:
   gitBranch: main
   imageRepo: ${{ values.dockerOrg }}/${{ values.repoName }}
   gitopsRepo: ${{ values.gitopsRepo }}
-  gitopsPath: "."
+  gitopsPath: '.'
   webhookSecret: ${{ values.name }}-webhook-secret
   port: ${{ values.port }}
   replicas: 1
@@ -30,9 +30,9 @@ spec:
               secretKeyRef:
                 name: ${{ values.name }}-db-secret
                 key: PGRST_DB_URI
-                
+
           - name: HASURA_GRAPHQL_ENABLE_CONSOLE
-            value: "true"
+            value: 'true'
       traits:
         - type: database
           properties:
@@ -40,7 +40,7 @@ spec:
             dbName: ${{ values.databaseName or values.name }}-db
             port: 5432
             version: "${{ values.databaseVersion or '18.4' }}"
-            storage: "1Gi"
+            storage: '1Gi'
         - type: service
           properties:
             port: ${{ values.port }}
