@@ -21,12 +21,14 @@ export const apis: AnyApiFactory[] = [
     api: toastApiRef,
     deps: { alertApi: alertApiRef },
     factory: ({ alertApi }) => ({
-      post: toast => {
+      post: (toast: any) => {
         alertApi.post({
           message: String(toast.title),
           severity: ((): 'error' | 'warning' | 'info' | 'success' => {
-            switch (toast.status) {
+            const statusOrType = (toast as any).type || (toast as any).status;
+            switch (statusOrType) {
               case 'danger':
+              case 'error':
                 return 'error';
               case 'success':
                 return 'success';
