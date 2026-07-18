@@ -121,11 +121,12 @@ tasks:
       - echo "============================================="
 
   setup:all:
-    desc: Run full setup sequence (registry + infra + tekton + portal deps)
+    desc: Run full setup sequence (registry + infra + tekton + portal deps + metrics)
     cmds:
       - task: setup:registry
       - task: setup:terraform
       - task: setup:tekton
+      - task: setup:metrics-server
       - task: setup:portal-deps
 
   setup:registry:
@@ -600,6 +601,19 @@ tasks:
           kubectl patch sa default -p '{"imagePullSecrets": [{"name": "docker-credentials"}]}'
         platforms: [linux, darwin]
       - cmd: powershell -ExecutionPolicy Bypass -File scripts/setup-credentials.ps1
+        platforms: [windows]
+
+  setup:metrics-server:
+    desc: Install metrics-server for Kubernetes observability (required by Backstage)
+    cmds:
+      - echo "Installing metrics-server..."
+      - cmd: |
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+          # Patch metrics-server to allow insecure TLS for local development
+          kubectl patch -n kube-system deployment metrics-server --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"}]'
+        platforms: [linux, darwin]
+      - cmd: |
+          powershell -ExecutionPolicy Bypass -Command 'kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml; kubectl patch -n kube-system deployment metrics-server --type="json" -p="[{`"op`": `"add`", `"path`": `"/spec/template/spec/containers/0/args/-`", `"value`": `"--kubelet-insecure-tls`"}]"'
         platforms: [windows]
 
   setup:portal-deps:
