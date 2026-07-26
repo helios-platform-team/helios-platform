@@ -14,10 +14,10 @@ COPY postgrestrc.conf /etc/postgrest/postgrestrc.conf
 
 # Health check to ensure PostgREST is running and ready
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/ || exit 1
+  CMD curl -f http://localhost:${{ values.port }}/ || exit 1
 
 # Expose the PostgREST API port
-EXPOSE 3000
+EXPOSE ${{ values.port }}
 
 # Start PostgREST with your custom configuration
 CMD ["postgrest", "/etc/postgrest/postgrestrc.conf"]

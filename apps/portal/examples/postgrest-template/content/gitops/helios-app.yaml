@@ -31,6 +31,8 @@ spec:
           # The native operator Phase 0.9 reconciliation builds the PGRST_DB_URI from these and injects it
           - name: PGRST_DB_SCHEMA
             value: "${{ values.apiSchema }}"
+          - name: PGRST_SERVER_PORT
+            value: "${{ values.port }}"
           - name: PGRST_DB_ANON_ROLE
             value: "${{ values.anonRole }}"
           - name: PGRST_JWT_AUDIENCE
