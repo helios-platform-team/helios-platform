@@ -11,7 +11,7 @@ spec:
   imageRepo: ${{ values.image }}
   gitopsRepo: ${{ values.gitopsRepo }}
   gitopsPath: "."
-  webhookSecret: ${{ values.name }}-webhook-secret
+  webhookSecret: git-credentials-${{ values.name }}
   port: ${{ values.port }}
   replicas: 1
   triggerType: db-migrate

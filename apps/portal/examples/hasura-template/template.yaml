@@ -103,12 +103,12 @@ spec:
 
     - id: create-webhook-secret
       name: Create Kubernetes Webhook Secret
-      action: kubernetes:create-secret
+      action: kubernetes:create-git-credentials-secret
       input:
+        name: ${{ parameters.name }}
         namespace: default
-        secretName: ${{ parameters.name }}-webhook-secret
-        data:
-          secret: ${{ parameters.name }}-webhook-secret
+        username: ${{ environment.parameters.gitOrg }}
+        webhookSecret: ${{ parameters.name }}-webhook-secret
 
     - id: apply-helios
       name: Deploy to Kubernetes

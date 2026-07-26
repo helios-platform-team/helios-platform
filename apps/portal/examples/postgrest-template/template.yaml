@@ -163,15 +163,12 @@ spec:
     # 4. Create webhook secret in cluster
     - id: create-webhook-secret
       name: Create Kubernetes Webhook Secret
-      action: kubernetes:create-secret
+      action: kubernetes:create-git-credentials-secret
       input:
+        name: ${{ parameters.name }}
         namespace: default
-        secretName: ${{ parameters.name }}-webhook-secret
-        data:
-          # Tekton Triggers interceptor expects the shared secret under key `secret`.
-          secret: ${{ parameters.name }}
-          # Keep `secretToken` for compatibility with any legacy consumers.
-          secretToken: ${{ parameters.name }}
+        username: ${{ environment.parameters.gitOrg }}
+        webhookSecret: ${{ parameters.name }}
 
     # 5. Deploy HeliosApp to cluster
     - id: apply-heliosapp

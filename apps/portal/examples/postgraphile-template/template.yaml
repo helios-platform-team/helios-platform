@@ -93,12 +93,12 @@ spec:
 
     - id: create-webhook-secret
       name: Create Kubernetes Webhook Secret
-      action: kubernetes:create-secret
+      action: kubernetes:create-git-credentials-secret
       input:
+        name: ${{ parameters.name }}
         namespace: default
-        secretName: ${{ parameters.name }}-webhook-secret
-        data:
-          secret: ${{ parameters.name }}
+        username: ${{ environment.parameters.gitOrg }}
+        webhookSecret: ${{ parameters.name }}
 
     - id: apply-rbac
       name: Apply RBAC for Migration
