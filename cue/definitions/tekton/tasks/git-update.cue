@@ -239,7 +239,11 @@ import "helios.io/cue/definitions/tekton"
 				    echo "No changes to commit"
 				else
 				    git_safe commit -m "chore: Update image=$(params.new-image-url) [skip-ci]"
-				    git_safe push origin "$(params.gitops-repo-branch)"
+				    if ! git_safe push origin "$(params.gitops-repo-branch)"; then
+				        echo "Push failed, likely due to concurrent updates. Pulling with rebase..."
+				        git_safe pull --rebase origin "$(params.gitops-repo-branch)"
+				        git_safe push origin "$(params.gitops-repo-branch)"
+				    fi
 				fi
 				"""
 		}]

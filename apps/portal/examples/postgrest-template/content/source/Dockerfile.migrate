@@ -20,9 +20,9 @@ COPY --from=builder /tmp/migrate /usr/local/bin/migrate
 
 # Copy migration scripts from source repo
 # These will be mounted from the Kubernetes volume in the PreSync Job
-COPY db/migrations /migrations
+COPY db/migrations db/migrations
 
 # Create a simple wrapper script to run migrations
-RUN echo '#!/bin/bash\nset -e\necho "Running database migrations..."\nmigrate -path /migrations -database "$PGRST_DB_URI" up\necho "Migrations completed successfully"\n' > /entrypoint.sh && chmod +x /entrypoint.sh
+RUN echo '#!/bin/bash\nset -e\necho "Running database migrations..."\nmigrate -path db/migrations -database "$PGRST_DB_URI" up\necho "Migrations completed successfully"\n' > /entrypoint.sh && chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
