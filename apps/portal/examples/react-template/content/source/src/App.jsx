@@ -26,7 +26,7 @@ function App() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['backendData'],
     queryFn: async () => {
-      const url = {% if values.hasBackend %}`http://localhost:${{ values.backendPort }}/health`{% else %}'https://api.github.com/repos/facebook/react'{% endif %}
+      const url = {% if values.hasBackend %}'/api'{% else %}'https://api.github.com/repos/facebook/react'{% endif %}
       const res = await fetch(url)
       if (!res.ok) {
         throw new Error('Network response was not ok')
@@ -41,7 +41,7 @@ function App() {
 
   React.useEffect(() => {
     setIsLoading(true)
-    const url = {% if values.hasBackend %}`http://localhost:${{ values.backendPort }}/health`{% else %}'https://api.github.com/repos/facebook/react'{% endif %}
+    const url = {% if values.hasBackend %}`http://${{ values.backendComponent }}.default.svc.cluster.local:${{ values.backendPort }}/health`{% else %}'https://api.github.com/repos/facebook/react'{% endif %}
     fetch(url)
       .then((res) => {
         if (!res.ok) {
@@ -107,14 +107,14 @@ function App() {
             <div className="{% if values.styling == 'tailwind' %}text-red-400 space-y-1{% else %}error-panel{% endif %}">
               <p><strong>Status:</strong> Disconnected / Error</p>
               <p className="text-sm">Error details: {error.message || 'Unknown error'}</p>
-              {% if values.hasBackend %}<p className="text-xs text-slate-400 mt-2">Make sure your backend is running at http://localhost:${{ values.backendPort }}</p>{% endif %}
+              {% if values.hasBackend %}<p className="text-xs text-slate-400 mt-2">Make sure your backend is running at http://${{ values.backendComponent }}.default.svc.cluster.local:${{ values.backendPort }}</p>{% endif %}
             </div>
           )}
           {data && (
             <div className="{% if values.styling == 'tailwind' %}text-sm space-y-2{% else %}stats-grid{% endif %}">
               {% if values.hasBackend %}
               <p><strong>Backend Service:</strong> ${{ values.backendComponent }}</p>
-              <p><strong>API Endpoint:</strong> <code className="bg-slate-700 px-1 py-0.5 rounded">http://localhost:${{ values.backendPort }}/health</code></p>
+              <p><strong>API Endpoint:</strong> <code className="bg-slate-700 px-1 py-0.5 rounded">http://${{ values.backendComponent }}.default.svc.cluster.local:${{ values.backendPort }}/health</code></p>
               <p><strong>Status:</strong> <span className="text-emerald-400 font-semibold">Active & Healthy</span></p>
               {data.database && (
                 <p><strong>Database:</strong> <span className={data.database === 'connected' ? "text-emerald-400 font-semibold" : "text-amber-400 font-semibold"}>{data.database === 'connected' ? 'Connected' : 'Disconnected'}</span></p>
@@ -128,6 +128,19 @@ function App() {
             </div>
           )}
         </div>
+
+        {data && (
+          <div className="{% if values.styling == 'tailwind' %}mt-6 border-t border-slate-700 pt-6{% else %}raw-data-section{% endif %}">
+            <h2 className="{% if values.styling == 'tailwind' %}text-xl font-semibold mb-4{% else %}section-title{% endif %}">
+              Raw API Response
+            </h2>
+            <div className="{% if values.styling == 'tailwind' %}bg-slate-900 rounded-lg p-4 max-h-64 overflow-auto border border-slate-700{% else %}raw-data-container{% endif %}">
+              <pre className="{% if values.styling == 'tailwind' %}text-xs font-mono text-cyan-300 whitespace-pre-wrap break-all{% else %}raw-data-pre{% endif %}">
+                {JSON.stringify(data, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

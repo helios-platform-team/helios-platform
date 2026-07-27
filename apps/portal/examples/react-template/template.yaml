@@ -154,6 +154,8 @@ spec:
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "npm install && npm run build"
+          backendComponent: ${{ parameters.backendConfig.backendComponent if parameters.backendConfig else '' }}
+          backendPort: ${{ parameters.backendConfig.backendPort if parameters.backendConfig else 3001 }}
 
     # 7. Publish GitOps Manifests to Gitea
     - id: publish-gitops

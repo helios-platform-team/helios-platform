@@ -22,6 +22,11 @@ spec:
         image: ${{ values.dockerOrg }}/${{ values.repoName }}:main
         port: ${{ values.port }}
         replicas: 1
+{% if values.backendComponent %}
+        env:
+          - name: BACKEND_URL
+            value: "http://${{ values.backendComponent }}.default.svc.cluster.local:${{ values.backendPort }}"
+{% endif %}
       traits:
         - type: service
           properties:
