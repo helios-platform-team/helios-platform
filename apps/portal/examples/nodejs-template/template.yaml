@@ -11,14 +11,13 @@ spec:
   parameters:
     - title: Component Information
       description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+        We automatically configure your Git repository and Docker image locations using your local `.env` settings (`GITEA_USER` and `DOCKER_USERNAME`). No manual routing setup is required!
       required: [name]
       properties:
         name:
           title: Project Name
           type: string
-          description: Unique name of the service.
+          description: The unique name for your project. This will be used to name your Node.js service, code repository, and container image.
           ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
@@ -26,10 +25,11 @@ spec:
           type: number
           default: 3002
           ui:field: PortPicker
-          description: Standardized platform networking port for web services.
+          description: The network port your Node.js application will serve traffic on.
         databaseConfig:
           title: Database Settings
           type: object
+          description: Automatically provision and connect a PostgreSQL database to your application. Select 'None' if your service does not need a database.
           ui:field: DatabasePicker
 
   steps:

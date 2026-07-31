@@ -18,7 +18,7 @@ spec:
         name:
           title: Project Name
           type: string
-          description: Unique name of the service.
+          description: The unique name for your project. This will be used to name your application, code repository, and container image.
           ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
@@ -26,11 +26,11 @@ spec:
           type: number
           default: 5173
           ui:field: PortPicker
-          description: Standardized platform networking port for web services.
+          description: The network port your React app will serve traffic on.
         buildTool:
           title: Build Tool
           type: string
-          description: Select the build tool and bundler
+          description: Choose your bundler. Vite is extremely fast and recommended for beginners. Webpack is an older, highly customizable standard.
           enum:
             - vite
             - webpack
@@ -41,7 +41,7 @@ spec:
         styling:
           title: Styling
           type: string
-          description: Choose the styling method
+          description: Choose how you want to write CSS. Tailwind uses pre-built utility classes for fast styling without leaving HTML. Vanilla uses standard .css files.
           enum:
             - tailwind
             - vanilla
@@ -52,7 +52,7 @@ spec:
         stateManagement:
           title: State Management
           type: string
-          description: Choose a state management library
+          description: Choose how to share data across your app. Zustand is simple and easy to learn. Redux is powerful but requires more setup.
           enum:
             - none
             - zustand
@@ -65,7 +65,7 @@ spec:
         dataFetching:
           title: Data Fetching
           type: string
-          description: Choose a data fetching library
+          description: Choose how to fetch data from APIs. React Query handles caching and loading states automatically. Select 'None' to use basic fetch() calls.
           enum:
             - none
             - react-query
@@ -76,6 +76,7 @@ spec:
         backendConfig:
           title: Backend Configuration
           type: object
+          description: Optionally connect your React app to a backend. You can scaffold a brand new backend alongside this app or link to an existing one.
           ui:field: BackendComponentPicker
 
   steps:
