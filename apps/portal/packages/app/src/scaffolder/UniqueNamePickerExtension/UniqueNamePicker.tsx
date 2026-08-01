@@ -3,11 +3,46 @@ import { FieldExtensionComponentProps } from '@backstage/plugin-scaffolder-react
 import { TextField } from '@material-ui/core';
 
 const NOUNS = [
-  'alpha', 'beta', 'gamma', 'delta', 'echo', 'falcon', 'griffin', 'helix',
-  'iris', 'jazz', 'koala', 'lotus', 'mango', 'nexus', 'omega', 'panda',
-  'quantum', 'raven', 'sphinx', 'tiger', 'umbra', 'vortex', 'wolf', 'xenon',
-  'yacht', 'zenith', 'app', 'service', 'api', 'core', 'data', 'cloud',
-  'web', 'net', 'sys', 'node', 'link', 'flow', 'grid', 'base'
+  'alpha',
+  'beta',
+  'gamma',
+  'delta',
+  'echo',
+  'falcon',
+  'griffin',
+  'helix',
+  'iris',
+  'jazz',
+  'koala',
+  'lotus',
+  'mango',
+  'nexus',
+  'omega',
+  'panda',
+  'quantum',
+  'raven',
+  'sphinx',
+  'tiger',
+  'umbra',
+  'vortex',
+  'wolf',
+  'xenon',
+  'yacht',
+  'zenith',
+  'app',
+  'service',
+  'api',
+  'core',
+  'data',
+  'cloud',
+  'web',
+  'net',
+  'sys',
+  'node',
+  'link',
+  'flow',
+  'grid',
+  'base',
 ];
 
 const generateName = () => {
@@ -24,7 +59,6 @@ export const UniqueNamePicker = ({
   formData,
   idSchema,
 }: FieldExtensionComponentProps<string>) => {
-  
   useEffect(() => {
     if (!formData) {
       onChange(generateName());

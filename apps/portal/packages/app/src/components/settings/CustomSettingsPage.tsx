@@ -1,5 +1,11 @@
-
-import { Button, Grid, Avatar, Typography, Box, makeStyles } from '@material-ui/core';
+import {
+  Button,
+  Grid,
+  Avatar,
+  Typography,
+  Box,
+  makeStyles,
+} from '@material-ui/core';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
 import {
@@ -30,7 +36,10 @@ const useStyles = makeStyles(theme => ({
 const CustomProfileCard = () => {
   const classes = useStyles();
   const identity = useApi(identityApiRef);
-  const { value: profile, loading } = useAsync(() => identity.getProfileInfo(), []);
+  const { value: profile, loading } = useAsync(
+    () => identity.getProfileInfo(),
+    [],
+  );
 
   if (loading) {
     return <InfoCard title="Profile">Loading...</InfoCard>;

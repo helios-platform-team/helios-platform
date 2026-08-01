@@ -20,10 +20,10 @@ import { OAuth2 } from '@backstage/core-app-api';
 
 export const giteaAuthApiRef = createApiRef<
   OAuthApi &
-  OpenIdConnectApi &
-  ProfileInfoApi &
-  BackstageIdentityApi &
-  SessionApi
+    OpenIdConnectApi &
+    ProfileInfoApi &
+    BackstageIdentityApi &
+    SessionApi
 >({
   id: 'internal.auth.gitea',
 });
@@ -54,12 +54,15 @@ export const apis: AnyApiFactory[] = [
       });
 
       const originalSignOut = api.signOut.bind(api);
-      
-      const giteaIntegrations = configApi.getOptionalConfigArray('integrations.gitea');
-      const giteaBaseUrl = giteaIntegrations && giteaIntegrations.length > 0
-        ? giteaIntegrations[0].getOptionalString('baseUrl') ?? 'http://localhost:3030'
-        : 'http://localhost:3030';
-        
+
+      const giteaIntegrations =
+        configApi.getOptionalConfigArray('integrations.gitea');
+      const giteaBaseUrl =
+        giteaIntegrations && giteaIntegrations.length > 0
+          ? (giteaIntegrations[0].getOptionalString('baseUrl') ??
+            'http://localhost:3030')
+          : 'http://localhost:3030';
+
       const appBaseUrl =
         configApi.getOptionalString('app.baseUrl') ?? window.location.origin;
 
