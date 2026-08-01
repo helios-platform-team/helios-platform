@@ -58,7 +58,7 @@ export const createKubernetesApplyAction = () => {
         );
       }
 
-      const args = ['apply', '-f', effectiveManifestPath];
+      const args = ['apply', '--server-side', '-f', effectiveManifestPath];
       if (namespace) {
         args.push('-n', namespace);
       }
