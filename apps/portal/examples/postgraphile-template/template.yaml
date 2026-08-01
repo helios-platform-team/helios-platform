@@ -43,7 +43,7 @@ spec:
           name: ${{ parameters.name }}
           port: ${{ parameters.port }} # Safely reads the locked 8080 value
           namespace: default
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
 
     - id: publish-source
       name: Publish Source Code
@@ -77,7 +77,7 @@ spec:
           namespace: default
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           migrateImage: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}-migrate:main

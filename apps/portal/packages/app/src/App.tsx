@@ -76,7 +76,6 @@ const app = createApp({
     SignInPage: props => (
       <SignInPage
         {...props}
-        auto
         providers={[
           {
             id: 'gitea',

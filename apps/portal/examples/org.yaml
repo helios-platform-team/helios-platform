@@ -50,3 +50,11 @@ metadata:
   name: hoangphuc841
 spec:
   memberOf: [helios-platform-team]
+---
+# https://backstage.io/docs/features/software-catalog/descriptor-format#kind-user
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: nghiax160904
+spec:
+  memberOf: [helios-platform-team]

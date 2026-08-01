@@ -82,7 +82,7 @@ const customAuth = createBackendModule({
                       return ctx.issueToken({
                         claims: {
                           sub: userEntityRef,
-                          ent: [userEntityRef, userGroupRef, 'user:default/guest', 'group:default/guest'],
+                          ent: [userEntityRef, userGroupRef, 'user:default/guest'],
                         },
                       });
                     }
@@ -109,6 +109,11 @@ class CatalogOwnershipPermissionPolicy implements PermissionPolicy {
       console.log('Permission policy check for:', request.permission.name);
       console.log('User claims:', claims);
       
+      // Allow internal backend-to-backend calls (which have no user token because backend.auth.keys is disabled)
+      if (!user) {
+        return { result: AuthorizeResult.ALLOW };
+      }
+
       if (!claims || claims.length === 0) {
         return { result: AuthorizeResult.DENY };
       }
@@ -118,7 +123,7 @@ class CatalogOwnershipPermissionPolicy implements PermissionPolicy {
         {
           anyOf: [
             catalogConditions.isEntityKind({
-              kinds: ['Template', 'Location', 'User', 'Group', 'System', 'Domain'],
+              kinds: ['Template', 'Location', 'User', 'Group', 'System', 'Domain', 'API', 'Resource'],
             }),
             catalogConditions.isEntityOwner({
               claims,
