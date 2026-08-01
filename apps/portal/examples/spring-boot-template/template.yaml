@@ -4,6 +4,7 @@ metadata:
   name: spring-boot-template
   title: Java Spring Boot Template
   description: Create a production-ready Java Spring Boot application (Gradle) integrated with a PostgreSQL database and automatic environment credential injection.
+  tags: ['backend', 'java', 'spring-boot', 'api']
 spec:
   owner: user:guest
   type: service

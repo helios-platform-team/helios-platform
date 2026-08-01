@@ -4,6 +4,7 @@ metadata:
   name: postgraphile-template
   title: PostGraphile GraphQL API Template
   description: Generate an instant, high-performance GraphQL API directly from your PostgreSQL database schema using PostGraphile.
+  tags: ['backend', 'graphql', 'postgraphile', 'database']
 spec:
   owner: user:guest
   type: service

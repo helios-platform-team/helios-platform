@@ -4,6 +4,7 @@ metadata:
   name: postgrest-template
   title: PostgREST API Template
   description: Expose a fully-featured, instant RESTful API directly from any PostgreSQL database schema using PostgREST.
+  tags: ['backend', 'rest', 'postgrest', 'database']
 spec:
   owner: user:guest
   type: service

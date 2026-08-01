@@ -4,6 +4,7 @@ metadata:
   name: nestjs-template
   title: NestJS Template
   description: Build a modular NestJS backend service. Features out-of-the-box Prisma ORM and PostgreSQL support.
+  tags: ['backend', 'nestjs', 'api']
 spec:
   owner: user:guest
   type: service

@@ -4,6 +4,7 @@ metadata:
   name: nodejs-template
   title: Node.js Template
   description: Scaffold a lightweight, pure Node.js service. Features out-of-the-box Prisma ORM and PostgreSQL support.
+  tags: ['backend', 'nodejs', 'api']
 spec:
   owner: user:guest
   type: service

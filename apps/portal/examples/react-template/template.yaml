@@ -4,6 +4,7 @@ metadata:
   name: react-template
   title: React Template
   description: Bootstrap a customizable React application (Vite/Webpack, Tailwind/CSS, Zustand/Redux, React Query). Supports connecting to a new template backend or linking to an existing one.
+  tags: ['frontend', 'react']
 spec:
   owner: user:guest
   type: service

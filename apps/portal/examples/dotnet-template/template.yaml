@@ -4,6 +4,7 @@ metadata:
   name: dotnet-webapi-template
   title: .NET Web API Template
   description: Create a high-performance ASP.NET Core Web API service with optional PostgreSQL database support.
+  tags: ['backend', 'dotnet', 'api']
 spec:
   owner: user:guest
   type: service
