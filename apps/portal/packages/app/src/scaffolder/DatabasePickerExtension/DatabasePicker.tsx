@@ -6,6 +6,7 @@ import {
   Select,
   MenuItem,
   TextField,
+  FormHelperText,
 } from '@material-ui/core';
 
 // Define the exact state structure expected by PhuocHoan's CUE schema
@@ -21,6 +22,7 @@ export const DatabasePicker = ({
   required,
   formData,
   formContext,
+  schema
 }: FieldExtensionComponentProps<DatabaseConfig>) => {
   const rootFormData = formContext?.formData || {};
   const componentName = rootFormData.name || '';
@@ -79,11 +81,16 @@ export const DatabasePicker = ({
   return (
     <div>
       <FormControl fullWidth required={required} margin="normal">
-        <InputLabel>Database Type</InputLabel>
+        {/* Dynamically render title */}
+        <InputLabel>{schema?.title || 'Database Type'}</InputLabel>
         <Select value={dbType} onChange={handleTypeChange}>
           <MenuItem value="none">No Database</MenuItem>
           <MenuItem value="postgres">PostgreSQL</MenuItem>
         </Select>
+        {/* Dynamically render description */}
+        {schema?.description && (
+          <FormHelperText>{schema.description}</FormHelperText>
+        )}
       </FormControl>
 
       {dbType === 'postgres' && (

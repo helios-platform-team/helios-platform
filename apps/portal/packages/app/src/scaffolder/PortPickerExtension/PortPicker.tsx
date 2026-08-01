@@ -86,7 +86,7 @@ export const PortPicker = ({
   return (
     <TextField
       id={idSchema?.$id}
-      label="API Port"
+      label={schema?.title || "API Port"} // Now reads the title from YAML
       type="number"
       value={formData || ''}
       onChange={e => {
@@ -96,7 +96,7 @@ export const PortPicker = ({
       fullWidth
       margin="normal"
       required={required}
-      helperText="Standardized platform networking port for web services."
+      helperText={schema?.description || "Standardized platform networking port for web services."} // Now reads the description from YAML
       error={rawErrors && rawErrors.length > 0}
     />
   );

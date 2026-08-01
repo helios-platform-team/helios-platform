@@ -23,6 +23,7 @@ export const UniqueNamePicker = ({
   required,
   formData,
   idSchema,
+  schema, // <--- Add schema here so we can read the YAML
 }: FieldExtensionComponentProps<string>) => {
   
   useEffect(() => {
@@ -34,13 +35,13 @@ export const UniqueNamePicker = ({
   return (
     <TextField
       id={idSchema?.$id}
-      label="Name"
+      label={schema?.title || "Name"} // Now reads the title from YAML
       value={formData || ''}
       onChange={e => onChange(e.target.value)}
       fullWidth
       margin="normal"
       required={required}
-      helperText="Unique name of the component (e.g. my-service-1234)"
+      helperText={schema?.description || "Unique name of the component"} // Now reads the description from YAML
       error={rawErrors?.length > 0}
     />
   );
