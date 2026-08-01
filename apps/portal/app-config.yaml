@@ -127,6 +127,12 @@ catalog:
       rules:
         - allow: [User, Group]
 
+    # Shared APIs
+    - type: file
+      target: ../../examples/apis.yaml
+      rules:
+        - allow: [API]
+
     # Node.js Template
     - type: file
       target: ../../examples/nodejs-template/template.yaml
