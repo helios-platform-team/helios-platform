@@ -4,6 +4,7 @@ metadata:
   name: postgrest-template
   title: PostgREST API Template
   description: Expose a fully-featured, instant RESTful API directly from any PostgreSQL database schema using PostgREST.
+  tags: ['backend', 'rest', 'postgrest', 'database']
 spec:
   owner: user:guest
   type: service
@@ -11,8 +12,7 @@ spec:
   parameters:
     - title: Component Information
       description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+        We automatically configure your Git repository and Docker image locations using your local `.env` settings (`GITEA_USER` and `DOCKER_USERNAME`). No manual routing setup is required!
       required:
         - name
         - port
@@ -20,18 +20,19 @@ spec:
         name:
           title: Service Name
           type: string
-          description: Unique name for the PostgREST API service.
+          description: The unique name for your project. This will be used to name your PostgREST service, code repository, and container image.
           ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
           title: API Port
           type: number
           ui:field: PortPicker
-          description: The port PostgREST listens on
+          description: The network port your PostgREST API will serve traffic on.
           default: 3003
         databaseConfig:
           title: Database Settings
           type: object
+          description: Choose a database configuration here to automatically generate a REST API from its schema.
           ui:field: DatabasePicker
 
     - title: PostgREST Configuration
@@ -39,24 +40,24 @@ spec:
         apiSchema:
           title: API Schema
           type: string
-          description: PostgreSQL schema to expose as REST API (e.g. public, api)
+          description: The specific PostgreSQL schema to expose as a REST API (e.g., 'public' or 'api').
           default: public
         jwtSecret:
           title: JWT Secret
           type: string
-          description: Secret for signing JWT tokens (32-64 characters required for PostgREST)
+          description: A secure secret string used for signing JSON Web Tokens (JWT). It must be at least 32 characters long.
           minLength: 32
           maxLength: 64
           ui:field: Secret
         jwtRole:
           title: JWT Role
           type: string
-          description: Default role claim in JWT tokens
+          description: The default database role assigned to authenticated users providing a valid JWT.
           default: authenticated
         anonRole:
           title: Anonymous Role
           type: string
-          description: Role for unauthenticated requests (or leave empty to disable)
+          description: The default database role for unauthenticated (anonymous) requests. Leave empty to disable public access.
           default: anon
 
     - title: Deployment Configuration
@@ -64,7 +65,7 @@ spec:
         namespace:
           title: Kubernetes Namespace
           type: string
-          description: Namespace where the service will be deployed
+          description: The Kubernetes namespace where this service will be deployed.
           default: default
 
 
