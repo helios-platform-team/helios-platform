@@ -44,7 +44,7 @@ spec:
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           port: ${{ parameters.port }}
           description: "NestJS service: ${{ parameters.name }}"
           # DYNAMIC ROUTING
@@ -104,7 +104,7 @@ spec:
           databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
           databaseName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
           databaseVersion: ${{ parameters.databaseConfig.dbVersion if parameters.databaseConfig.dbType == 'postgres' else '' }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           # Node_modules caching (keyed by package-lock.json hash) is handled
@@ -153,7 +153,7 @@ spec:
       input:
         recipients: entity
         entityRefs:
-          - user:default/guest
+          - ${{ user.ref or 'user:default/guest' }}
         title: 'NestJS + Prisma Template Executed'
         info: 'Your NestJS + Prisma service has been scaffolded with a PostgreSQL database!'
 

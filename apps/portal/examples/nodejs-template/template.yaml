@@ -44,7 +44,7 @@ spec:
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           port: ${{ parameters.port }}
           description: "Node.js service: ${{ parameters.name }}"
           # DYNAMIC ROUTING
@@ -103,7 +103,7 @@ spec:
           databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
           databaseName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
           databaseVersion: ${{ parameters.databaseConfig.dbVersion if parameters.databaseConfig.dbType == 'postgres' else '' }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "npm test"
@@ -150,7 +150,7 @@ spec:
       input:
         recipients: entity
         entityRefs:
-          - user:default/guest
+          - ${{ user.ref or 'user:default/guest' }}
         title: 'Advanced Template Executed'
         info: 'Your advanced Node.js service has been scaffolded with GitOps and Webhooks!'
 

@@ -86,9 +86,15 @@ techdocs:
 
 auth:
   # see https://backstage.io/docs/auth/ to learn about auth providers
+  environment: ${AUTH_ENVIRONMENT}
   providers:
-    # See https://backstage.io/docs/auth/guest/provider
-    guest: {}
+    oauth2:
+      development:
+        clientId: ${GITEA_CLIENT_ID}
+        clientSecret: ${GITEA_CLIENT_SECRET}
+        authorizationUrl: ${GITEA_URL}/login/oauth/authorize
+        tokenUrl: ${GITEA_URL}/login/oauth/access_token
+        additionalScopes: ['read:user']
     # Optional: GitHub OAuth (uncomment to enable GitHub login)
     # github:
     #   development:
@@ -120,6 +126,12 @@ catalog:
       target: ../../examples/org.yaml
       rules:
         - allow: [User, Group]
+
+    # Shared APIs
+    - type: file
+      target: ../../examples/apis.yaml
+      rules:
+        - allow: [API]
 
     # Node.js Template
     - type: file

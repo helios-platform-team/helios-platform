@@ -79,7 +79,7 @@ spec:
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           port: ${{ parameters.port }}
           description: "PostgREST API: ${{ parameters.name }}"
           # DYNAMIC ROUTING: Uses Docker bridge variable
@@ -130,7 +130,7 @@ spec:
           jwtSecret: ${{ secrets.jwtSecret }}
           jwtRole: ${{ parameters.jwtRole }}
           anonRole: ${{ parameters.anonRole }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           # Migration image configuration for PreSync Job
@@ -194,7 +194,7 @@ spec:
       input:
         recipients: entity
         entityRefs:
-          - user:default/guest
+          - ${{ user.ref or 'user:default/guest' }}
         title: 'PostgREST API Template Executed'
         info: 'Your PostgREST instant REST API has been scaffolded with automatic CRUD endpoints!'
 

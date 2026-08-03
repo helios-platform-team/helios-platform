@@ -97,7 +97,7 @@ spec:
           stateManagement: ${{ parameters.stateManagement }}
           dataFetching: ${{ parameters.dataFetching }}
           port: ${{ parameters.port }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
           backendComponent: ${{ parameters.backendConfig.backendComponent if parameters.backendConfig else '' }}
           backendPort: ${{ parameters.backendConfig.backendPort if parameters.backendConfig else 3001 }}
@@ -152,7 +152,7 @@ spec:
           image: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}
           dockerOrg: ${{ environment.parameters.dockerOrg }}
           port: ${{ parameters.port }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "npm install && npm run build"
@@ -204,7 +204,7 @@ spec:
         targetPath: ./backend-source
         values:
           name: ${{ parameters.backendConfig.backendComponent }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           port: ${{ parameters.backendConfig.backendPort }}
           description: "Backend service for ${{ parameters.name }}"
           image: ${{ "index.docker.io/" + environment.parameters.dockerOrg + "/" + parameters.backendConfig.backendComponent }}
@@ -275,7 +275,7 @@ spec:
           dbType: ${{ parameters.backendConfig.backendDatabaseConfig.dbType }}
           dbName: ${{ parameters.backendConfig.backendDatabaseConfig.dbName }}
           dbVersion: ${{ parameters.backendConfig.backendDatabaseConfig.dbVersion }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-backend-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-backend-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: ${{ "npm test" if parameters.backendConfig.backendType == 'nestjs' else ("npm install && npm test" if parameters.backendConfig.backendType == 'nodejs' else ("dotnet test" if parameters.backendConfig.backendType == 'dotnet' else ("gradle test" if parameters.backendConfig.backendType == 'spring-boot' else ""))) }}

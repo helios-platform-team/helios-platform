@@ -424,6 +424,7 @@ tasks:
           GITEA_ADMIN_USER="${GITEA_ADMIN_USER:-helios}"
           GITEA_ADMIN_PASS="${GITEA_ADMIN_PASS:-helios123}"
           GITEA_BASE="http://localhost:{{.GITEA_PORT}}"
+          OAUTH_APP_NAME="${GITEA_OAUTH_APP_NAME:-backstage-local}"
 
           echo "Creating Gitea organization 'helios'..."
           curl -s -X POST "$GITEA_BASE/api/v1/orgs" \
@@ -439,12 +440,42 @@ tasks:
 
           TOKEN=$(echo "$TOKEN_RESP" | jq -r '.sha1 // .token // empty')
 
+          ENV_FILE=".env"
+          PORTAL_ENV="apps/portal/.env"
+
+          read_env_var() {
+            local file="$1" key="$2"
+            [ -f "$file" ] || return 0
+            grep -m1 "^${key}=" "$file" | cut -d'=' -f2-
+          }
+
+          CLIENT_ID="$(read_env_var "$PORTAL_ENV" "GITEA_CLIENT_ID")"
+          CLIENT_SECRET="$(read_env_var "$PORTAL_ENV" "GITEA_CLIENT_SECRET")"
+          if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ]; then
+            CLIENT_ID="$(read_env_var "$ENV_FILE" "GITEA_CLIENT_ID")"
+            CLIENT_SECRET="$(read_env_var "$ENV_FILE" "GITEA_CLIENT_SECRET")"
+          fi
+
+          if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ]; then
+            echo "Creating Gitea OAuth2 Application for Backstage (${OAUTH_APP_NAME})..."
+            OAUTH2_RESP=$(curl -s -X POST "$GITEA_BASE/api/v1/user/applications/oauth2" \
+              -u "$GITEA_ADMIN_USER:$GITEA_ADMIN_PASS" \
+              -H "Content-Type: application/json" \
+              -d '{"name":"'"$OAUTH_APP_NAME"'","redirect_uris":["http://localhost:7007/api/auth/oauth2/handler/frame"]}')
+            
+            CLIENT_ID=$(echo "$OAUTH2_RESP" | jq -r '.client_id // empty')
+            CLIENT_SECRET=$(echo "$OAUTH2_RESP" | jq -r '.client_secret // empty')
+          else
+            echo "Reusing existing Backstage OAuth2 credentials from .env files."
+          fi
+
           if [ -z "$TOKEN" ]; then
             echo "Warning: Could not extract token. You may need to create one manually."
             echo "Response was: $TOKEN_RESP"
+          elif [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ]; then
+            echo "Warning: Could not extract OAuth2 client credentials."
+            echo "Response was: $OAUTH2_RESP"
           else
-            ENV_FILE=".env"
-            PORTAL_ENV="apps/portal/.env"
             GITEA_URL="http://localhost:{{.GITEA_PORT}}"
             GITEA_INTERNAL_URL="http://gitea-http.gitea.svc.cluster.local:3000"
 
@@ -459,17 +490,21 @@ tasks:
             }
 
             for f in "$ENV_FILE" "$PORTAL_ENV"; do
-              update_env_var "$f" "GITEA_TOKEN"        "$TOKEN"
-              update_env_var "$f" "GITEA_USER"         "$GITEA_ADMIN_USER"
-              update_env_var "$f" "GITEA_URL"          "$GITEA_URL"
-              update_env_var "$f" "GITEA_INTERNAL_URL" "$GITEA_INTERNAL_URL"
+              update_env_var "$f" "GITEA_TOKEN"         "$TOKEN"
+              update_env_var "$f" "GITEA_USER"          "$GITEA_ADMIN_USER"
+              update_env_var "$f" "GITEA_URL"           "$GITEA_URL"
+              update_env_var "$f" "GITEA_INTERNAL_URL"  "$GITEA_INTERNAL_URL"
+              update_env_var "$f" "GITEA_CLIENT_ID"     "$CLIENT_ID"
+              update_env_var "$f" "GITEA_CLIENT_SECRET" "$CLIENT_SECRET"
+              update_env_var "$f" "AUTH_ENVIRONMENT"    "development"
             done
 
             echo ""
             echo "============================================="
-            echo "  Gitea API token created and saved!"
+            echo "  Gitea API token and OAuth2 credentials ready!"
             echo "  Updated: $ENV_FILE, $PORTAL_ENV"
             echo "  GITEA_TOKEN=$TOKEN"
+            echo "  GITEA_CLIENT_ID=$CLIENT_ID"
             echo "============================================="
           fi
 

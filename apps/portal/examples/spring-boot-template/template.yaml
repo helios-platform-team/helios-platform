@@ -42,7 +42,7 @@ spec:
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           port: ${{ parameters.port }}
           description: "Spring Boot service: ${{ parameters.name }}"
           # DYNAMIC ROUTING: Uses Docker bridge variable
@@ -83,7 +83,7 @@ spec:
           port: ${{ parameters.port }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "gradle test"

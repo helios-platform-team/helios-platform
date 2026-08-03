@@ -45,7 +45,7 @@ spec:
           name: ${{ parameters.name }}
           port: ${{ parameters.port }}
           namespace: default
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
 
     - id: publish-source
       name: Publish Source Repo
@@ -80,7 +80,7 @@ spec:
           namespace: default
           databaseName: ${{ parameters.databaseConfig.dbName }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           # DYNAMIC ROUTING: Uses Docker bridge variable
           
           dockerOrg: index.docker.io/${{ environment.parameters.dockerOrg }}
@@ -131,7 +131,8 @@ spec:
       if: '{{ parameters.sendNotification }}'
       input:
         recipients: entity
-        entityRefs: ["user:default/guest"]
+        entityRefs:
+          - ${{ user.ref or 'user:default/guest' }}
         title: 'Hasura Template Executed'
         info: 'Your Hasura instance is being deployed!'
 

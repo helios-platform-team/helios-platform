@@ -10,10 +10,6 @@ import CreateComponentIcon from '@material-ui/icons/AddCircleOutline';
 import LogoFull from './LogoFull';
 import LogoIcon from './LogoIcon';
 import CategoryIcon from '@material-ui/icons/Category';
-import {
-  Settings as SidebarSettings,
-  UserSettingsSignInAvatar,
-} from '@backstage/plugin-user-settings';
 import { SidebarSearchModal } from '@backstage/plugin-search';
 import {
   Sidebar,
@@ -101,13 +97,6 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
         <SidebarDivider />
         <NotificationsSidebarItem />
         <SidebarDivider />
-        <SidebarGroup
-          label="Settings"
-          icon={<UserSettingsSignInAvatar />}
-          to="/settings"
-        >
-          <SidebarSettings />
-        </SidebarGroup>
         <SidebarItem
           icon={
             profile?.picture

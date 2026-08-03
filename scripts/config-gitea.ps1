@@ -8,6 +8,7 @@ if ([string]::IsNullOrEmpty($AdminUser)) { $AdminUser = "helios" }
 if ([string]::IsNullOrEmpty($AdminPass)) { $AdminPass = "helios123" }
 
 $GiteaBase = "http://localhost:$GiteaPort"
+$oauthAppName = if ([string]::IsNullOrEmpty($env:GITEA_OAUTH_APP_NAME)) { "backstage-local" } else { $env:GITEA_OAUTH_APP_NAME }
 
 Write-Host "Cleaning up port $GiteaPort..."
 Get-NetTCPConnection -LocalPort $GiteaPort -ErrorAction SilentlyContinue | ForEach-Object {
@@ -118,11 +119,63 @@ function Update-EnvVar {
     }
 }
 
+function Read-EnvVar {
+    param($filePath, $key)
+    if (-not (Test-Path $filePath)) {
+        return $null
+    }
+
+    $line = Get-Content $filePath | Where-Object { $_ -match "^$key=" } | Select-Object -First 1
+    if (-not $line) {
+        return $null
+    }
+
+    return $line.Substring($key.Length + 1)
+}
+
+$clientId = Read-EnvVar -filePath "apps/portal/.env" -key "GITEA_CLIENT_ID"
+$clientSecret = Read-EnvVar -filePath "apps/portal/.env" -key "GITEA_CLIENT_SECRET"
+if ([string]::IsNullOrEmpty($clientId) -or [string]::IsNullOrEmpty($clientSecret)) {
+    $clientId = Read-EnvVar -filePath ".env" -key "GITEA_CLIENT_ID"
+    $clientSecret = Read-EnvVar -filePath ".env" -key "GITEA_CLIENT_SECRET"
+}
+
+if ([string]::IsNullOrEmpty($clientId) -or [string]::IsNullOrEmpty($clientSecret)) {
+    Write-Host "Creating Gitea OAuth2 Application for Backstage ($oauthAppName)..."
+    $oauthBody = @{
+        name = $oauthAppName
+        redirect_uris = @("http://localhost:7007/api/auth/oauth2/handler/frame")
+    } | ConvertTo-Json
+
+    try {
+        $oauthResp = Invoke-RestMethod -Uri "$GiteaBase/api/v1/user/applications/oauth2" -Method Post -Headers $Headers -Body $oauthBody
+        $clientId = $oauthResp.client_id
+        $clientSecret = $oauthResp.client_secret
+    } catch {
+        Write-Error "Failed to create Gitea OAuth2 application: $_"
+        Stop-Job $Job
+        Remove-Job $Job
+        exit 1
+    }
+} else {
+    Write-Host "Reusing existing Backstage OAuth2 credentials from .env files."
+}
+
+if ([string]::IsNullOrEmpty($clientId) -or [string]::IsNullOrEmpty($clientSecret)) {
+    Write-Error "Could not extract OAuth2 client credentials from response."
+    Stop-Job $Job
+    Remove-Job $Job
+    exit 1
+}
+
 foreach ($file in $envFiles) {
     Update-EnvVar -filePath $file -key "GITEA_TOKEN" -value $token
     Update-EnvVar -filePath $file -key "GITEA_USER" -value $AdminUser
     Update-EnvVar -filePath $file -key "GITEA_URL" -value $GiteaBase
     Update-EnvVar -filePath $file -key "GITEA_INTERNAL_URL" -value "http://gitea-http.gitea.svc.cluster.local:3000"
+    Update-EnvVar -filePath $file -key "GITEA_CLIENT_ID" -value $clientId
+    Update-EnvVar -filePath $file -key "GITEA_CLIENT_SECRET" -value $clientSecret
+    Update-EnvVar -filePath $file -key "AUTH_ENVIRONMENT" -value "development"
 }
 
 Write-Host "============================================="
