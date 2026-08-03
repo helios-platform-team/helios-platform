@@ -248,7 +248,7 @@ const websiteEntityPage = (
         </EntitySwitch.Case>
       </EntitySwitch>
     </EntityLayout.Route>
-    
+
     <EntityLayout.Route
       path="/kubernetes"
       title="Kubernetes"

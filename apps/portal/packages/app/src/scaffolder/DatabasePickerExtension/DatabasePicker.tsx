@@ -22,7 +22,7 @@ export const DatabasePicker = ({
   required,
   formData,
   formContext,
-  schema
+  schema,
 }: FieldExtensionComponentProps<DatabaseConfig>) => {
   const rootFormData = formContext?.formData || {};
   const componentName = rootFormData.name || '';

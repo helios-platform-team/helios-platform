@@ -121,16 +121,18 @@ const routes = (
     <Route
       path="/create"
       element={
-        <ScaffolderPage 
+        <ScaffolderPage
           formProps={{ showErrorList: false } as any}
           groups={[
             {
               title: 'Frontend Templates',
-              filter: entity => entity.metadata?.tags?.includes('frontend') ?? false,
+              filter: entity =>
+                entity.metadata?.tags?.includes('frontend') ?? false,
             },
             {
               title: 'Backend Templates',
-              filter: entity => entity.metadata?.tags?.includes('backend') ?? false,
+              filter: entity =>
+                entity.metadata?.tags?.includes('backend') ?? false,
             },
           ]}
         >
