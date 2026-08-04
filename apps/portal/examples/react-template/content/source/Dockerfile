@@ -20,7 +20,25 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Configure port dynamically at runtime/build-time
 ARG PORT=${{ values.port }}
 ENV PORT=${PORT}
-RUN sed -i "s/listen\(  *\)80;/listen ${PORT};/" /etc/nginx/conf.d/default.conf
+
+RUN echo 'server { \
+    listen '${PORT}'; \
+    \
+    # Serve static React files \
+    location / { \
+        root /usr/share/nginx/html; \
+        index index.html index.htm; \
+        try_files $uri $uri/ /index.html; \
+    } \
+    \
+    # Proxy /api/ requests to the internal K8s backend \
+    location /api/ { \
+        proxy_pass http://${{ values.backendComponent }}.default.svc.cluster.local:${{ values.backendPort }}/; \
+        proxy_http_version 1.1; \
+        proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
 
 # Labels for metadata
 LABEL org.opencontainers.image.source="https://github.com/helios-platform-team/helios-platform" \
