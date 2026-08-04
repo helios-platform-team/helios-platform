@@ -123,6 +123,16 @@ resource "terraform_data" "configure_gitea" {
 
       echo "Generated Gitea token successfully."
 
+      echo "Creating Gitea OAuth2 Application for Backstage..."
+      OAUTH2_RESP=$(kubectl exec -n gitea $POD_NAME -c gitea -- curl -s -X POST "http://localhost:3000/api/v1/user/applications/oauth2" -u "${var.gitea_admin_user}:${var.gitea_admin_pass}" -H "Content-Type: application/json" -d '{"name":"backstage-'"$(date +%s)"'","redirect_uris":["http://localhost:7007/api/auth/oauth2/handler/frame"], "confidential_client": true}')
+      CLIENT_ID=$(echo "$OAUTH2_RESP" | grep -o '"client_id":"[^"]*' | cut -d'"' -f4 || true)
+      CLIENT_SECRET=$(echo "$OAUTH2_RESP" | grep -o '"client_secret":"[^"]*' | cut -d'"' -f4 || true)
+      
+      if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ]; then
+        echo "Failed to generate OAuth2 application. Output was: $OAUTH2_RESP"
+        exit 1
+      fi
+
       ENV_FILE="${var.workspace_root}/.env"
       PORTAL_ENV="${var.workspace_root}/apps/portal/.env"
 
@@ -141,12 +151,16 @@ resource "terraform_data" "configure_gitea" {
       update_env "$ENV_FILE" "GITEA_URL" "http://localhost:${var.gitea_port}"
       update_env "$ENV_FILE" "GITEA_INTERNAL_URL" "http://${var.gitea_internal_host}"
       update_env "$ENV_FILE" "GITOPS_SECRET_REF" "${var.gitops_secret_name}"
+      update_env "$ENV_FILE" "GITEA_CLIENT_ID" "$CLIENT_ID"
+      update_env "$ENV_FILE" "GITEA_CLIENT_SECRET" "$CLIENT_SECRET"
 
       update_env "$PORTAL_ENV" "GITEA_TOKEN" "$TOKEN"
       update_env "$PORTAL_ENV" "GITEA_USER" "${var.gitea_admin_user}"
       update_env "$PORTAL_ENV" "GITEA_URL" "http://localhost:${var.gitea_port}"
       update_env "$PORTAL_ENV" "GITEA_INTERNAL_URL" "http://${var.gitea_internal_host}"
       update_env "$PORTAL_ENV" "GITOPS_SECRET_REF" "${var.gitops_secret_name}"
+      update_env "$PORTAL_ENV" "GITEA_CLIENT_ID" "$CLIENT_ID"
+      update_env "$PORTAL_ENV" "GITEA_CLIENT_SECRET" "$CLIENT_SECRET"
 
       echo "Environment files updated successfully!"
     EOT

@@ -1,0 +1,14 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: database-postgres
+  title: PostgreSQL Database API
+  description: Shared PostgreSQL database instance used by multiple services.
+spec:
+  type: database
+  lifecycle: production
+  owner: helios-platform-team
+  definition: |
+    # PostgreSQL Database
+    Connect via standard Postgres connection string.

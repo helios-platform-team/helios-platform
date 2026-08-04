@@ -4,6 +4,7 @@ metadata:
   name: spring-boot-template
   title: Java Spring Boot Template
   description: Create a production-ready Java Spring Boot application (Gradle) integrated with a PostgreSQL database and automatic environment credential injection.
+  tags: ['backend', 'java', 'spring-boot', 'api']
 spec:
   owner: user:guest
   type: service
@@ -11,14 +12,13 @@ spec:
   parameters:
     - title: Component Information
       description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+        We automatically configure your Git repository and Docker image locations using your local `.env` settings (`GITEA_USER` and `DOCKER_USERNAME`). No manual routing setup is required!
       required: [name]
       properties:
         name:
           title: Project Name
           type: string
-          description: Unique name of the service.
+          description: The unique name for your project. This will be used to name your Spring Boot application, code repository, and container image.
           ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
@@ -26,10 +26,11 @@ spec:
           type: number
           default: 8081
           ui:field: PortPicker
-          description: Standardized platform networking port for web services.
+          description: The network port your Spring Boot API will serve traffic on.
         databaseConfig:
           title: Database Settings
           type: object
+          description: Automatically provision and connect a PostgreSQL database to your Spring Boot application. Select 'None' if your API does not need a database.
           ui:field: DatabasePicker
 
   steps:
@@ -41,7 +42,7 @@ spec:
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           port: ${{ parameters.port }}
           description: "Spring Boot service: ${{ parameters.name }}"
           # DYNAMIC ROUTING: Uses Docker bridge variable
@@ -82,7 +83,7 @@ spec:
           port: ${{ parameters.port }}
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "gradle test"

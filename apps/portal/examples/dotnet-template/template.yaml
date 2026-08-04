@@ -4,6 +4,7 @@ metadata:
   name: dotnet-webapi-template
   title: .NET Web API Template
   description: Create a high-performance ASP.NET Core Web API service with optional PostgreSQL database support.
+  tags: ['backend', 'dotnet', 'api']
 spec:
   owner: user:guest
   type: service
@@ -11,14 +12,13 @@ spec:
   parameters:
     - title: Component Information
       description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+        We automatically configure your Git repository and Docker image locations using your local `.env` settings (`GITEA_USER` and `DOCKER_USERNAME`). No manual routing setup is required!
       required: [name]
       properties:
         name:
           title: Project Name
           type: string
-          description: Unique name of the service.
+          description: The unique name for your project. This will be used to name your .NET application, code repository, and container image.
           ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
@@ -26,10 +26,11 @@ spec:
           type: number
           default: 5000
           ui:field: PortPicker
-          description: Standardized platform networking port for web services.
+          description: The network port your API will serve traffic on.
         databaseConfig:
           title: Database Settings
           type: object
+          description: Automatically provision and connect a PostgreSQL database to your application. Select 'None' if your API does not need a database.
           ui:field: DatabasePicker
 
   steps:
@@ -41,7 +42,7 @@ spec:
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
-          owner: user:default/${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           port: ${{ parameters.port }}
           description: ".NET Web API service for ${{ parameters.name }}"
           # DYNAMIC ROUTING
@@ -84,7 +85,7 @@ spec:
           hasDatabase: ${{ parameters.databaseConfig.dbType == 'postgres' }}
           databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
           databaseName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
-          owner: user:default/${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           testCommand: "dotnet test"

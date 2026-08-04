@@ -56,7 +56,7 @@ export const createGiteaWebhookAction = (options: { config: Config }) => {
         );
       }
 
-      const { password, username } = giteaIntegration.config;
+      const { password, username } = giteaIntegration.config as any;
 
       if (!password) {
         throw new InputError(

@@ -4,6 +4,7 @@ metadata:
   name: nestjs-template
   title: NestJS Template
   description: Build a modular NestJS backend service. Features out-of-the-box Prisma ORM and PostgreSQL support.
+  tags: ['backend', 'nestjs', 'api']
 spec:
   owner: user:guest
   type: service
@@ -11,14 +12,13 @@ spec:
   parameters:
     - title: Component Information
       description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+        We automatically configure your Git repository and Docker image locations using your local `.env` settings (`GITEA_USER` and `DOCKER_USERNAME`). No manual routing setup is required!
       required: [name]
       properties:
         name:
           title: Project Name
           type: string
-          description: Unique name of the service.
+          description: The unique name for your project. This will be used to name your NestJS service, code repository, and container image.
           ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
@@ -26,10 +26,11 @@ spec:
           type: number
           default: 3001
           ui:field: PortPicker
-          description: Standardized platform networking port for web services.
+          description: The network port your API will serve traffic on.
         databaseConfig:
           title: Database Settings
           type: object
+          description: Automatically provision and connect a PostgreSQL database to your application. Select 'None' if your API does not need a database.
           ui:field: DatabasePicker
 
   steps:
@@ -43,7 +44,7 @@ spec:
         targetPath: ./source
         values:
           name: ${{ parameters.name }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           port: ${{ parameters.port }}
           description: "NestJS service: ${{ parameters.name }}"
           # DYNAMIC ROUTING
@@ -103,7 +104,7 @@ spec:
           databaseType: ${{ parameters.databaseConfig.dbType if parameters.databaseConfig.dbType == 'postgres' else '' }}
           databaseName: ${{ parameters.databaseConfig.dbName if parameters.databaseConfig.dbType == 'postgres' else '' }}
           databaseVersion: ${{ parameters.databaseConfig.dbVersion if parameters.databaseConfig.dbType == 'postgres' else '' }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           # Node_modules caching (keyed by package-lock.json hash) is handled
@@ -152,7 +153,7 @@ spec:
       input:
         recipients: entity
         entityRefs:
-          - user:default/guest
+          - ${{ user.ref or 'user:default/guest' }}
         title: 'NestJS + Prisma Template Executed'
         info: 'Your NestJS + Prisma service has been scaffolded with a PostgreSQL database!'
 

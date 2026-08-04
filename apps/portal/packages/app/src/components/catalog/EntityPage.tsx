@@ -233,6 +233,22 @@ const websiteEntityPage = (
 
     {cicdContent}
 
+    {/* --- NEW TABS PASTED FROM SERVICE ENTITY PAGE --- */}
+    <EntityLayout.Route path="/argo-cd" title="ArgoCD">
+      <EntitySwitch>
+        <EntitySwitch.Case if={isArgocdAvailable}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <EntityArgoCDOverviewCard />
+            </Grid>
+            <Grid item xs={12}>
+              <EntityArgoCDHistoryCard />
+            </Grid>
+          </Grid>
+        </EntitySwitch.Case>
+      </EntitySwitch>
+    </EntityLayout.Route>
+
     <EntityLayout.Route
       path="/kubernetes"
       title="Kubernetes"
@@ -253,6 +269,15 @@ const websiteEntityPage = (
           <EntityDependsOnResourcesCard />
         </Grid>
       </Grid>
+    </EntityLayout.Route>
+
+    {/* --- NEW TABS PASTED FROM SERVICE ENTITY PAGE --- */}
+    <EntityLayout.Route path="/database" title="Database">
+      <DatabaseTab />
+    </EntityLayout.Route>
+
+    <EntityLayout.Route path="/secrets" title="Secrets">
+      <SecretsManagementPage />
     </EntityLayout.Route>
 
     <EntityLayout.Route path="/docs" title="Docs">

@@ -4,6 +4,7 @@ metadata:
   name: postgraphile-template
   title: PostGraphile GraphQL API Template
   description: Generate an instant, high-performance GraphQL API directly from your PostgreSQL database schema using PostGraphile.
+  tags: ['backend', 'graphql', 'postgraphile', 'database']
 spec:
   owner: user:guest
   type: service
@@ -11,14 +12,13 @@ spec:
   parameters:
     - title: Component Information
       description: >-
-        To satisfy dynamic portability, this template automatically maps repository and image registry destinations
-        using your active workstation configuration (`GITEA_USER` and `DOCKER_USERNAME` from your `.env` file).
+        We automatically configure your Git repository and Docker image locations using your local `.env` settings (`GITEA_USER` and `DOCKER_USERNAME`). No manual routing setup is required!
       required: [name]
       properties:
         name:
           title: Project Name
           type: string
-          description: Unique name of the service.
+          description: The unique name for your project. This will be used to name your PostGraphile service, code repository, and container image.
           ui:field: UniqueNamePicker
           ui:autofocus: true
         port:
@@ -26,10 +26,11 @@ spec:
           type: number
           default: 5433
           ui:field: PortPicker
-          description: Standardized platform networking port for web services.
+          description: The network port your PostGraphile API will serve traffic on.
         databaseConfig:
           title: Database Settings
           type: object
+          description: Choose a database configuration here to automatically generate a GraphQL API from its schema.
           ui:field: DatabasePicker
 
   steps:
@@ -43,7 +44,7 @@ spec:
           name: ${{ parameters.name }}
           port: ${{ parameters.port }} # Safely reads the locked 8080 value
           namespace: default
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
 
     - id: publish-source
       name: Publish Source Code
@@ -77,7 +78,7 @@ spec:
           namespace: default
           databaseType: ${{ parameters.databaseConfig.dbType }}
           databaseName: ${{ parameters.databaseConfig.dbName }}
-          owner: ${{ user.entity.metadata.name or 'guest' }}
+          owner: ${{ user.ref or 'user:default/guest' }}
           sourceRepo: ${{ steps['publish-source'].output.remoteUrl }}
           gitopsRepo: ${{ steps['publish-source'].output.remoteUrl | replace(".git", "") }}-gitops
           migrateImage: index.docker.io/${{ environment.parameters.dockerOrg }}/${{ parameters.name }}-migrate:main
