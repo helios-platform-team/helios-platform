@@ -121,7 +121,7 @@ const app = createApp({
 const routes = (
   <FlatRoutes>
     <Route path="/" element={<HomepageCompositionRoot />}>
-      <HeliosHomepage />
+      <CatalogIndexPage />
     </Route>
     <Route path="/catalog" element={<CatalogIndexPage />} />
     <Route
