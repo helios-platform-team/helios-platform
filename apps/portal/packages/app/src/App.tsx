@@ -91,7 +91,6 @@ const app = createApp({
         {...props}
         future={{
           v7_startTransition: true,
-          v7_relativeSplatPath: true,
         }}
       />
     ),
@@ -178,7 +177,7 @@ const routes = (
     <Route path="/search" element={<SearchPage />}>
       {searchPage}
     </Route>
-    <Route path="/settings" element={<CustomSettingsPage />} />
+    <Route path="/settings/*" element={<CustomSettingsPage />} />
     <Route path="/catalog-graph" element={<CatalogGraphPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
     <Route path="/k8s-secret-manager" element={<K8SSecretManagerPage />} />
